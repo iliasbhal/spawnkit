@@ -3,11 +3,10 @@ import { StateValue } from "xstate";
 import { waitFor } from "poll-until-promise";
 import { ORM } from "../../prisma";
 import { InstanceSnapshot, InstanceEvent } from "../repositories";
-
-import * as Spawnkit from "../";
 import { SendEvent } from "../repositories/index.zod";
-import { toggle, toggleWithSync } from "./fixtures";
+import { toggle, toggleWithSync } from "../instances/fixtures";
 import { Machine } from "../instances";
+import * as Spawnkit from "../";
 
 describe("ActorRepository", () => {
   const instances = {

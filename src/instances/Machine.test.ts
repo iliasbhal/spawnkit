@@ -1,6 +1,6 @@
 import wait from "wait";
 import { Machine } from "../instances";
-import { toggle, toggleWithSync, createInvokeMachine } from "../tests/fixtures";
+import { toggle, toggleWithSync, createInvokeMachine } from "./fixtures";
 import { InstanceSnapshot, InstanceEvent } from "../repositories";
 import * as Spawnkit from "..";
 

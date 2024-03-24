@@ -1,8 +1,8 @@
-import { toggle, toggleWithSync } from "./fixtures";
-import * as Spawnkit from "../";
+import { toggle, toggleWithSync } from "../instances/fixtures";
 import { InstanceSnapshot, InstanceEvent, InstanceLock } from "../repositories";
 import { ControlledPromise } from "@/utils/ControlledPromise";
 import { Machine } from "../instances";
+import * as Spawnkit from "../";
 
 describe("Instance", () => {
   const instances = {
