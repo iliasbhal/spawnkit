@@ -1,0 +1,44 @@
+import { ControlledPromise } from "./ControlledPromise";
+
+export class PromiseList extends ControlledPromise<unknown> {
+  waitList: Set<Promise<unknown>> = new Set();
+
+  add(promise: Promise<any>) {
+    this.waitList.add(promise);
+    promise.finally(() => {
+      this.waitList.delete(promise);
+    });
+  }
+
+  addControlled(name?: string) {
+    const promiseCtl = ControlledPromise.new(name);
+    this.add(promiseCtl.await);
+    return promiseCtl;
+  }
+
+  addWait(timeout: number, name: string) {
+    const timeoutPromise = new Promise((r) => setTimeout(r, timeout));
+    Object.assign(timeoutPromise, { name });
+    this.add(timeoutPromise);
+  }
+
+  clear() {
+    this.waitList.clear();
+    this.resolve(true);
+  }
+
+  async waitOnAll() {
+    while (true) {
+      const previousPromises = Array.from(this.waitList);
+      await Promise.allSettled(previousPromises);
+      previousPromises.forEach((p) => this.waitList.delete(p));
+
+      const hasNewPromises = this.waitList.size > 0;
+      if (!hasNewPromises) {
+        break;
+      }
+    }
+
+    return this.resolve(true);
+  }
+}
