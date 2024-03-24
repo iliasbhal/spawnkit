@@ -5,10 +5,7 @@ import * as Spawnkit from "..";
 type AnySnapshot = x.Snapshot<x.AnyStateMachine>;
 type AnyEvent = x.AnyEventObject;
 
-export class MachineActorInstance extends Spawnkit.Instance<
-  AnySnapshot,
-  AnyEvent
-> {
+export class Machine extends Spawnkit.Instance<AnySnapshot, AnyEvent> {
   machine: x.AnyStateMachine = null as any;
   actor: x.Actor<x.AnyStateMachine> = null as any;
   actorByActorId = new Map<string, x.AnyActorRef>();
@@ -20,14 +17,14 @@ export class MachineActorInstance extends Spawnkit.Instance<
   }
 
   static from(machine: x.AnyStateMachine) {
-    const kind = MachineActorInstance.getKind(machine);
+    const kind = Machine.getKind(machine);
     if (!kind) {
       throw new Error(
         "Machine Validation: Each machine should have a meta.kind",
       );
     }
 
-    return class MachineInstance extends MachineActorInstance {
+    return class MachineInstance extends Machine {
       static kind = kind;
       machine = machine;
 

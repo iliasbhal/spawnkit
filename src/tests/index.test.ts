@@ -1,18 +1,18 @@
 import { z } from "zod";
 import { StateValue } from "xstate";
 import { waitFor } from "poll-until-promise";
-import { ORM } from "@/api/prisma";
+import { ORM } from "../../prisma";
 import { InstanceSnapshot, InstanceEvent } from "../repositories";
 
 import * as Spawnkit from "../";
 import { SendEvent } from "../repositories/index.zod";
 import { toggle, toggleWithSync } from "./fixtures";
-import { MachineActorInstance } from "../instances";
+import { Machine } from "../instances";
 
 describe("ActorRepository", () => {
   const instances = {
-    toggle: MachineActorInstance.from(toggle),
-    toggleWithSync: MachineActorInstance.from(toggleWithSync),
+    toggle: Machine.from(toggle),
+    toggleWithSync: Machine.from(toggleWithSync),
   };
 
   Spawnkit.Worker.listen({ instances: Object.values(instances) });
@@ -116,7 +116,7 @@ const waitForExpectedSnapshot = async (
 ) => {
   return await waitFor(
     async () => {
-      const snapshot: any = await ActorRepository.getActorSnapshot(actorId);
+      const snapshot: any = await InstanceSnapshot.getActorSnapshot(actorId);
       const isExpectedValue = snapshot.value == expectedValue;
       if (!isExpectedValue) throw new Error("POLL AGAIN");
       return snapshot;

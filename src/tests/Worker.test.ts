@@ -1,10 +1,10 @@
 import * as x from "xstate";
 import * as Spawnkit from "../";
-import { MachineActorInstance } from "../instances";
+import { Machine } from "../instances";
 
 describe("Worker", () => {
   it("should not allow several machines with the same meta.kind", () => {
-    const first = MachineActorInstance.from(
+    const first = Machine.from(
       x.createMachine({
         meta: { kind: "first" },
         initial: "1",
@@ -15,7 +15,7 @@ describe("Worker", () => {
       }),
     );
 
-    const second = MachineActorInstance.from(
+    const second = Machine.from(
       x.createMachine({
         meta: { kind: "first" },
         initial: "1",
@@ -32,7 +32,7 @@ describe("Worker", () => {
   });
 
   it("should allow several machines when all have different meta.kind", () => {
-    const first = MachineActorInstance.from(
+    const first = Machine.from(
       x.createMachine({
         meta: { kind: "first" },
         initial: "1",
@@ -43,7 +43,7 @@ describe("Worker", () => {
       }),
     );
 
-    const second = MachineActorInstance.from(
+    const second = Machine.from(
       x.createMachine({
         meta: { kind: "second" },
         initial: "1",
@@ -60,7 +60,7 @@ describe("Worker", () => {
   });
 
   it("should not a machines doesn't provide a meta.kind", () => {
-    const first = MachineActorInstance.from(
+    const first = Machine.from(
       x.createMachine({
         meta: {},
         initial: "1",
@@ -71,7 +71,7 @@ describe("Worker", () => {
       }),
     );
 
-    const second = MachineActorInstance.from(
+    const second = Machine.from(
       x.createMachine({
         meta: { kind: "second" },
         initial: "1",

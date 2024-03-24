@@ -4,10 +4,7 @@ interface ActorData {}
 
 interface ActorEvent {}
 
-export class ExampleActorInstance extends Spawnkit.Instance<
-  ActorData,
-  ActorEvent
-> {
+export class Example extends Spawnkit.Instance<ActorData, ActorEvent> {
   async stop() {
     console.log("STOPED");
   }

@@ -1,2 +1,2 @@
-export * from "./ExampleActorInstance";
-export * from "./ActorMachineInstane";
+export * from "./Example";
+export * from "./Machine";
