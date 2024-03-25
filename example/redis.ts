@@ -11,8 +11,12 @@ const spawnORM: Adapters = {
   worker: new Adapter.Worker(redis),
 };
 
-Spawnkit.Worker.listen({
-  instances: [],
-  concurrency: 100,
+const worker = Spawnkit.Worker.listen({
   adapters: spawnORM,
+  instances: [],
+});
+
+const client = Spawnkit.Client.from({
+  adapters: spawnORM,
+  instances: [],
 });
