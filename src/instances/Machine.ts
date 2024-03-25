@@ -1,6 +1,7 @@
 import * as x from "xstate";
 import { ControlledPromise } from "@/utils/ControlledPromise";
 import * as Spawnkit from "..";
+import { ScheduleData, Adapters } from "@/adapters";
 
 type AnySnapshot = x.Snapshot<x.AnyStateMachine>;
 type AnyEvent = x.AnyEventObject;
@@ -28,12 +29,14 @@ export class Machine extends Spawnkit.Instance<AnySnapshot, AnyEvent> {
       static kind = kind;
       machine = machine;
 
-      constructor(config?: undefined | { input: any } | { id: number }) {
-        super({
-          kind: kind,
-          id: config?.id,
-          input: config?.input,
-        } as any);
+      constructor(config: Omit<ScheduleData, "kind">, adapters: Adapters) {
+        super(
+          {
+            ...config,
+            kind: kind,
+          },
+          adapters,
+        );
       }
     };
   }
@@ -53,10 +56,9 @@ export class Machine extends Spawnkit.Instance<AnySnapshot, AnyEvent> {
   }
 
   protected async start() {
-    const actorInput = "input" in this.config ? this.config.input : null;
     const actor = x.createActor(this.machine, {
-      snapshot: this.data,
-      input: actorInput,
+      snapshot: this.data as any,
+      input: this.config.input,
       id: `${this.id}`,
       inspect: (inspectionEvent) => {
         switch (inspectionEvent.type) {

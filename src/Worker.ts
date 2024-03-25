@@ -1,45 +1,17 @@
-import { InstanceLock, InstanceEvent, ActorLaunchConfig } from "./repositories";
 import { Instance } from "./Instance";
+import { Lock } from "./Lock";
+import { Adapters, ScheduleData } from "./adapters";
 
 type InstanceClass = typeof Instance<any>;
 
 interface ListenProps<T extends InstanceClass = InstanceClass> {
   instances: T[];
-  concurrency?: number;
+  adapters: Adapters;
 }
 
 export class Worker {
-  static async handleEvent(Instance: InstanceClass, event: ActorLaunchConfig) {
-    const runConfig =
-      "id" in event
-        ? {
-            kind: event.kind,
-            id: event.id,
-          }
-        : {
-            kind: event.kind,
-            input: event.input,
-          };
-
-    const instance = new Instance(runConfig);
-
-    try {
-      await instance.run();
-    } catch (err) {
-      const shouldSilenceError =
-        err instanceof InstanceLock.LockError ||
-        err instanceof InstanceLock.ExtendError;
-      if (!shouldSilenceError) {
-        console.log("THROWN", err);
-        throw err;
-      } else {
-        // console.log("-->", err);
-      }
-    }
-  }
-
   static listen(opts: ListenProps) {
-    const { instances } = opts;
+    const { instances, adapters } = opts;
     Worker.verify(instances);
 
     if (process.env.NODE_ENV !== "test") {
@@ -57,26 +29,41 @@ export class Worker {
       {} as Record<string, InstanceClass>,
     );
 
-    return InstanceEvent.subscribeToNewEvents(
-      {
-        concurrency: opts.concurrency || 50,
-      },
-      async (event) => {
-        const machine = inctanceByKind[event.kind];
-        if (!machine) {
-          throw new Error("Machine Not implemented");
-        }
+    return adapters.worker.subscribe(async (event) => {
+      const machine = inctanceByKind[event.kind];
+      if (!machine) {
+        throw new Error("Machine Not implemented");
+      }
 
-        return await Worker.handleEvent(machine, event);
-      },
-    );
+      return await Worker.handleEvent(machine, event, adapters);
+    });
+  }
+
+  static async handleEvent(
+    Instance: InstanceClass,
+    event: ScheduleData,
+    adapters: ListenProps<any>["adapters"],
+  ) {
+    try {
+      const instance = new Instance(event, adapters);
+      await instance.run();
+    } catch (err) {
+      const shouldSilenceError =
+        err instanceof Lock.AcquireLockError || err instanceof Lock.ExtendError;
+      if (!shouldSilenceError) {
+        console.log("THROWN", err);
+        throw err;
+      } else {
+        // console.log("-->", err);
+      }
+    }
   }
 
   static verify(instances: ListenProps["instances"]) {
     const kinds = new Set<string>();
 
     if (instances.length === 0) {
-      throw new Error(`Machine Validation: worker configured with 0 actors`);
+      throw new Error(`Validation Error: worker configured with 0 actors`);
     }
 
     instances.forEach((Instance) => {
@@ -84,7 +71,7 @@ export class Worker {
       const isAlreadyDefined = kinds.has(Instance.kind);
       if (isAlreadyDefined) {
         throw new Error(
-          `Machine Validation: machines should have distinct meta.kind ( received 2 "${kind}" )`,
+          `Machine Error: machines should have distinct meta.kind ( received 2 "${kind}" )`,
         );
       } else {
         kinds.add(kind);

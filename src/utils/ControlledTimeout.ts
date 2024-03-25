@@ -1,4 +1,4 @@
-export class ControlledTimer {
+export class ControlledTimeout {
   callback: () => void;
 
   constructor(callback: () => void) {

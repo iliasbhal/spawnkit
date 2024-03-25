@@ -2,25 +2,23 @@ import wait from "wait";
 import { PromiseList } from "@/utils/PromiseList";
 import { ControlledPromise } from "@/utils/ControlledPromise";
 import { AsyncDebounceHandler } from "@/utils/AsyncDebounceHandler";
-import { ControlledTimer } from "@/utils/ControlledTimer";
-import {
-  InstanceSnapshot,
-  InstanceEvent,
-  InstanceLock,
-  ActorConfig,
-} from "./repositories";
+import { ControlledTimeout } from "@/utils/ControlledTimeout";
+import { Lock } from "./Lock";
+import { Adapters, ScheduleData } from "./adapters";
 
 interface InstanceResult<V extends any> {
   data: V | undefined;
   stale: boolean;
 }
 
-export class Instance<Data = any, Event = any> {
+export class Instance<Data extends object = any, Event = any> {
   running: boolean = false;
   keepAlive = new PromiseList();
   aborted = new ControlledPromise("Aborted");
   minLockDurationMs: number = 5_000; // 90sec;
-  config!: ActorConfig;
+
+  config: ScheduleData;
+  adapters: Adapters;
 
   get kind() {
     return this.config.kind;
@@ -30,8 +28,9 @@ export class Instance<Data = any, Event = any> {
     return this.config.id;
   }
 
-  constructor(actorConfig: ActorConfig) {
-    this.config = actorConfig;
+  constructor(config: ScheduleData, adapters: Adapters) {
+    this.config = config;
+    this.adapters = adapters;
   }
 
   static kind = "default";
@@ -51,7 +50,7 @@ export class Instance<Data = any, Event = any> {
     throw new Error("Not implemented");
   }
 
-  data: Data | undefined;
+  data: Data | null = null;
 
   saveAsyncManager = new AsyncDebounceHandler();
   async save(data: Data) {
@@ -59,57 +58,55 @@ export class Instance<Data = any, Event = any> {
 
     await this.runExternalEffect(async () => {
       await this.saveAsyncManager.onlyLastOnePerTick(async () => {
-        await InstanceSnapshot.storeActorSnapShot(this.id, data!);
+        await this.adapters.snapshot.set(this.id, data);
       });
     });
   }
 
-  async setup(config: ActorConfig) {
-    const alreadyCreated = "id" in config;
-    if (alreadyCreated) {
-      this.config.id = config.id;
-    } else {
-      const newActorId = await InstanceSnapshot.getNewActorId(this.kind);
-      this.config.id = newActorId;
-    }
+  getLock() {
+    const lockConfig = {
+      lockId: `redlock:${this.id}`,
+      duration: this.minLockDurationMs,
+    };
+
+    const lock = new Lock(lockConfig, this.adapters.lock);
+    return lock;
   }
 
-  async run(): Promise<InstanceResult<Data>> {
-    await this.setup(this.config);
+  async run(): Promise<InstanceResult<Data | null>> {
+    // ids are generated in the application code
+    // you can use uuids or any other algorithm to create those.
     if (!this.id) throw new Error("Actor should have an Id");
 
     // When instantiating a new actor, we should acquire a lock
     // So that only one worker in the cloud is instantiating the actor
     // This is to prevent from executing side effects twice and race conditions.
-    const result = await InstanceLock.aquireLockAndRun({
-      lockKey: `redlock:${this.id}`,
-      lockDuration: this.minLockDurationMs,
-      callback: async (abortSignal) => {
-        // Seed data with previously stored data.
-        this.data = await InstanceSnapshot.getActorSnapshot(this.id);
+    const lock = this.getLock();
+    const result = await lock.using(async (abortSignal) => {
+      // Seed data with previously stored data.
+      this.data = await this.adapters.snapshot.get(this.id);
 
-        // Start the process + start listening for events
-        this.running = true;
-        const current = this.start();
-        this.keepAlive.add(current);
-        this.keepAlive.add(this.subscribeToActorEvent());
+      // Start the process + start listening for events
+      this.running = true;
+      const current = this.start();
+      this.keepAlive.add(current);
+      this.keepAlive.add(this.subscribeToActorEvent());
 
-        const syncAbort = this.syncAbortSignalWithPromise(abortSignal);
-        this.aborted.await.finally(() => {
-          this.keepAlive.clear();
-          syncAbort.dispose();
-          this.stopRun();
-        });
+      const syncAbort = this.syncAbortSignalWithPromise(abortSignal);
+      this.aborted.await.finally(() => {
+        this.keepAlive.clear();
+        syncAbort.dispose();
+        this.stopRun();
+      });
 
-        await this.keepAliveUntilNothingHappens().finally(() => {
-          syncAbort.dispose();
-        });
+      await this.keepAliveUntilNothingHappens().finally(() => {
+        syncAbort.dispose();
+      });
 
-        return {
-          data: this.data,
-          stale: false,
-        };
-      },
+      return {
+        data: this.data,
+        stale: false,
+      };
     });
 
     // // In order to make sure that we didn't miss any event and to avoid any race conditions
@@ -121,14 +118,11 @@ export class Instance<Data = any, Event = any> {
         const waitTime = (1 + i) * 200;
         await wait(waitTime);
 
-        const hasUnprocessedEvents =
-          await InstanceEvent.checkActorHasUnprocessedEvents(this.id);
-
+        const hasUnprocessedEvents = await this.adapters.events.has(this.id);
         if (hasUnprocessedEvents) {
-          InstanceEvent.schedule({
-            kind: this.config.kind,
+          this.adapters.scheduler.schedule({
+            kind: this.kind,
             id: this.id,
-            origin: "leftover",
           });
         }
       }
@@ -147,7 +141,7 @@ export class Instance<Data = any, Event = any> {
   protected async waitOnExternalEffects() {
     await this.keepAlive.waitOnAll();
     if (this.aborted.fulfilled) {
-      throw new InstanceLock.ExtendError(this.id.toString());
+      throw new Lock.ExtendError(this.id.toString());
     }
   }
 
@@ -184,22 +178,21 @@ export class Instance<Data = any, Event = any> {
     const noMoreEventsCtl = new ControlledPromise();
 
     const NO_EVENT_TIMEOUT = 3000;
-    const timer = new ControlledTimer(() => {
+    const timer = new ControlledTimeout(() => {
       noMoreEventsCtl.resolve(true);
     });
 
     timer.start(NO_EVENT_TIMEOUT);
 
-    this.onEventSubscription = InstanceEvent.subscribeToActorEvents(
+    this.onEventSubscription = this.adapters.events.subscribe(
       this.id,
       async (event) => {
         this.keepAlive.addWait(300, "Event Received");
         timer.restart(NO_EVENT_TIMEOUT);
 
         const fullyProcessEvent = async () => {
-          const eventContent = event.data as any;
-          await this.onEvent(eventContent);
-          await InstanceEvent.markEventAsProccessed(event.id);
+          await this.onEvent(event.data);
+          await this.adapters.events.ack(this.id, event.id);
         };
 
         const waitUntilFullyProcessed = fullyProcessEvent();
@@ -217,7 +210,7 @@ export class Instance<Data = any, Event = any> {
         return;
       }
 
-      const extendLockErr = new InstanceLock.ExtendError(this.id.toString());
+      const extendLockErr = new Lock.ExtendError(this.id.toString());
       this.aborted.resolve(extendLockErr);
     };
 
