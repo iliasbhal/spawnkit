@@ -33,20 +33,18 @@ export class Instance<Data extends object = any, Event = any> {
     this.adapters = adapters;
   }
 
-  static kind = "default";
-
   /* This is where you initiate the actor */
-  protected async start(): Promise<any> {
+  async start(): Promise<any> {
     throw new Error("Not implemented");
   }
 
   /* Dispose of all the ressources allocated */
-  protected async stop(): Promise<any> {
+  async stop(): Promise<any> {
     throw new Error("Not implemented");
   }
 
   /* Should return a promise acknowledging the event as processed */
-  protected async onEvent(event: Event): Promise<any> {
+  async onEvent(event: Event): Promise<any> {
     throw new Error("Not implemented");
   }
 
@@ -184,7 +182,7 @@ export class Instance<Data extends object = any, Event = any> {
 
     timer.start(NO_EVENT_TIMEOUT);
 
-    this.onEventSubscription = this.adapters.events.subscribe(
+    this.onEventSubscription = this.adapters.events.subscribe<Event>(
       this.id,
       async (event) => {
         this.keepAlive.addWait(300, "Event Received");

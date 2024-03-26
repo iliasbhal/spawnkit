@@ -1,3 +1,8 @@
+type EventId = number;
+type ActorId = number;
+type ActorKind = string;
+type LockId = string;
+
 export interface Adapters {
   lock: AdapterLock;
   events: AdapaterEvents;
@@ -7,46 +12,42 @@ export interface Adapters {
 }
 
 export abstract class AdapterLock {
-  abstract acquire(lockId: string, duration: number): Promise<boolean>;
-  abstract extend(lockId: string, duration: number): Promise<boolean>;
-  abstract release(lockId: string): Promise<boolean>;
+  abstract acquire(lockId: LockId, duration: number): Promise<boolean>;
+  abstract extend(lockId: LockId, duration: number): Promise<boolean>;
+  abstract release(lockId: LockId): Promise<boolean>;
 }
 
 export abstract class AdapaterSnapshot {
-  abstract get<Data>(actorId: number): Promise<Data | null>;
+  abstract get<Data>(actorId: ActorId): Promise<Data | null>;
 
   abstract set<Data extends object>(
-    actorId: number,
+    actorId: ActorId,
     snapshot: Data,
   ): Promise<true>;
 
   abstract subscribe<Data>(
-    actorId: number,
+    actorId: ActorId,
     onSnapshot: (snapshot: Data) => void,
   ): { unsubscribe: Function };
 }
 
-export interface ScheduleData {
-  kind: string;
-  id: number;
-  input?: any;
-}
-
-export interface ScheduleEvent {
-  type: string;
-}
-
 export abstract class AdapaterEvents {
-  abstract publish<E extends ScheduleEvent>(
-    actorId: number,
-    event: E,
-  ): Promise<true>;
-  abstract ack(actorId: number, eventId: number): Promise<true>;
-  abstract has(actorId: number): Promise<boolean>;
-  abstract subscribe<E extends { id: number; data: ScheduleEvent }>(
-    actorId: number,
-    onEvent: (event: E) => void,
+  abstract publish<EventData>(
+    actorId: ActorId,
+    event: EventData,
+  ): Promise<EventId>;
+  abstract ack(actorId: ActorId, eventId: EventId): Promise<true>;
+  abstract has(actorId: ActorId): Promise<boolean>;
+  abstract subscribe<EventData>(
+    actorId: ActorId,
+    onEvent: (event: { id: EventId; data: EventData }) => void,
   ): { unsubscribe: Function };
+}
+
+export interface ScheduleData {
+  kind: ActorKind;
+  id: ActorId;
+  input?: any;
 }
 
 export abstract class AdapaterScheduler {

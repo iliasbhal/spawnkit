@@ -41,7 +41,7 @@ export class Machine extends Spawnkit.Instance<AnySnapshot, AnyEvent> {
     };
   }
 
-  protected async stop() {
+  async stop() {
     this.actor.stop();
   }
 
@@ -55,7 +55,7 @@ export class Machine extends Spawnkit.Instance<AnySnapshot, AnyEvent> {
     return eventProcessed.await;
   }
 
-  protected async start() {
+  async start() {
     const actor = x.createActor(this.machine, {
       snapshot: this.data as any,
       input: this.config.input,

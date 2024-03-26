@@ -13,7 +13,7 @@ export class Example extends Spawnkit.Instance<ActorData, ActorEvent> {
     console.log("RECEIVED EVENT", event);
   }
 
-  protected async start() {
+  async start() {
     console.log("STARTED");
   }
 }

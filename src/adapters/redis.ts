@@ -116,12 +116,12 @@ export class Event implements Adapters.AdapaterEvents {
     return `events:${actorId}`;
   }
 
-  async publish(actorId: number, event: { type: string }): Promise<true> {
+  async publish<EventData>(actorId: number, event: EventData) {
     const data = JSON.stringify(event);
     const hash = this.getKey(actorId);
     const eventId = await this.redis.incr(hash);
     await this.redis.hset(hash, eventId.toString(), data);
-    return true;
+    return eventId;
   }
 
   async ack(actorId: number, eventId: number): Promise<true> {

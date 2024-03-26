@@ -5,7 +5,7 @@ import { Adapters, ScheduleData } from "./adapters";
 type InstanceClass = typeof Instance<any>;
 
 interface ListenProps<T extends InstanceClass = InstanceClass> {
-  instances: T[];
+  instances: Record<string, T>;
   adapters: Adapters;
 }
 
@@ -20,17 +20,8 @@ export class Worker {
       });
     }
 
-    const inctanceByKind = instances.reduce(
-      (acc, Instance) => {
-        const kind = Instance.kind;
-        acc[kind] = Instance;
-        return acc;
-      },
-      {} as Record<string, InstanceClass>,
-    );
-
     return adapters.worker.subscribe(async (event) => {
-      const machine = inctanceByKind[event.kind];
+      const machine = instances[event.kind];
       if (!machine) {
         throw new Error("Machine Not implemented");
       }
@@ -62,11 +53,11 @@ export class Worker {
   static verify(instances: ListenProps["instances"]) {
     const kinds = new Set<string>();
 
-    if (instances.length === 0) {
+    if (Object.keys(instances).length === 0) {
       throw new Error(`Validation Error: worker configured with 0 actors`);
     }
 
-    instances.forEach((Instance) => {
+    Object.values(instances).forEach((Instance) => {
       const kind = Instance.kind;
       const isAlreadyDefined = kinds.has(Instance.kind);
       if (isAlreadyDefined) {
