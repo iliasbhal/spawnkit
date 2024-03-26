@@ -32,11 +32,18 @@ export interface ScheduleData {
   input?: any;
 }
 
+export interface ScheduleEvent {
+  type: string;
+}
+
 export abstract class AdapaterEvents {
-  abstract publish(actorId: number, event: { type: string }): Promise<true>;
+  abstract publish<E extends ScheduleEvent>(
+    actorId: number,
+    event: E,
+  ): Promise<true>;
   abstract ack(actorId: number, eventId: number): Promise<true>;
   abstract has(actorId: number): Promise<boolean>;
-  abstract subscribe<E extends { id: number; data: any }>(
+  abstract subscribe<E extends { id: number; data: ScheduleEvent }>(
     actorId: number,
     onEvent: (event: E) => void,
   ): { unsubscribe: Function };
