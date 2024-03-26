@@ -11,20 +11,43 @@ const spawnORM: Adapters = {
   worker: new Adapter.Worker(redis),
 };
 
+interface SpotMarketData {
+  orderBook: string[];
+}
+
+interface SpotMarketEvent {
+  order: "buy" | "sell";
+}
+
+class SpotMarket extends Spawnkit.Instance<SpotMarketData, SpotMarketEvent> {}
+
+interface GameSessionData {
+  board: string[][];
+}
+
+interface GameSessionEvent {
+  action: "move" | "jump";
+}
+
+class GameSession extends Spawnkit.Instance<
+  GameSessionData,
+  GameSessionEvent
+> {}
+
 const worker = Spawnkit.Worker.listen({
   adapters: spawnORM,
-  instances: [],
+  instances: { SpotMarket, GameSession },
 });
 
 const client = Spawnkit.Client.from({
   adapters: spawnORM,
-  instances: [],
+  instances: { SpotMarket, GameSession },
 });
 
 const main = async () => {
-  const invitation = client.actor("AAA", 123213);
-  await invitation.send({ type: "ELEVATE" });
-  await invitation.get();
-  invitation.on("event", (event) => {});
-  invitation.on("data", (data) => {});
+  const spotMarket = client.actor("GameSession", 123213);
+  await spotMarket.send({ action: "jump" });
+  await spotMarket.get();
+  spotMarket.on("event", (event) => {});
+  spotMarket.on("data", (data) => {});
 };
