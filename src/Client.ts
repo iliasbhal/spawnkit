@@ -8,6 +8,14 @@ interface ClientProps<T extends InstanceClass = InstanceClass> {
   adapters: Omit<Adapters, "lock" | "worker">;
 }
 
+class ActorController {
+  id: number;
+
+  constructor(actorId: number) {
+    this.id = actorId;
+  }
+}
+
 export class Client<Props extends ClientProps> {
   private adapters: Props["adapters"];
 
@@ -37,6 +45,29 @@ export class Client<Props extends ClientProps> {
     callback: Parameters<typeof this.adapters.snapshot.subscribe<Data>>[1],
   ) {
     return this.adapters.snapshot.subscribe(id, callback);
+  }
+
+  /**
+   * Creates a class for easier DX for interacting with actors
+   */
+  for<Kind extends keyof Props["instances"]>(kind: Kind) {
+    const client = this;
+
+    const constructor = class extends ActorController {
+      constructor(actorId: number) {
+        super(actorId);
+      }
+
+      get client() {
+        return client.actor(kind, this.id);
+      }
+
+      send = this.client.send;
+      on = this.client.on;
+      get = this.client.get;
+    };
+
+    return constructor;
   }
 
   actor<Kind extends keyof Props["instances"]>(kind: Kind, actorId: number) {
