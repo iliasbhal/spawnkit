@@ -3,51 +3,51 @@ import * as Spawnkit from "../src";
 import * as Adapter from "../src/adapters/redis";
 import { redis } from "../prisma";
 
-const spawnORM: Adapters = {
+import * as instances from "./instances";
+
+const adapters: Adapters = {
   lock: new Adapter.Lock(redis),
   snapshot: new Adapter.Snapshot(redis),
   events: new Adapter.Event(redis),
   scheduler: new Adapter.Scheduler(redis),
-  worker: new Adapter.Worker(redis),
+  worker: new Adapter.Worker(redis, {
+    concurrency: 50,
+  }),
 };
 
-interface SpotMarketData {
-  orderBook: string[];
-}
-
-interface SpotMarketEvent {
-  order: "buy" | "sell";
-}
-
-class SpotMarket extends Spawnkit.Instance<SpotMarketData, SpotMarketEvent> {}
-
-interface GameSessionData {
-  board: string[][];
-}
-
-interface GameSessionEvent {
-  action: "move" | "jump";
-}
-
-class GameSession extends Spawnkit.Instance<
-  GameSessionData,
-  GameSessionEvent
-> {}
-
 const worker = Spawnkit.Worker.listen({
-  adapters: spawnORM,
-  instances: { SpotMarket, GameSession },
+  adapters,
+  instances,
 });
 
 const client = Spawnkit.Client.from({
-  adapters: spawnORM,
-  instances: { SpotMarket, GameSession },
+  adapters,
+  instances,
 });
 
 const main = async () => {
-  const spotMarket = client.actor("GameSession", 123213);
-  await spotMarket.send({ action: "jump" });
-  await spotMarket.get();
-  spotMarket.on("event", (event) => {});
-  spotMarket.on("data", (data) => {});
+  {
+    const gameSession = client.actor("GameSession", 123213);
+    await gameSession.send({ action: "jump" });
+    await gameSession.get();
+    gameSession.on("event", (event) => {});
+    gameSession.on("data", (data) => {});
+  }
+
+  {
+    const orderBook = client.actor("OrderBook", 123213);
+    await orderBook.send({ order: "buy" });
+    await orderBook.get();
+    orderBook.on("event", (event) => {});
+    orderBook.on("data", (data) => {});
+  }
+
+  {
+    const LiveDocument = client.for("LiveDocument");
+    const liveDoc = new LiveDocument(123213);
+    liveDoc.send({ changes: {} });
+    await liveDoc.get();
+    liveDoc.on("event", (event) => {});
+    liveDoc.on("data", (data) => {});
+  }
 };
