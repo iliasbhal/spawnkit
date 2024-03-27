@@ -20,10 +20,7 @@ export abstract class AdapterLock {
 export abstract class AdapaterSnapshot {
   abstract get<Data>(actorId: ActorId): Promise<Data | null>;
 
-  abstract set<Data extends object>(
-    actorId: ActorId,
-    snapshot: Data,
-  ): Promise<true>;
+  abstract set<Data>(actorId: ActorId, snapshot: Data): Promise<true>;
 
   abstract subscribe<Data>(
     actorId: ActorId,

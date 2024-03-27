@@ -54,10 +54,7 @@ export class Snapshot implements Adapters.AdapaterSnapshot {
     return JSON.parse(data);
   }
 
-  async set<Data extends object>(
-    actorId: number,
-    snapshot: Data,
-  ): Promise<true> {
+  async set<Data>(actorId: number, snapshot: Data): Promise<true> {
     const key = this.getKey(actorId);
     const serialized = JSON.stringify(snapshot);
     await this.redis.set(key, serialized);
