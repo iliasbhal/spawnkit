@@ -11,14 +11,29 @@ interface InstanceResult<V extends any> {
   stale: boolean;
 }
 
-export class Instance<Data extends object = any, Event = any> {
+interface InstanceBase<InstanceData, InstanceEvent> {
+  data: InstanceData | null;
+
+  /* This is where you initiate the actor */
+  start(): Promise<any>;
+
+  /* Dispose of all the ressources allocated */
+  stop(): Promise<any>;
+
+  /* Should return a promise acknowledging the event as processed */
+  onEvent(event: InstanceEvent): Promise<any>;
+}
+
+export class Instance<InstanceData = any, InstanceEvent = any>
+  implements InstanceBase<InstanceData, InstanceEvent>
+{
   running: boolean = false;
   keepAlive = new PromiseList();
   aborted = new ControlledPromise("Aborted");
   minLockDurationMs: number = 5_000; // 90sec;
 
   config: ScheduleData;
-  adapters: Adapters;
+  private adapters: Adapters;
 
   get kind() {
     return this.config.kind;
@@ -44,14 +59,14 @@ export class Instance<Data extends object = any, Event = any> {
   }
 
   /* Should return a promise acknowledging the event as processed */
-  async onEvent(event: Event): Promise<any> {
+  async onEvent(event: InstanceEvent): Promise<any> {
     throw new Error("Not implemented");
   }
 
-  data: Data | null = null;
+  data: InstanceData | null = null;
 
   saveAsyncManager = new AsyncDebounceHandler();
-  async save(data: Data) {
+  async save(data: InstanceData) {
     this.data = data;
 
     await this.runExternalEffect(async () => {
@@ -61,7 +76,7 @@ export class Instance<Data extends object = any, Event = any> {
     });
   }
 
-  getLock() {
+  private getLock() {
     const lockConfig = {
       lockId: `redlock:${this.id}`,
       duration: this.minLockDurationMs,
@@ -71,7 +86,7 @@ export class Instance<Data extends object = any, Event = any> {
     return lock;
   }
 
-  async run(): Promise<InstanceResult<Data | null>> {
+  async run(): Promise<InstanceResult<InstanceData | null>> {
     // ids are generated in the application code
     // you can use uuids or any other algorithm to create those.
     if (!this.id) throw new Error("Actor should have an Id");
@@ -182,7 +197,7 @@ export class Instance<Data extends object = any, Event = any> {
 
     timer.start(NO_EVENT_TIMEOUT);
 
-    this.onEventSubscription = this.adapters.events.subscribe<Event>(
+    this.onEventSubscription = this.adapters.events.subscribe<InstanceEvent>(
       this.id,
       async (event) => {
         this.keepAlive.addWait(300, "Event Received");
