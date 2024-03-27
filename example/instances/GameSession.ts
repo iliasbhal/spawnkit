@@ -1,4 +1,4 @@
-import * as Spawnkit from "../../src";
+import * as Spawnkit from "@/.";
 
 interface GameSessionData {
   board: string[][];
