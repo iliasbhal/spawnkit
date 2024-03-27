@@ -39,7 +39,7 @@ export class Lock {
   static ExtendError = LockExtendError;
 
   config: InstanceLockConfig;
-  adapterLock: AdapterLock;
+  lock: AdapterLock;
 
   getConfig(input: InstanceLockConfigInput): InstanceLockConfig {
     const config = input;
@@ -64,22 +64,22 @@ export class Lock {
 
   constructor(config: InstanceLockConfigInput, adapterLock: AdapterLock) {
     this.config = this.getConfig(config);
-    this.adapterLock = adapterLock;
+    this.lock = adapterLock;
   }
 
   async acquire() {
     const { lockId, duration } = this.config;
-    await this.adapterLock.acquire(lockId, duration);
+    await this.lock.acquire(lockId, duration);
   }
 
   async extend() {
     const { lockId, duration } = this.config;
-    await this.adapterLock.extend(lockId, duration);
+    await this.lock.extend(lockId, duration);
   }
 
   async release() {
     const { lockId } = this.config;
-    await this.adapterLock.release(lockId);
+    await this.lock.release(lockId);
   }
 
   async using<T>(routine: (singal: AbortSignal) => Promise<T>) {

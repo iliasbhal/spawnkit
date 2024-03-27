@@ -1,3 +1,4 @@
+import wait from "wait";
 import { Instance } from "./Instance";
 import { Lock } from "./Lock";
 import { Adapters, ScheduleData } from "./adapters";
@@ -21,12 +22,12 @@ export class Worker {
     }
 
     return adapters.worker.subscribe(async (event) => {
-      const machine = instances[event.kind];
-      if (!machine) {
+      const Instance = instances[event.kind];
+      if (!Instance) {
         throw new Error("Machine Not implemented");
       }
 
-      return await Worker.handleEvent(machine, event, adapters);
+      return await Worker.handleEvent(Instance, event, adapters);
     });
   }
 
@@ -37,7 +38,44 @@ export class Worker {
   ) {
     try {
       const instance = new Instance(event, adapters);
-      await instance.run();
+      // When instantiating a new actor, we should acquire a lock
+      // So that only one worker in the cloud is instantiating the actor
+      // This is to prevent from executing side effects twice and race conditions.
+      const MIN_LOCK_DURATION = 30_000;
+
+      const lockConfig = {
+        lockId: `redlock:${event.id}`,
+        duration: MIN_LOCK_DURATION,
+      };
+
+      // When instantiating a new actor, we should acquire a lock
+      // So that only one worker in the cloud is instantiating the actor
+      // This is to prevent from executing side effects twice and race conditions.
+      const lock = new Lock(lockConfig, adapters.lock);
+      const result = await lock.using(async (abortSignal) => {
+        await instance.run(abortSignal);
+      });
+
+      // // In order to make sure that we didn't miss any event and to avoid any race conditions
+      // // we'll check if there any event left to process. But we do it outside of the lock.
+      // // This will ensure that if there is another process trying to pick up those event
+      // // this process doesn't acquire the lock.
+      Promise.resolve().then(async () => {
+        for (let i = 0; i <= 2; i++) {
+          const waitTime = (1 + i) * 200;
+          await wait(waitTime);
+
+          const hasUnprocessedEvents = await adapters.events.has(event.id);
+          if (hasUnprocessedEvents) {
+            adapters.scheduler.schedule({
+              kind: event.kind,
+              id: event.id,
+            });
+          }
+        }
+      });
+
+      return result;
     } catch (err) {
       const shouldSilenceError =
         err instanceof Lock.AcquireLockError || err instanceof Lock.ExtendError;

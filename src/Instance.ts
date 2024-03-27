@@ -1,4 +1,3 @@
-import wait from "wait";
 import { PromiseList } from "@/utils/PromiseList";
 import { ControlledPromise } from "@/utils/ControlledPromise";
 import { AsyncDebounceHandler } from "@/utils/AsyncDebounceHandler";
@@ -30,7 +29,6 @@ export class Instance<InstanceData = any, InstanceEvent = any>
   running: boolean = false;
   keepAlive = new PromiseList();
   aborted = new ControlledPromise("Aborted");
-  minLockDurationMs: number = 5_000; // 90sec;
 
   config: ScheduleData;
   private adapters: Adapters;
@@ -76,72 +74,33 @@ export class Instance<InstanceData = any, InstanceEvent = any>
     });
   }
 
-  private getLock() {
-    const lockConfig = {
-      lockId: `redlock:${this.id}`,
-      duration: this.minLockDurationMs,
+  async run(
+    abortSignal: AbortSignal,
+  ): Promise<InstanceResult<InstanceData | null>> {
+    // Seed data with previously stored data.
+    this.data = await this.adapters.snapshot.get(this.id);
+
+    // Start the process + start listening for events
+    this.running = true;
+    const current = this.start();
+    this.keepAlive.add(current);
+    this.keepAlive.add(this.subscribeToActorEvent());
+
+    const syncAbort = this.syncAbortSignalWithPromise(abortSignal);
+    this.aborted.await.finally(() => {
+      this.keepAlive.clear();
+      syncAbort.dispose();
+      this.stopRun();
+    });
+
+    await this.keepAliveUntilNothingHappens().finally(() => {
+      syncAbort.dispose();
+    });
+
+    return {
+      data: this.data,
+      stale: false,
     };
-
-    const lock = new Lock(lockConfig, this.adapters.lock);
-    return lock;
-  }
-
-  async run(): Promise<InstanceResult<InstanceData | null>> {
-    // ids are generated in the application code
-    // you can use uuids or any other algorithm to create those.
-    if (!this.id) throw new Error("Actor should have an Id");
-
-    // When instantiating a new actor, we should acquire a lock
-    // So that only one worker in the cloud is instantiating the actor
-    // This is to prevent from executing side effects twice and race conditions.
-    const lock = this.getLock();
-    const result = await lock.using(async (abortSignal) => {
-      // Seed data with previously stored data.
-      this.data = await this.adapters.snapshot.get(this.id);
-
-      // Start the process + start listening for events
-      this.running = true;
-      const current = this.start();
-      this.keepAlive.add(current);
-      this.keepAlive.add(this.subscribeToActorEvent());
-
-      const syncAbort = this.syncAbortSignalWithPromise(abortSignal);
-      this.aborted.await.finally(() => {
-        this.keepAlive.clear();
-        syncAbort.dispose();
-        this.stopRun();
-      });
-
-      await this.keepAliveUntilNothingHappens().finally(() => {
-        syncAbort.dispose();
-      });
-
-      return {
-        data: this.data,
-        stale: false,
-      };
-    });
-
-    // // In order to make sure that we didn't miss any event and to avoid any race conditions
-    // // we'll check if there any event left to process. But we do it outside of the lock.
-    // // This will ensure that if there is another process trying to pick up those event
-    // // this process doesn't acquire the lock.
-    Promise.resolve().then(async () => {
-      for (let i = 0; i <= 2; i++) {
-        const waitTime = (1 + i) * 200;
-        await wait(waitTime);
-
-        const hasUnprocessedEvents = await this.adapters.events.has(this.id);
-        if (hasUnprocessedEvents) {
-          this.adapters.scheduler.schedule({
-            kind: this.kind,
-            id: this.id,
-          });
-        }
-      }
-    });
-
-    return result;
   }
 
   async stopRun() {
