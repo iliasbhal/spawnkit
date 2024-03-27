@@ -35,6 +35,9 @@ export class ControlledPromise<T> {
   _resolve: (value: T) => void = (value: T) => {};
   resolve(value: T) {
     if (this.value || this.error) return;
+    if (this.state !== PROMISE_STATE.PENDING) return;
+
+    this.state = PROMISE_STATE.RESOLVED; // update internal state immediately
     this.value = value;
     this._resolve(value);
   }
@@ -43,11 +46,15 @@ export class ControlledPromise<T> {
   _reject: (value: typeof this.error) => void = (err) => {};
   reject(err: Error) {
     if (this.value || this.error) return;
+    if (this.state !== PROMISE_STATE.PENDING) return;
+
+    this.state = PROMISE_STATE.REJECTED; // update internal state immediately
     this.error = err;
     this._reject(err);
   }
 
-  setup() {
+  constructor(name?: string) {
+    this.name = name;
     this.state = PROMISE_STATE.PENDING;
     this.promise = new Promise<T>((_resolve, _reject) => {
       this._resolve = _resolve;
@@ -55,19 +62,6 @@ export class ControlledPromise<T> {
     });
 
     Object.assign(this.promise, { name: this.name });
-
-    this.promise
-      .then(() => {
-        this.state = PROMISE_STATE.RESOLVED;
-      })
-      .catch(() => {
-        this.state = PROMISE_STATE.REJECTED;
-      });
-  }
-
-  constructor(name?: string) {
-    this.name = name;
-    this.setup();
   }
 
   static new(name?: string) {
