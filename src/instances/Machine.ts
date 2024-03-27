@@ -1,7 +1,6 @@
 import * as x from "xstate";
 import { ControlledPromise } from "@/utils/ControlledPromise";
 import * as Spawnkit from "..";
-import { ScheduleData, Adapters } from "@/adapters";
 
 type AnySnapshot = x.Snapshot<x.AnyStateMachine>;
 type AnyEvent = x.AnyEventObject;
@@ -13,31 +12,10 @@ export class Machine extends Spawnkit.Instance<AnySnapshot, AnyEvent> {
   subscriptonByActor = new Map<string, x.Subscription>();
   snapshotByActorId = new Map<string, AnySnapshot>();
 
-  static getKind(machine: any): string {
-    return machine.meta?.kind || machine.config.meta?.kind;
-  }
-
   static from(machine: x.AnyStateMachine) {
-    const kind = Machine.getKind(machine);
-    if (!kind) {
-      throw new Error(
-        "Machine Validation: Each machine should have a meta.kind",
-      );
-    }
-
+    // simply preconfigure the class with the machine object
     return class MachineInstance extends Machine {
-      static kind = kind;
       machine = machine;
-
-      constructor(config: Omit<ScheduleData, "kind">, adapters: Adapters) {
-        super(
-          {
-            ...config,
-            kind: kind,
-          },
-          adapters,
-        );
-      }
     };
   }
 
@@ -56,7 +34,12 @@ export class Machine extends Spawnkit.Instance<AnySnapshot, AnyEvent> {
   }
 
   async start() {
-    const actor = x.createActor(this.machine, {
+    this.actor = this.createActor();
+    this.actor.start();
+  }
+
+  private createActor() {
+    return x.createActor(this.machine, {
       snapshot: this.data as any,
       input: this.config.input,
       id: `${this.id}`,
@@ -71,9 +54,6 @@ export class Machine extends Spawnkit.Instance<AnySnapshot, AnyEvent> {
         }
       },
     });
-
-    this.actor = actor;
-    this.actor.start();
   }
 
   private async handleSnapshot() {
