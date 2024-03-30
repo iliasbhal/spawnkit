@@ -119,8 +119,7 @@ export class EventBus extends RedisAdapter implements Adapters.AdapterEventBus {
     const key = "event";
     const value = JSON.stringify(event);
 
-    const emited = await this.redis.xadd(streamId, "*", key, value);
-    // console.log("emited", emited);
+    await this.redis.xadd(streamId, "*", key, value);
     return true;
   }
 
