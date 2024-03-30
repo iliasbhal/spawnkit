@@ -23,6 +23,7 @@
     "install-peers": "^1.0.4",
     "poll-until-promise": "^4.2.0",
     "prisma": "^5.11.0",
+    "redis-memory-server": "^0.10.0",
     "redlock": "^5.0.0-beta.2",
     "ts-jest": "^29.1.2",
     "ts-node": "^10.9.2",

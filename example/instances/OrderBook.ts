@@ -1,22 +1,29 @@
-import * as Spawnkit from "../../src";
+import * as Spawnkit from "@/.";
 
 interface OrderBookData {
   orderBook: string[];
 }
 
-interface OrderBookEvent {
-  order: "buy" | "sell";
+interface OrderEentBus {
+  change: string[];
 }
 
-export class OrderBook extends Spawnkit.Instance<
-  OrderBookData,
-  OrderBookEvent
-> {
-  async start(): Promise<any> {}
+interface Stock {
+  tick: string;
+}
 
+export class OrderBook extends Spawnkit.Instance<OrderBookData, OrderEentBus> {
+  async start(): Promise<any> {}
   async stop(): Promise<any> {}
 
-  async onEvent(event: OrderBookEvent): Promise<any> {
-    console.log(event);
+  async buy(stock: Stock) {
+    return {
+      success: true,
+      qty: 1000,
+    };
+  }
+
+  async sell(stock: Stock): Promise<true> {
+    return true;
   }
 }

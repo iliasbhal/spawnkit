@@ -1,4 +1,4 @@
-import { Instance } from "./Instance";
+import type { Instance } from "./Instance";
 import { Adapters } from "./adapters";
 
 type InstanceClass = typeof Instance<any>;
@@ -6,14 +6,6 @@ type InstanceClass = typeof Instance<any>;
 interface ClientProps<T extends InstanceClass = InstanceClass> {
   instances: Record<string, T>;
   adapters: Omit<Adapters, "lock" | "worker">;
-}
-
-class ActorController {
-  id: number;
-
-  constructor(actorId: number) {
-    this.id = actorId;
-  }
 }
 
 export class Client<Props extends ClientProps> {
@@ -27,101 +19,169 @@ export class Client<Props extends ClientProps> {
     return new Client(opts);
   }
 
-  private onEvent<InstanceEvent>(
-    id: number,
-    callback: (
-      eventData: Parameters<
-        Parameters<typeof this.adapters.events.subscribe<InstanceEvent>>[1]
-      >[0]["data"],
-    ) => any,
-  ) {
-    return this.adapters.events.subscribe<InstanceEvent>(id, (event) =>
-      callback(event.data),
-    );
-  }
-
-  private onData<Data>(
-    id: number,
-    callback: Parameters<typeof this.adapters.snapshot.subscribe<Data>>[1],
-  ) {
-    return this.adapters.snapshot.subscribe(id, callback);
-  }
-
   /**
    * Creates a class for easier DX for interacting with actors
    */
   for<Kind extends keyof Props["instances"]>(kind: Kind) {
+    type Current = InstanceType<Props["instances"][Kind]>;
+    type InstanceEvent = Parameters<Current["handleIncomingEvent"]>[0];
+    type InstanceEventBus = Parameters<Current["emit"]>;
+    type InstanceData = Parameters<Current["save"]>[0];
+
+    type ExtractMethodNames<T> = {
+      [K in keyof T]: T[K] extends (...args: any) => any ? K : never;
+    }[keyof T];
+    type ExtractMethods<T> = Pick<T, ExtractMethodNames<T>>;
+
+    type ForbiddenMethods = ExtractMethodNames<Instance>;
+
     const client = this;
 
-    const constructor = class extends ActorController {
+    const Constructor = class {
+      id: number;
+
       constructor(actorId: number) {
-        super(actorId);
-      }
+        this.id = actorId;
+        const actorClient = client.actor(kind, this.id);
 
-      get client() {
-        return client.actor(kind, this.id);
-      }
+        const self = this;
+        return new Proxy(this, {
+          get: (target, prop, receiver) => {
+            if (prop in target) return Reflect.get(target, prop, receiver);
+            if (typeof prop !== "string") return;
 
-      send = this.client.send;
-      on = this.client.on;
-      get = this.client.get;
+            return actorClient[prop];
+          },
+        });
+      }
     };
 
-    return constructor;
+    type AvailableMethods = Omit<Current, keyof Instance>;
+    return Constructor as any as new (actorId: number) => AvailableMethods;
+  }
+
+  on<Callback extends (...args: any[]) => any>(
+    channel: string,
+    callback: Callback,
+  ) {
+    return this.adapters.eventBus.on(channel, callback);
   }
 
   actor<Kind extends keyof Props["instances"]>(kind: Kind, actorId: number) {
-    type InstanceEvent = Parameters<
-      InstanceType<Props["instances"][Kind]>["onEvent"]
-    >[0];
+    type Current = InstanceType<Props["instances"][Kind]>;
+    type InstanceEvent = Parameters<Current["handleIncomingEvent"]>[1];
+    type InstanceEventBus = Parameters<Current["emit"]>;
+    type InstanceData = Parameters<Current["save"]>[0];
 
-    type InstanceData = Parameters<
-      InstanceType<Props["instances"][Kind]>["save"]
-    >[0];
+    type ExtractMethodNames<T> = {
+      [K in keyof T]: T[K] extends (...args: any) => any ? K : never;
+    }[keyof T];
+    type ExtractMethods<T> = Pick<T, ExtractMethodNames<T>>;
 
-    const subscribers = {
-      event: this.onEvent<InstanceEvent>,
-      data: this.onData<InstanceData>,
+    type ForbiddenMethods = ExtractMethodNames<Instance>;
+    type AvailableMethods = Omit<ExtractMethods<Current>, ForbiddenMethods>;
+    type RemoteMethodes = {
+      [key in keyof AvailableMethods]: (
+        // @ts-ignore
+        ...args: Parameters<AvailableMethods[key]>
+        //@ts-ignore
+      ) => Promise<Awaited<ReturnType<AvailableMethods[key]>>>;
     };
 
-    return {
-      send: async (eventData: InstanceEvent) => {
-        // when sending an event, we shall always try to spawn an instance
-        // to ensure that the event will be processed
-        const [eventId] = await Promise.all([
-          this.adapters.events.publish(actorId, eventData),
-          this.adapters.scheduler.schedule({
-            id: actorId,
-            kind: kind.toString(),
-          }),
-        ]);
+    type JustRemoteMethodes = {
+      [key in keyof AvailableMethods]: (
+        // @ts-ignore
+        ...args: Parameters<AvailableMethods[key]>
+        //@ts-ignore
+      ) => Promise<true>;
+    };
 
-        return eventId;
-      },
-      get: () => {
+    const sendEventToActor = async (event: InstanceEvent) => {
+      // when sending an event, we shall always try to spawn an instance
+      // to ensure that the event will be processed
+      const [eventId] = await Promise.all([
+        this.adapters.events.publish(actorId, event),
+        this.adapters.scheduler.schedule({
+          id: actorId,
+          kind: kind.toString(),
+        }),
+      ]);
+
+      return eventId;
+    };
+
+    const actorClientAPI = {
+      getState: () => {
         return this.adapters.snapshot.get<InstanceData>(actorId);
       },
 
-      on: <
-        Type extends keyof typeof subscribers,
-        Callback extends Parameters<(typeof subscribers)[Type]>[1],
-      >(
-        type: Type,
-        callback: Callback,
+      on: (
+        channel: InstanceEventBus[0],
+        callback: (data: InstanceEventBus[1]) => any,
       ) => {
-        type Subscriber<T extends keyof typeof subscribers> = Parameters<
-          (typeof subscribers)[T]
-        >[1];
-
-        switch (type) {
-          case "data":
-            return this.onData(actorId, callback as Subscriber<"data">);
-          case "event":
-            return this.onEvent(actorId, callback as Subscriber<"event">);
-          default:
-            throw new Error("Unsupported Event Type");
-        }
+        return this.adapters.eventBus.on(channel, callback);
       },
     };
+
+    const createRemoteMethodHandler = (mode: "just" | "normal") => {
+      return (action: string) => {
+        return async (...args: any[]) => {
+          const eventId = await sendEventToActor({
+            action,
+            args,
+            mode,
+          });
+
+          if (mode === "just") {
+            return eventId;
+          }
+
+          if (mode === "normal") {
+            return new Promise((resolve) => {
+              const subscription = actorClientAPI.on(
+                `actor:${actorId}:event:${eventId}`,
+                (data) => {
+                  resolve(data);
+                  subscription.unsubscribe();
+                },
+              );
+            });
+          }
+
+          throw new Error("Not Implemented");
+        };
+      };
+    };
+
+    const normalRemoteMethodHandler = createRemoteMethodHandler("normal");
+    const justRemoteMethodHandler = createRemoteMethodHandler("just");
+
+    const actorJustClientAPI = new Proxy(
+      {},
+      {
+        get(target, prop, receiver) {
+          if (prop in target) return Reflect.get(target, prop, receiver);
+          if (typeof prop !== "string") return;
+          return justRemoteMethodHandler(prop);
+        },
+      },
+    );
+
+    return new Proxy(
+      actorClientAPI as typeof actorClientAPI &
+        RemoteMethodes & { just: JustRemoteMethodes },
+      {
+        get(target, prop, receiver) {
+          if (prop in target) return Reflect.get(target, prop, receiver);
+          if (typeof prop !== "string") return;
+
+          if (prop === "just") {
+            return actorJustClientAPI;
+          }
+
+          return normalRemoteMethodHandler(prop);
+        },
+      },
+    );
   }
 }

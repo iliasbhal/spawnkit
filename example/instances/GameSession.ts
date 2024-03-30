@@ -4,17 +4,14 @@ interface GameSessionData {
   board: string[][];
 }
 
-interface GameSessionEvent {
-  action: "move" | "jump";
+interface EventBus {
+  round: number;
 }
 
-export class GameSession extends Spawnkit.Instance<
-  GameSessionData,
-  GameSessionEvent
-> {
+export class GameSession extends Spawnkit.Instance<GameSessionData, EventBus> {
+  async start(): Promise<any> {}
   async stop(): Promise<any> {}
 
-  async start(): Promise<any> {}
-
-  async onEvent(event: GameSessionEvent): Promise<any> {}
+  move(x: number, y: number) {}
+  jump() {}
 }

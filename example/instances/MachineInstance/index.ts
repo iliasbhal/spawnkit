@@ -12,7 +12,7 @@ type MachineSnapshot<M extends x.AnyStateMachine> = ReturnType<
 
 export class MachineInstance<
   Machine extends x.AnyStateMachine,
-> extends Spawnkit.Instance<MachineSnapshot<Machine>, MachineEvent<Machine>> {
+> extends Spawnkit.Instance<MachineSnapshot<Machine>> {
   machine: Machine = null as any;
   sync?: (actor: x.Actor<typeof this.machine>) => any;
   actor: x.Actor<Machine> = null as any;
@@ -31,23 +31,24 @@ export class MachineInstance<
     };
   }
 
-  async stop() {
-    this.actor.stop();
-  }
-
   eventProcessing = new Map<MachineEvent<Machine>, ControlledPromise<true>>();
-  async onEvent(event: MachineEvent<Machine>) {
+  async send(event: MachineEvent<Machine>) {
     const eventProcessed = new ControlledPromise<true>();
 
     this.eventProcessing.set(event, eventProcessed);
     this.actor.send(event);
 
-    return eventProcessed.await;
+    await eventProcessed.await;
+    return this.actor.getSnapshot();
   }
 
   async start() {
     this.actor = this.createActor();
     this.actor.start();
+  }
+
+  async stop() {
+    this.actor.stop();
   }
 
   private createActor() {
@@ -58,7 +59,7 @@ export class MachineInstance<
       inspect: (inspectionEvent) => {
         switch (inspectionEvent.type) {
           case "@xstate.event":
-            return this.handleIncomingEvent(inspectionEvent);
+            return this.handleActorEvent(inspectionEvent);
           case "@xstate.actor":
             return this.handleChildActorCreateEvent(inspectionEvent);
           case "@xstate.snapshot":
@@ -130,7 +131,7 @@ export class MachineInstance<
   /**
    * This method releases the event that we received within onEvent
    */
-  private async handleIncomingEvent(event: x.InspectedEventEvent) {
+  private async handleActorEvent(event: x.InspectedEventEvent) {
     const eventData = event.event as MachineEvent<Machine>;
     const isExternaEventBeeingProcessed = this.eventProcessing.has(eventData);
     if (isExternaEventBeeingProcessed) {

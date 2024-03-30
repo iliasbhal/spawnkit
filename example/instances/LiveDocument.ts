@@ -4,17 +4,13 @@ interface LiveDocumentData {
   pages: string[];
 }
 
-interface LiveDocumentEvent {
+interface DocumentChange {
   changes: object;
 }
 
-export class LiveDocument extends Spawnkit.Instance<
-  LiveDocumentData,
-  LiveDocumentEvent
-> {
+export class LiveDocument extends Spawnkit.Instance<LiveDocumentData> {
+  async start(): Promise<any> {}
   async stop(): Promise<any> {}
 
-  async start(): Promise<any> {}
-
-  async onEvent(event: LiveDocumentEvent): Promise<any> {}
+  update(change: DocumentChange) {}
 }

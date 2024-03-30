@@ -7,6 +7,7 @@ export interface Adapters {
   lock: AdapterLock;
   events: AdapaterEvents;
   snapshot: AdapaterSnapshot;
+  eventBus: AdapterEventBus;
   scheduler: AdapaterScheduler;
   worker: AdapaterWorker;
 }
@@ -28,11 +29,20 @@ export abstract class AdapaterSnapshot {
   ): { unsubscribe: Function };
 }
 
+export abstract class AdapterEventBus {
+  abstract emit(channel: string, data: any): Promise<true>;
+  abstract on(
+    channel: string,
+    callback: (data: any) => any,
+  ): { unsubscribe: Function };
+}
+
 export abstract class AdapaterEvents {
   abstract publish<EventData>(
     actorId: ActorId,
     event: EventData,
   ): Promise<EventId>;
+
   abstract ack(actorId: ActorId, eventId: EventId): Promise<true>;
   abstract has(actorId: ActorId): Promise<boolean>;
   abstract subscribe<EventData>(

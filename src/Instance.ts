@@ -10,22 +10,17 @@ interface InstanceResult<V extends any> {
   stale: boolean;
 }
 
-interface InstanceBase<InstanceData, InstanceEvent> {
-  data: InstanceData | null;
-
-  /* This is where you initiate the actor */
-  start(): Promise<any>;
-
-  /* Dispose of all the ressources allocated */
-  stop(): Promise<any>;
-
-  /* Should return a promise acknowledging the event as processed */
-  onEvent(event: InstanceEvent): Promise<any>;
+interface InstanceEvent {
+  action: string;
+  args: any[];
+  mode?: "just" | "normal";
 }
 
-export class Instance<InstanceData = any, InstanceEvent = any>
-  implements InstanceBase<InstanceData, InstanceEvent>
-{
+interface InternalChannels {
+  [key: `actor:${string}:event:${string}`]: any;
+}
+
+export class Instance<InstanceData = {}, CustomChannels = {}> {
   running: boolean = false;
   keepAlive = new PromiseList();
   aborted = new ControlledPromise("Aborted");
@@ -47,18 +42,27 @@ export class Instance<InstanceData = any, InstanceEvent = any>
   }
 
   /* This is where you initiate the actor */
-  async start(): Promise<any> {
-    throw new Error("Not implemented");
-  }
+  async start(): Promise<any> {}
 
   /* Dispose of all the ressources allocated */
-  async stop(): Promise<any> {
-    throw new Error("Not implemented");
-  }
+  async stop(): Promise<any> {}
 
-  /* Should return a promise acknowledging the event as processed */
-  async onEvent(event: InstanceEvent): Promise<any> {
-    throw new Error("Not implemented");
+  async handleIncomingEvent(id: number, event: InstanceEvent): Promise<any> {
+    // 1. call the method specified in the event;
+    const { action, args, mode = "normal" } = event;
+
+    // @ts-ignore
+    if (typeof this[action] == "function") {
+      // @ts-ignore
+      const response: unknown = await this[action]?.(args);
+      if (mode === "normal") {
+        this.emit(`actor:${this.id}:event:${id}`, response as any);
+      }
+    }
+
+    throw new Error("Should ");
+
+    // awat this.adapters.eventBus.emit(`event:${event.id}`, response)
   }
 
   data: InstanceData | null = null;
@@ -162,12 +166,11 @@ export class Instance<InstanceData = any, InstanceEvent = any>
         this.keepAlive.addWait(300, "Event Received");
         timer.restart(NO_EVENT_TIMEOUT);
 
-        const fullyProcessEvent = async () => {
-          await this.onEvent(event.data);
-          await this.adapters.events.ack(this.id, event.id);
-        };
+        const waitUntilFullyProcessed = Promise.all([
+          this.handleIncomingEvent(event.id, event.data),
+          this.adapters.events.ack(this.id, event.id),
+        ]);
 
-        const waitUntilFullyProcessed = fullyProcessEvent();
         this.keepAlive.add(waitUntilFullyProcessed);
         await waitUntilFullyProcessed;
       },
@@ -176,14 +179,24 @@ export class Instance<InstanceData = any, InstanceEvent = any>
     return noMoreEventsCtl.await;
   }
 
+  emit<Channel extends keyof CustomChannels | keyof InternalChannels>(
+    channel: Channel,
+    data: Channel extends keyof CustomChannels
+      ? CustomChannels[Channel]
+      : Channel extends keyof InternalChannels
+        ? InternalChannels[Channel]
+        : never,
+  ) {
+    throw new Error("SHOULD IMPLEMENT A WAY TO EMIT VALUE");
+  }
+
   private syncAbortSignalWithPromise(abortCtl: AbortSignal) {
     const onAbortCallback = () => {
       if (!this.live) {
         return;
       }
 
-      const extendLockErr = new Lock.ExtendError(this.id.toString());
-      this.aborted.resolve(extendLockErr);
+      this.aborted.resolve(true);
     };
 
     abortCtl.addEventListener("abort", onAbortCallback);
