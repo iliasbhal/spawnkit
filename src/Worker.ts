@@ -61,8 +61,9 @@ export class Worker {
       // // This will ensure that if there is another process trying to pick up those event
       // // this process doesn't acquire the lock.
       Promise.resolve().then(async () => {
-        for (let i = 0; i <= 2; i++) {
-          const waitTime = (1 + i) * 200;
+        const waitTimeBeforeAttemp = [200, 400, 800];
+
+        for (const waitTime of waitTimeBeforeAttemp) {
           await wait(waitTime);
 
           const hasUnprocessedEvents = await adapters.events.has(event.id);
