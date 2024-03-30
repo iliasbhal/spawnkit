@@ -4,6 +4,7 @@ import { AsyncDebounceHandler } from "@/utils/AsyncDebounceHandler";
 import { ControlledTimeout } from "@/utils/ControlledTimeout";
 import { Lock } from "./Lock";
 import { Adapters, ScheduleData } from "./adapters";
+import { Client } from "./Client";
 
 interface InstanceResult<V extends any> {
   data: V | undefined;
@@ -56,7 +57,8 @@ export class Instance<InstanceData = {}, CustomChannels = {}> {
       // @ts-ignore
       const response: unknown = await this[action]?.(args);
       if (mode === "normal") {
-        this.emit(`actor:${this.id}:event:${id}`, response as any);
+        const channelID = Client.getChannelForEventResponse(this.id, id);
+        this.emit(channelID, response as any);
       }
     }
 
@@ -179,7 +181,12 @@ export class Instance<InstanceData = {}, CustomChannels = {}> {
     return noMoreEventsCtl.await;
   }
 
-  emit<Channel extends keyof CustomChannels | keyof InternalChannels>(
+  emit<
+    Channel extends Exclude<
+      keyof CustomChannels | keyof InternalChannels,
+      symbol | number
+    >,
+  >(
     channel: Channel,
     data: Channel extends keyof CustomChannels
       ? CustomChannels[Channel]
@@ -187,6 +194,7 @@ export class Instance<InstanceData = {}, CustomChannels = {}> {
         ? InternalChannels[Channel]
         : never,
   ) {
+    this.adapters.eventBus.emit(channel, data);
     throw new Error("SHOULD IMPLEMENT A WAY TO EMIT VALUE");
   }
 
