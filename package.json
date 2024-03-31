@@ -6,9 +6,6 @@
   "license": "MIT",
   "scripts": {
     "docker": "docker-compose --env-file .env -f ./docker/compose.yml up --build",
-    "prisma:reset": "prisma migrate reset --schema ./prisma/schema.prisma",
-    "prisma:migrate": "prisma migrate dev --schema ./prisma/schema.prisma",
-    "prisma:generate": "prisma generate --schema ./prisma/schema.prisma"
   },
   "dependencies": {
     "@prisma/client": "5.11.0",
