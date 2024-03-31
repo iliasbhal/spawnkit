@@ -82,11 +82,19 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
     });
   }
 
+  private async loadData() {
+    // Seed data with previously stored data.
+    const currentData = await this.adapters.snapshot.get<InstanceData | null>(
+      this.id,
+    );
+
+    this.data = currentData;
+  }
+
   async run(
     abortSignal: AbortSignal,
   ): Promise<InstanceResult<InstanceData | null>> {
-    // Seed data with previously stored data.
-    this.data = await this.adapters.snapshot.get(this.id);
+    await this.loadData();
 
     // Start the process + start listening for events
     this.running = true;
