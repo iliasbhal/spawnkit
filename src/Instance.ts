@@ -114,6 +114,7 @@ export class Instance<InstanceData = {}, CustomChannels = {}> {
     this.running = false;
     this.onEventSubscription?.unsubscribe();
     await this.stop();
+    await this.save(this.data!);
   }
 
   protected async waitOnExternalEffects() {
