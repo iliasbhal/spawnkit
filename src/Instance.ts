@@ -48,23 +48,25 @@ export class Instance<InstanceData = {}, CustomChannels = {}> {
   /* Dispose of all the ressources allocated */
   async stop(): Promise<any> {}
 
-  async handleIncomingEvent(id: number, event: InstanceEvent): Promise<any> {
-    // 1. call the method specified in the event;
+  async callMethodDefinedInEvent(
+    id: number,
+    event: InstanceEvent,
+  ): Promise<any> {
     const { action, args, mode = "normal" } = event;
 
     // @ts-ignore
-    if (typeof this[action] == "function") {
-      // @ts-ignore
-      const response: unknown = await this[action]?.(args);
-      if (mode === "normal") {
-        const channelID = Client.getChannelForEventResponse(this.id, id);
-        this.emit(channelID, response as any);
-      }
+    const method = this[action]?.bind(this);
+    const isActionDefined = typeof method == "function";
+    if (!isActionDefined) {
+      // TODO: Maybe emit an Error that can be forawarded to the client ???
+      return;
     }
 
-    throw new Error("Should ");
-
-    // awat this.adapters.eventBus.emit(`event:${event.id}`, response)
+    const response: unknown = await method?.(...args);
+    if (mode === "normal") {
+      const channelID = Client.getChannelForEventResponse(this.id, id);
+      this.emit(channelID, response as any);
+    }
   }
 
   data: InstanceData | null = null;
@@ -90,7 +92,7 @@ export class Instance<InstanceData = {}, CustomChannels = {}> {
     this.running = true;
     const current = this.start();
     this.keepAlive.add(current);
-    this.keepAlive.add(this.subscribeToActorEvent());
+    this.subscribeToActorEvent();
 
     const syncAbort = this.syncAbortSignalWithPromise(abortSignal);
     this.aborted.await.finally(() => {
@@ -170,7 +172,7 @@ export class Instance<InstanceData = {}, CustomChannels = {}> {
         timer.restart(NO_EVENT_TIMEOUT);
 
         const waitUntilFullyProcessed = Promise.all([
-          this.handleIncomingEvent(event.id, event.data),
+          this.callMethodDefinedInEvent(event.id, event.data),
           this.adapters.events.ack(this.id, event.id),
         ]);
 
@@ -179,10 +181,10 @@ export class Instance<InstanceData = {}, CustomChannels = {}> {
       },
     );
 
-    return noMoreEventsCtl.await;
+    this.keepAlive.add(noMoreEventsCtl.await);
   }
 
-  emit<
+  async emit<
     Channel extends Exclude<
       keyof CustomChannels | keyof InternalChannels,
       symbol | number
@@ -195,8 +197,9 @@ export class Instance<InstanceData = {}, CustomChannels = {}> {
         ? InternalChannels[Channel]
         : never,
   ) {
-    this.adapters.eventBus.emit(channel, data);
-    throw new Error("SHOULD IMPLEMENT A WAY TO EMIT VALUE");
+    return this.runExternalEffect(async () => {
+      return await this.adapters.eventBus.emit(channel, data);
+    });
   }
 
   private syncAbortSignalWithPromise(abortCtl: AbortSignal) {
