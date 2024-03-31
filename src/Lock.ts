@@ -69,17 +69,22 @@ export class Lock {
 
   async acquire() {
     const { lockId, duration } = this.config;
-    await this.lock.acquire(lockId, duration);
+
+    const acquired = await this.lock.acquire(lockId, duration);
+    if (!acquired) throw new AcquireLockError(lockId);
+    return acquired;
   }
 
   async extend() {
     const { lockId, duration } = this.config;
-    await this.lock.extend(lockId, duration);
+    const extended = await this.lock.extend(lockId, duration);
+    if (!extended) throw new LockExtendError(lockId);
   }
 
   async release() {
     const { lockId } = this.config;
-    await this.lock.release(lockId);
+    const released = await this.lock.release(lockId);
+    if (!released) throw new LockReleaseError(lockId);
   }
 
   async using<T>(routine: (singal: AbortSignal) => Promise<T>) {
