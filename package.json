@@ -6,6 +6,7 @@
   "license": "MIT",
   "scripts": {
     "docker": "docker-compose --env-file .env -f ./docker/compose.yml up --build",
+    "playground": "bun run --watch  ./scripts/playground.ts"
   },
   "dependencies": {
     "@prisma/client": "5.11.0",
