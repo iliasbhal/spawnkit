@@ -1,7 +1,8 @@
 import { Redis } from "ioredis";
 import * as BullMQ from "bullmq";
 import Redlock, { Lock as RedlockLock } from "redlock";
-import * as Adapters from "./index";
+import * as Adapters from "../index";
+import wait from "wait";
 
 class RedisAdapter {
   redis: Redis;
@@ -16,32 +17,62 @@ export class Lock extends RedisAdapter implements Adapters.AdapterLock {
   constructor(redis: Redis) {
     super(redis);
     this.redlock = new Redlock([redis]);
+
+    process.on("exit", () => {
+      this.releaseAll();
+    });
   }
 
   lockById = new Map<string, RedlockLock>();
 
+  private releaseAll() {
+    Array.from(this.lockById.keys()).forEach((lockId) => {
+      this.release(lockId);
+    });
+  }
+
   async acquire(lockId: string, duration: number): Promise<boolean> {
-    const lock = await this.redlock.acquire([lockId], duration);
-    this.lockById.set(lockId, lock);
-    return true;
+    try {
+      const lock = await this.redlock.acquire([lockId], duration);
+      this.lockById.set(lockId, lock);
+      return true;
+    } catch (err) {
+      if (err instanceof Error) {
+        if (err.message.includes("unable to achieve a quorum ")) {
+          return false;
+        }
+      }
+
+      throw err;
+    }
   }
 
   async extend(lockId: string, duration: number): Promise<boolean> {
     const lock = this.lockById.get(lockId);
     if (!lock) return false;
 
-    const newLock = await this.redlock.extend(lock, duration);
-    this.lockById.set(lockId, newLock);
-    return true;
+    try {
+      const newLock = await this.redlock.extend(lock, duration);
+      this.lockById.set(lockId, newLock);
+      return true;
+    } catch (err) {
+      this.lockById.delete(lockId);
+      return false;
+    }
   }
 
   async release(lockId: string): Promise<boolean> {
     const lock = this.lockById.get(lockId);
     if (!lock) return false;
 
-    await this.redlock.release(lock);
-    this.lockById.delete(lockId);
-    return true;
+    try {
+      await this.redlock.release(lock);
+      return true;
+    } catch (err) {
+      return false;
+    } finally {
+      this.lockById.delete(lockId);
+    }
   }
 }
 
@@ -124,50 +155,49 @@ export class EventBus extends RedisAdapter implements Adapters.AdapterEventBus {
   }
 
   on(channel: string, callback: (data: any) => any): { unsubscribe: Function } {
-    // console.log("await wait(1000);");
     const streamId = this.getKey(channel);
     let active = true;
     const seenTimestampIds = new Set();
+
     let prevTimetampKey = Date.now();
+    Promise.resolve().then(async () => {
+      while (active) {
+        const before = Date.now() - 100;
+        const elements = await this.redis.xread(
+          "STREAMS",
+          streamId,
+          prevTimetampKey,
+        );
 
-    const intervalId = setInterval(async () => {
-      const before = Date.now() - 100;
+        prevTimetampKey = before;
 
-      const elements = await this.redis.xread(
-        "STREAMS",
-        streamId,
-        prevTimetampKey,
-      );
+        const notify = (data: any) => {
+          if (active) callback(data);
+        };
 
-      prevTimetampKey = before;
+        if (elements) {
+          elements.forEach(([streamId, eventsByTimestampKey]) => {
+            eventsByTimestampKey.forEach(([timestampKey, events]) => {
+              if (seenTimestampIds.has(timestampKey)) return;
+              seenTimestampIds.add(timestampKey);
 
-      const notify = (data: any) => {
-        if (active) callback(data);
-      };
+              const eventKey = events[0]; // should be "event" as per .emit method;
+              const rawEventData = events[1];
+              if (rawEventData) {
+                const eventData = JSON.parse(rawEventData);
+                notify(eventData);
+              }
+            });
+          });
+        }
 
-      if (!elements) return;
-
-      // console.log(JSON.stringify(elements, null, 2));
-
-      elements.forEach(([streamId, eventsByTimestampKey]) => {
-        eventsByTimestampKey.forEach(([timestampKey, events]) => {
-          if (seenTimestampIds.has(timestampKey)) return;
-          seenTimestampIds.add(timestampKey);
-
-          const eventKey = events[0]; // should be "event" as per .emit method;
-          const rawEventData = events[1];
-          if (rawEventData) {
-            const eventData = JSON.parse(rawEventData);
-            notify(eventData);
-          }
-        });
-      });
-    }, 10);
+        await wait(200);
+      }
+    });
 
     return {
       unsubscribe: () => {
         active = false;
-        clearInterval(intervalId);
       },
     };
   }
@@ -179,22 +209,23 @@ export class Event extends RedisAdapter implements Adapters.AdapaterEvents {
   }
 
   async publish<EventData>(id: number, event: EventData) {
+    const hashID = this.getKey(id);
+    const eventId = await this.redis.incr(hashID + ":uid");
+
     const data = JSON.stringify(event);
-    const hash = this.getKey(id);
-    const eventId = await this.redis.incr(hash);
-    await this.redis.hset(hash, eventId.toString(), data);
+    await this.redis.hset(hashID, eventId.toString(), data);
     return eventId;
   }
 
   async ack(id: number, eventId: number): Promise<true> {
-    const hash = this.getKey(id);
-    await this.redis.hdel(hash, eventId.toString());
+    const hashID = this.getKey(id);
+    await this.redis.hdel(hashID, eventId.toString());
     return true;
   }
 
   async has(id: number): Promise<boolean> {
-    const hash = this.getKey(id);
-    const size = await this.redis.hlen(hash);
+    const hashID = this.getKey(id);
+    const size = await this.redis.hlen(hashID);
     const hasUnprocessedEvents = size > 0;
     return hasUnprocessedEvents;
   }
@@ -219,7 +250,7 @@ export class Event extends RedisAdapter implements Adapters.AdapaterEvents {
         if (!active) return;
         if (seenEventIds.has(eventId)) continue;
 
-        notify({ id: eventId, data: eventData });
+        notify({ id: eventId, data: JSON.parse(eventData) });
         seenEventIds.add(eventId);
       }
     }, 100);
