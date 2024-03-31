@@ -1,5 +1,5 @@
+import { Machine } from "@/integrations/xstate";
 import { setup } from "xstate";
-import { MachineInstance } from "./MachineInstance";
 
 const machine = setup({
   types: {
@@ -25,7 +25,7 @@ const machine = setup({
   },
 });
 
-export const ToggleMachine = MachineInstance.from(machine, {
+export const ToggleMachine = Machine.from(machine, {
   sync: (actor) => {
     const data = actor.getSnapshot();
   },
