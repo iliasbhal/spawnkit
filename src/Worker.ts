@@ -79,13 +79,17 @@ export class Worker {
       return result;
     } catch (err) {
       const shouldSilenceError =
-        err instanceof Lock.AcquireLockError || err instanceof Lock.ExtendError;
-      if (!shouldSilenceError) {
-        console.log("THROWN", err);
-        throw err;
-      } else {
-        // console.log("-->", err);
+        err instanceof Lock.AcquireLockError ||
+        err instanceof Lock.ExtendError ||
+        err instanceof Lock.ReleaseError;
+      if (shouldSilenceError) {
+        return;
       }
+
+      console.log("THROWN", err);
+      throw err;
+    }
+  }
     }
   }
 
