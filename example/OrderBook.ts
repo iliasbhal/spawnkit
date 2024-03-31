@@ -5,7 +5,7 @@ interface OrderBookData {
   count: number;
 }
 
-interface OrderEentBus {
+interface OrderEentChannel {
   change: string[];
 }
 
@@ -13,7 +13,10 @@ interface Stock {
   tick: string;
 }
 
-export class OrderBook extends Spawnkit.Instance<OrderBookData, OrderEentBus> {
+export class OrderBook extends Spawnkit.Instance<
+  OrderBookData,
+  OrderEentChannel
+> {
   async start(): Promise<any> {}
   async stop(): Promise<any> {}
 

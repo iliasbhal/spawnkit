@@ -21,7 +21,7 @@ interface InternalChannels {
   [key: `actor:${string}:event:${string}`]: any;
 }
 
-export class Instance<InstanceData = {}, CustomChannels = {}> {
+export class Instance<InstanceData = {}, InstanceChannels = {}> {
   running: boolean = false;
   keepAlive = new PromiseList();
   aborted = new ControlledPromise("Aborted");
@@ -186,19 +186,19 @@ export class Instance<InstanceData = {}, CustomChannels = {}> {
 
   async emit<
     Channel extends Exclude<
-      keyof CustomChannels | keyof InternalChannels,
+      keyof InstanceChannels | keyof InternalChannels,
       symbol | number
     >,
   >(
     channel: Channel,
-    data: Channel extends keyof CustomChannels
-      ? CustomChannels[Channel]
+    data: Channel extends keyof InstanceChannels
+      ? InstanceChannels[Channel]
       : Channel extends keyof InternalChannels
         ? InternalChannels[Channel]
         : never,
   ) {
     return this.runExternalEffect(async () => {
-      return await this.adapters.eventBus.emit(channel, data);
+      return await this.adapters.pubsub.emit(channel, data);
     });
   }
 

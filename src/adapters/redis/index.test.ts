@@ -7,7 +7,7 @@ import { generateTestSuite } from "../generateTestSuite";
 generateTestSuite("Redis Adapter", createGetAdapters);
 
 describe("Redis Adapter", () => {
-  describe("EventBus", () => {
+  describe("PubSub", () => {
     it.todo(
       "should clean up once an event has been consumed by all subscribers",
     );
@@ -27,7 +27,7 @@ function createGetAdapters() {
       lock: new RedisAdapters.Lock(redisClient),
       snapshot: new RedisAdapters.Snapshot(redisClient),
       events: new RedisAdapters.Event(redisClient),
-      eventBus: new RedisAdapters.EventBus(redisClient),
+      pubsub: new RedisAdapters.PubSub(redisClient),
       scheduler: new RedisAdapters.Scheduler(redisClient),
       worker: new RedisAdapters.Worker(redisClient, {
         concurrency: 50,

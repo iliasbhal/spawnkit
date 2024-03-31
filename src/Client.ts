@@ -23,50 +23,9 @@ export class Client<Props extends ClientProps> {
     return `actor:${actorId}:event:${eventId}` as const;
   }
 
-  // /**
-  //  * Creates a class for easier DX for interacting with actors
-  //  */
-  // for<Kind extends keyof Props["instances"]>(kind: Kind) {
-  //   type Current = InstanceType<Props["instances"][Kind]>;
-  //   type InstanceEvent = Parameters<Current["handleIncomingEvent"]>[0];
-  //   type InstanceEventBus = Parameters<Current["emit"]>;
-  //   type InstanceData = Parameters<Current["save"]>[0];
-
-  //   type ExtractMethodNames<T> = {
-  //     [K in keyof T]: T[K] extends (...args: any) => any ? K : never;
-  //   }[keyof T];
-  //   type ExtractMethods<T> = Pick<T, ExtractMethodNames<T>>;
-
-  //   type ForbiddenMethods = ExtractMethodNames<Instance>;
-
-  //   const client = this;
-
-  //   const Constructor = class {
-  //     id: number;
-
-  //     constructor(actorId: number) {
-  //       this.id = actorId;
-  //       const actorClient = client.actor(kind, this.id);
-
-  //       const self = this;
-  //       return new Proxy(this, {
-  //         get: (target, prop, receiver) => {
-  //           if (prop in target) return Reflect.get(target, prop, receiver);
-  //           if (typeof prop !== "string") return;
-
-  //           return actorClient[prop];
-  //         },
-  //       });
-  //     }
-  //   };
-
-  //   type AvailableMethods = Omit<Current, keyof Instance>;
-  //   return Constructor as any as new (actorId: number) => AvailableMethods;
-  // }
-
   actor<Kind extends keyof Props["instances"]>(kind: Kind, actorId: number) {
     type Current = InstanceType<Props["instances"][Kind]>;
-    type InstanceEvent = Parameters<Current["handleIncomingEvent"]>[1];
+    type InstanceEvent = Parameters<Current["callMethodDefinedInEvent"]>[1];
     type InstanceEmittable = Parameters<Current["emit"]>;
     type InstanceData = Parameters<Current["save"]>[0];
 
@@ -116,7 +75,7 @@ export class Client<Props extends ClientProps> {
         channel: InstanceEmittable[0],
         callback: (data: InstanceEmittable[1]) => any,
       ) => {
-        return this.adapters.eventBus.on(channel, callback);
+        return this.adapters.pubsub.on(channel, callback);
       },
     };
 

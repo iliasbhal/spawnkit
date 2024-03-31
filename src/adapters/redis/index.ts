@@ -139,7 +139,7 @@ export class Snapshot
   }
 }
 
-export class EventBus extends RedisAdapter implements Adapters.AdapterEventBus {
+export class PubSub extends RedisAdapter implements Adapters.AdapterPubSub {
   private getKey(channel: string) {
     return `events-bus:${channel}`;
   }
@@ -181,7 +181,9 @@ export class EventBus extends RedisAdapter implements Adapters.AdapterEventBus {
               if (seenTimestampIds.has(timestampKey)) return;
               seenTimestampIds.add(timestampKey);
 
-              const eventKey = events[0]; // should be "event" as per .emit method;
+              // eventKey should be "event" as per .emit method;
+              // But we don't need it
+              const eventKey = events[0];
               const rawEventData = events[1];
               if (rawEventData) {
                 const eventData = JSON.parse(rawEventData);
@@ -191,7 +193,7 @@ export class EventBus extends RedisAdapter implements Adapters.AdapterEventBus {
           });
         }
 
-        await wait(200);
+        await wait(25);
       }
     });
 
