@@ -1,9 +1,9 @@
-import * as Spawnkit from "../src";
-import * as instances from "../example/instances";
+import wait from "wait";
 import { Adapters } from "@/adapters";
 import * as Adapter from "@/adapters/redis";
 import { redis } from "@/adapters/redis/client";
-import wait from "wait";
+import * as Spawnkit from "../src";
+import { OrderBook } from "../example/OrderBook";
 
 export const adapters: Adapters = {
   lock: new Adapter.Lock(redis),
@@ -18,13 +18,13 @@ export const adapters: Adapters = {
 
 const worker = Spawnkit.Worker.from({
   adapters,
-  instances,
+  instances: { OrderBook },
 });
 
 // import type * as instances from "./instances";
 const client = Spawnkit.Client.from({
   adapters,
-  instances: {} as typeof instances,
+  instances: { OrderBook },
 });
 
 // worker.start();
@@ -33,12 +33,22 @@ const main = async () => {
   // await redis.flushall();
   worker.start();
 
-  const toggle = client.actor("OrderBook", 111);
+  const orderBook = client.actor("OrderBook", 111);
+
+  orderBook.on("change", (event) => {
+    console.log("CHANGE RECEIVED", event);
+  });
 
   const intervalId = setInterval(async () => {
-    const response = await toggle.buy({ tick: "APPL" });
+    const isJust = Math.random() > 0.5;
+    if (isJust) {
+      orderBook.just.buy({ tick: "APPL" });
+      return;
+    }
+
+    const response = await orderBook.buy({ tick: "APPL" });
     console.log("response", response);
-  }, 1);
+  }, 1000);
 
   await wait(10_000);
   clearInterval(intervalId);
