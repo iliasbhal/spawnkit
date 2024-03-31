@@ -10,38 +10,42 @@ interface ListenProps<T extends InstanceClass = InstanceClass> {
   adapters: Adapters;
 }
 
-export class Worker {
-  static listen(opts: ListenProps) {
-    const { instances, adapters } = opts;
-    Worker.verify(instances);
+export class Worker<T extends InstanceClass = InstanceClass>
+  implements ListenProps<T>
+{
+  instances: Record<string, T>;
+  adapters: Adapters;
 
-    if (process.env.NODE_ENV !== "test") {
-      Object.keys(instances).forEach((kind) => {
-        console.log(`ActorWorker ready to handle "${kind}" actors`);
-      });
-    }
+  constructor(config: ListenProps<T>) {
+    this.instances = config.instances;
+    this.adapters = config.adapters;
+  }
 
-    return adapters.worker.subscribe(async (event) => {
-      const Instance = instances[event.kind];
+  start() {
+    const subscription = this.adapters.worker.subscribe(async (event) => {
+      const Instance = this.instances[event.kind];
       if (!Instance) {
         throw new Error("Machine Not implemented");
       }
 
-      return await Worker.handleEvent(Instance, event, adapters);
+      return await this.handleEvent(Instance, event);
     });
+
+    this.stopCallback = subscription.unsubscribe;
   }
 
-  static async handleEvent(
-    Instance: InstanceClass,
-    event: ScheduleData,
-    adapters: ListenProps<any>["adapters"],
-  ) {
+  private stopCallback?: Function;
+  stop() {
+    this.stopCallback?.();
+  }
+
+  private async handleEvent(Instance: InstanceClass, event: ScheduleData) {
     try {
-      const instance = new Instance(event, adapters);
+      const instance = new Instance(event, this.adapters);
       // When instantiating a new actor, we should acquire a lock
       // So that only one worker in the cloud is instantiating the actor
       // This is to prevent from executing side effects twice and race conditions.
-      const MIN_LOCK_DURATION = 30_000;
+      const MIN_LOCK_DURATION = 5_000;
 
       const lockConfig = {
         lockId: `redlock:${event.id}`,
@@ -51,7 +55,7 @@ export class Worker {
       // When instantiating a new actor, we should acquire a lock
       // So that only one worker in the cloud is instantiating the actor
       // This is to prevent from executing side effects twice and race conditions.
-      const lock = new Lock(lockConfig, adapters.lock);
+      const lock = new Lock(lockConfig, this.adapters.lock);
       const result = await lock.using(async (abortSignal) => {
         await instance.run(abortSignal);
       });
@@ -66,9 +70,9 @@ export class Worker {
         for (const waitTime of waitTimeBeforeAttemp) {
           await wait(waitTime);
 
-          const hasUnprocessedEvents = await adapters.events.has(event.id);
+          const hasUnprocessedEvents = await this.adapters.events.has(event.id);
           if (hasUnprocessedEvents) {
-            adapters.scheduler.schedule({
+            this.adapters.scheduler.schedule({
               kind: event.kind,
               id: event.id,
             });
@@ -90,7 +94,18 @@ export class Worker {
       throw err;
     }
   }
+
+  static from<O extends ListenProps>(opts: O) {
+    const { instances, adapters } = opts;
+    Worker.verify(instances);
+
+    if (process.env.NODE_ENV !== "test") {
+      Object.keys(instances).forEach((kind) => {
+        console.log(`ActorWorker ready to handle "${kind}" actors`);
+      });
     }
+
+    return new Worker(opts);
   }
 
   static verify(instances: ListenProps["instances"]) {
