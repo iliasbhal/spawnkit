@@ -4,12 +4,15 @@ import * as Adapter from "@/adapters/redis";
 import { redis } from "@/adapters/redis/client";
 import * as Spawnkit from "../src";
 import { OrderBook } from "../example/OrderBook";
+import { ToggleMachine } from "../example/ToggleMachine";
+import { GameSession } from "../example/GameSession";
 
 export const adapters: Adapters = {
   lock: new Adapter.Lock(redis),
   snapshot: new Adapter.Snapshot(redis),
   events: new Adapter.Event(redis),
-  eventBus: new Adapter.EventBus(redis),
+  pubsub: new Adapter.PubSub(redis),
+
   scheduler: new Adapter.Scheduler(redis),
   worker: new Adapter.Worker(redis, {
     concurrency: 50,
@@ -17,24 +20,23 @@ export const adapters: Adapters = {
 };
 
 const worker = Spawnkit.Worker.from({
+  instances: { OrderBook, ToggleMachine, GameSession },
   adapters,
-  instances: { OrderBook },
 });
 
 // import type * as instances from "./instances";
 const client = Spawnkit.Client.from({
+  instances: { OrderBook, ToggleMachine, GameSession },
   adapters,
-  instances: { OrderBook },
 });
 
 // worker.start();
 
 const main = async () => {
-  // await redis.flushall();
+  await redis.flushall();
   worker.start();
 
   const orderBook = client.actor("OrderBook", 111);
-
   orderBook.on("change", (event) => {
     console.log("CHANGE RECEIVED", event);
   });
@@ -46,9 +48,12 @@ const main = async () => {
       return;
     }
 
+    const prev = Date.now();
     const response = await orderBook.buy({ tick: "APPL" });
-    console.log("response", response);
-  }, 1000);
+    const then = Date.now();
+
+    console.log("response", response, then - prev);
+  }, 25);
 
   await wait(10_000);
   clearInterval(intervalId);

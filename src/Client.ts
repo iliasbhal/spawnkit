@@ -26,8 +26,8 @@ export class Client<Props extends ClientProps> {
   actor<Kind extends keyof Props["instances"]>(kind: Kind, actorId: number) {
     type Current = InstanceType<Props["instances"][Kind]>;
     type InstanceEvent = Parameters<Current["callMethodDefinedInEvent"]>[1];
-    type InstanceEmittable = Parameters<Current["emit"]>;
-    type InstanceData = Parameters<Current["save"]>[0];
+    type InstanceEmittable = Parameters<Current["emitExternal"]>;
+    type InstanceInternalEmittable = Parameters<Current["emitInternal"]>;
 
     type ExtractMethodNames<T> = {
       [K in keyof T]: T[K] extends (...args: any) => any ? K : never;
@@ -66,11 +66,14 @@ export class Client<Props extends ClientProps> {
       return eventId;
     };
 
-    const actorClientAPI = {
-      getState: () => {
-        return this.adapters.snapshot.get<InstanceData>(actorId);
-      },
+    const onInternalEmit = (
+      channel: InstanceInternalEmittable[0],
+      callback: (data: InstanceInternalEmittable[1]) => any,
+    ) => {
+      return this.adapters.pubsub.on(channel, callback) as any;
+    };
 
+    const actorClientAPI = {
       on: (
         channel: InstanceEmittable[0],
         callback: (data: InstanceEmittable[1]) => any,
@@ -98,7 +101,7 @@ export class Client<Props extends ClientProps> {
                 actorId,
                 eventId,
               );
-              const subscription = actorClientAPI.on(channelID, (data) => {
+              const subscription = onInternalEmit(channelID, (data) => {
                 resolve(data);
                 subscription.unsubscribe();
               });
@@ -124,9 +127,13 @@ export class Client<Props extends ClientProps> {
       },
     );
 
+    // We use the Kind type here just o it to show nicely
+    // in the intelissense. it will show as Remote<OrderBook> for example
+    type Remote<Kind> = typeof actorClientAPI &
+      RemoteMethodes & { just: JustRemoteMethodes };
+
     return new Proxy(
-      actorClientAPI as typeof actorClientAPI &
-        RemoteMethodes & { just: JustRemoteMethodes },
+      actorClientAPI as Remote<InstanceType<Props["instances"][Kind]>>,
       {
         get(target, prop, receiver) {
           if (prop in target) return Reflect.get(target, prop, receiver);

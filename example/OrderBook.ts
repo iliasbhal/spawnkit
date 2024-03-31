@@ -5,8 +5,8 @@ interface OrderBookData {
   count: number;
 }
 
-interface OrderEentChannel {
-  change: string[];
+interface OrderBookEvent {
+  change: number[];
 }
 
 interface Stock {
@@ -15,22 +15,23 @@ interface Stock {
 
 export class OrderBook extends Spawnkit.Instance<
   OrderBookData,
-  OrderEentChannel
+  OrderBookEvent
 > {
   async start(): Promise<any> {}
   async stop(): Promise<any> {}
 
   async buy(stock: Stock) {
-    this.data = this.data || {};
+    this.data = this.data || ({} as any);
     this.data!.count = this.data?.count || 0;
     this.data!.count++;
 
-    this.emit("change", this.data!.count);
+    this.emit("change", [this.data!.count]);
 
     return {
       success: true,
       count: this.data!.count,
       qty: 1000,
+      stock,
     };
   }
 

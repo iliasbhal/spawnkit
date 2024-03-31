@@ -65,7 +65,7 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
     const response: unknown = await method?.(...args);
     if (mode === "normal") {
       const channelID = Client.getChannelForEventResponse(this.id, id);
-      this.emit(channelID, response as any);
+      this.emitInternal(channelID, response as any);
     }
   }
 
@@ -184,19 +184,23 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
     this.keepAlive.add(noMoreEventsCtl.await);
   }
 
-  async emit<
-    Channel extends Exclude<
-      keyof InstanceChannels | keyof InternalChannels,
-      symbol | number
-    >,
-  >(
-    channel: Channel,
-    data: Channel extends keyof InstanceChannels
-      ? InstanceChannels[Channel]
-      : Channel extends keyof InternalChannels
-        ? InternalChannels[Channel]
-        : never,
-  ) {
+  /** this function is used to emit message to one client,
+   * also for type safety, so that so that it doesn't show on client.on channel name autocomplete
+   **/
+  async emitInternal<
+    Channel extends Exclude<keyof InternalChannels, symbol | number>,
+  >(channel: Channel, data: InternalChannels[Channel]) {
+    return this.emit(channel, data);
+  }
+
+  /** this will send a message to all client subscribed to this actor specified channel */
+  async emitExternal<
+    Channel extends Exclude<keyof InstanceChannels, symbol | number>,
+  >(channel: Channel, data: InstanceChannels[Channel]) {
+    return this.emit(channel, data);
+  }
+
+  emit(channel: string, data: any) {
     return this.runExternalEffect(async () => {
       return await this.adapters.pubsub.emit(channel, data);
     });
