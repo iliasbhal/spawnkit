@@ -35,8 +35,8 @@ interface InstanceLockConfig {
 
 export class Lock {
   static AcquireLockError = AcquireLockError;
-  static ReleaseError = LockReleaseError;
   static ExtendError = LockExtendError;
+  static ReleaseError = LockReleaseError;
 
   config: InstanceLockConfig;
   lock: AdapterLock;
@@ -87,41 +87,49 @@ export class Lock {
     if (!released) throw new LockReleaseError(lockId);
   }
 
-  async using<T>(routine: (singal: AbortSignal) => Promise<T>) {
-    await this.acquire();
-    let expireAt = Date.now();
-
-    // If we are not able to acquire the lock in the first place
-    // there is not point in going through all the code below.
-
-    const routineAbortCtl = new AbortController();
+  autoExtendLockInBackground(stopExtendingSignal: AbortSignal) {
     const extendAbortCtl = new AbortController();
 
-    const autoExtendBackground = Promise.resolve()
+    Promise.resolve()
       .then(async () => {
         const { extendBeforeThreshold } = this.config;
+        let expireAt = Date.now();
+
         loop: while (true) {
           const timeBeforeExpire = expireAt - Date.now();
           const timeBeforeExtend = timeBeforeExpire - extendBeforeThreshold;
 
-          if (routineAbortCtl.signal.aborted) break loop;
+          if (stopExtendingSignal.aborted) break loop;
           await wait(timeBeforeExtend);
 
-          if (routineAbortCtl.signal.aborted) break loop;
-          await this.extend();
+          if (stopExtendingSignal.aborted) break loop;
           expireAt = Date.now();
+          await this.extend();
         }
       })
       .catch((err) => {
         // If an error happens after the routine has completed,
         // we can safely ignore, otherwise, we throw the error;
-        if (routineAbortCtl.signal.aborted) return;
+        if (stopExtendingSignal.aborted) return;
         extendAbortCtl.abort(err);
         throw err;
       });
 
+    return extendAbortCtl.signal;
+  }
+
+  async using<T>(routine: (singal: AbortSignal) => Promise<T>) {
+    await this.acquire();
+
+    // If we are not able to acquire the lock in the first place
+    // there is not point in going through all the code below.
+    const routineAbortCtl = new AbortController();
+    const abortExtSignal = this.autoExtendLockInBackground(
+      routineAbortCtl.signal,
+    );
+
     try {
-      const result = await routine(extendAbortCtl.signal);
+      const result = await routine(abortExtSignal);
       return result;
     } finally {
       routineAbortCtl.abort();
