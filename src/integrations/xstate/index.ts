@@ -6,33 +6,36 @@ type MachineEvent<M extends x.AnyStateMachine> = Parameters<
   ReturnType<typeof x.createActor<M>>["send"]
 >[0];
 
-type MachineSnapshot<M extends x.AnyStateMachine> = ReturnType<
+type MachineData<M extends x.AnyStateMachine> = ReturnType<
   ReturnType<typeof x.createActor<M>>["getPersistedSnapshot"]
 >;
 
-export class MachineInstance<
-  Machine extends x.AnyStateMachine,
-> extends Spawnkit.Instance<MachineSnapshot<Machine>> {
-  machine: Machine = null as any;
+export class Machine<
+  StateMachine extends x.AnyStateMachine,
+> extends Spawnkit.Instance<MachineData<StateMachine>> {
+  machine: StateMachine = null as any;
   sync?: (actor: x.Actor<typeof this.machine>) => any;
-  actor: x.Actor<Machine> = null as any;
+  actor: x.Actor<StateMachine> = null as any;
   actorByActorId = new Map<string, x.AnyActorRef>();
   subscriptonByActor = new Map<string, x.Subscription>();
-  snapshotByActorId = new Map<string, MachineSnapshot<Machine>>();
+  snapshotByActorId = new Map<string, MachineData<StateMachine>>();
 
-  static from<Machine extends x.AnyStateMachine>(
-    machine: Machine,
-    config?: { sync?: MachineInstance<typeof machine>["sync"] },
+  static from<StateMachine extends x.AnyStateMachine>(
+    machine: StateMachine,
+    config?: { sync?: Machine<typeof machine>["sync"] },
   ) {
     // simply preconfigure the class with the machine object
-    return class extends MachineInstance<typeof machine> {
+    return class extends Machine<typeof machine> {
       machine = machine;
       sync = config?.sync;
     };
   }
 
-  eventProcessing = new Map<MachineEvent<Machine>, ControlledPromise<true>>();
-  async send(event: MachineEvent<Machine>) {
+  eventProcessing = new Map<
+    MachineEvent<StateMachine>,
+    ControlledPromise<true>
+  >();
+  async send(event: MachineEvent<StateMachine>) {
     const eventProcessed = new ControlledPromise<true>();
 
     this.eventProcessing.set(event, eventProcessed);
@@ -70,8 +73,7 @@ export class MachineInstance<
   }
 
   private async handleSnapshot() {
-    const snapshot =
-      this.actor.getPersistedSnapshot() as MachineSnapshot<Machine>;
+    const snapshot = this.actor.getPersistedSnapshot() as MachineData<Machine>;
     this.snapshotByActorId.set(this.actor.id, snapshot);
     this.save(snapshot);
 
@@ -110,7 +112,7 @@ export class MachineInstance<
           this.runExternalEffect(async () => {
             this.snapshotByActorId.set(
               actor.id,
-              snapshot as MachineSnapshot<Machine>,
+              snapshot as MachineData<Machine>,
             );
             const shouldResolve = ["error", "done"].includes(snapshot.status);
             if (shouldResolve) {
@@ -132,7 +134,7 @@ export class MachineInstance<
    * This method releases the event that we received within onEvent
    */
   private async handleActorEvent(event: x.InspectedEventEvent) {
-    const eventData = event.event as MachineEvent<Machine>;
+    const eventData = event.event as MachineEvent<StateMachine>;
     const isExternaEventBeeingProcessed = this.eventProcessing.has(eventData);
     if (isExternaEventBeeingProcessed) {
       const isProcessedCtl = this.eventProcessing.get(eventData)!;
