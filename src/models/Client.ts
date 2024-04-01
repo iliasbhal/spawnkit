@@ -55,15 +55,36 @@ export class Client<Props extends ClientProps> {
       ) => Promise<true>;
     };
 
+    let lastEventSentAt: number | null = null;
+    const checkShouldScheduleWithEventSent = () => {
+      if (!lastEventSentAt) {
+        lastEventSentAt = Date.now();
+        return true;
+      }
+
+      const timeSinceLastEventSent = Date.now() - lastEventSentAt;
+      const shouldScheduleInstance = timeSinceLastEventSent > 1000;
+      lastEventSentAt = Date.now();
+      return shouldScheduleInstance;
+    };
+
     const sendEventToActor = async (event: InstanceEvent) => {
-      // when sending an event, we shall always try to spawn an instance
-      // to ensure that the event will be processed
+      const shouldScheduleInstance = checkShouldScheduleWithEventSent();
       const [eventId] = await Promise.all([
         this.adapters.events.publish(actorId, event),
-        this.adapters.scheduler.schedule({
-          id: actorId,
-          kind: kind.toString(),
-        }),
+
+        // when sending an event, we shall always try to spawn an instance
+        // to ensure that the event will be processed except In the case that we are sending a lot of events
+        // We don't have to try t schedule an instance together with every event we send.
+        // Once an instance terminate, it will try again 3 times to check if there are pending events process.
+        // We can rely on this fact to only schedule an instance if it has been a long time since last event push.
+        // This is mainly to avoid adding unnessary pressure the the backend.
+        // Scheduling too often is guarenteed to fail often as theu won't be able to acquire the locks
+        shouldScheduleInstance &&
+          this.adapters.scheduler.schedule({
+            id: actorId,
+            kind: kind.toString(),
+          }),
       ]);
 
       return eventId;
