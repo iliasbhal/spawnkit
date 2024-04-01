@@ -1,5 +1,5 @@
 import wait from "wait";
-import { AdapterLock } from "./adapters";
+import { AdapterLock } from "../adapters";
 
 export class LockError extends Error {}
 

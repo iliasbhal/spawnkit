@@ -3,8 +3,9 @@ import { ControlledPromise } from "@/utils/ControlledPromise";
 import { AsyncDebounceHandler } from "@/utils/AsyncDebounceHandler";
 import { ControlledTimeout } from "@/utils/ControlledTimeout";
 import { Lock } from "./Lock";
-import { Adapters, ScheduleData } from "./adapters";
+import { Adapters, ScheduleData } from "../adapters";
 import { Client } from "./Client";
+import { Stream } from "./Stream";
 
 interface InstanceResult<V extends any> {
   data: V | undefined;
@@ -14,11 +15,16 @@ interface InstanceResult<V extends any> {
 interface InstanceEvent {
   action: string;
   args: any[];
-  mode?: "just" | "normal";
+  mode?: "emit" | "normal";
 }
 
 interface InternalChannels {
-  [key: `actor:${string}:event:${string}`]: any;
+  [key: `actor:${string}:event:${string}`]:
+    | { response: any }
+    | { stream: true; start: true }
+    | { stream: true; data: any }
+    | { stream: true; end: true }
+    | { stream: true; error: Error };
 }
 
 export class Instance<InstanceData = {}, InstanceChannels = {}> {
@@ -62,10 +68,35 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
       return;
     }
 
+    const channelD = Client.getChannelForEventResponse(this.id, id);
     const response: unknown = await method?.(...args);
+    if (mode === "emit") {
+      // NO OP
+      // TODO: we should exclude methods that return a Stream from clientAPI.emit method;
+      return;
+    }
+
     if (mode === "normal") {
       const channelID = Client.getChannelForEventResponse(this.id, id);
-      this.emitInternal(channelID, response as any);
+      if (response instanceof Stream) {
+        response.on("start", () =>
+          this.emitInternal(channelID, { stream: true, start: true }),
+        );
+        response.on("data", (data) =>
+          this.emitInternal(channelID, { stream: true, data: data }),
+        );
+        response.on("end", () =>
+          this.emitInternal(channelID, { stream: true, end: true }),
+        );
+
+        response.on("error", (err) =>
+          this.emitInternal(channelID, { stream: true, error: err }),
+        );
+
+        response.start();
+      } else {
+        this.emitInternal(channelID, { response });
+      }
     }
   }
 

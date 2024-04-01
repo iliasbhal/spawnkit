@@ -1,7 +1,7 @@
 import wait from "wait";
 import { Instance } from "./Instance";
 import { Lock } from "./Lock";
-import { Adapters, ScheduleData } from "./adapters";
+import { Adapters, ScheduleData } from "../adapters";
 
 type InstanceClass = typeof Instance<any>;
 
@@ -90,17 +90,16 @@ export class Worker<T extends InstanceClass = InstanceClass>
         return;
       }
 
-      console.log("THROWN", err);
+      console.error(err);
       throw err;
     }
   }
 
   static from<O extends ListenProps>(opts: O) {
-    const { instances, adapters } = opts;
-    Worker.verify(instances);
+    Worker.verify(opts.instances);
 
     if (process.env.NODE_ENV !== "test") {
-      Object.keys(instances).forEach((kind) => {
+      Object.keys(opts.instances).forEach((kind) => {
         console.log(`ActorWorker ready to handle "${kind}" actors`);
       });
     }

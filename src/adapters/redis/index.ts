@@ -146,7 +146,6 @@ export class PubSub extends RedisAdapter implements Adapters.AdapterPubSub {
 
   async emit(channel: string, event: any): Promise<true> {
     const streamId = this.getKey(channel);
-
     const key = "event";
     const value = JSON.stringify(event);
 
@@ -160,6 +159,7 @@ export class PubSub extends RedisAdapter implements Adapters.AdapterPubSub {
     const seenTimestampIds = new Set();
 
     let prevTimetampKey = Date.now();
+
     Promise.resolve().then(async () => {
       while (active) {
         const before = Date.now() - 100;

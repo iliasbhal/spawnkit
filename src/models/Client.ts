@@ -1,5 +1,6 @@
 import type { Instance } from "./Instance";
-import { Adapters } from "./adapters";
+import { Adapters } from "../adapters";
+import { Stream } from "./Stream";
 
 type InstanceClass = typeof Instance<any>;
 
@@ -22,6 +23,8 @@ export class Client<Props extends ClientProps> {
   static getChannelForEventResponse(actorId: number, eventId: number) {
     return `actor:${actorId}:event:${eventId}` as const;
   }
+
+  static handleIncomingStream() {}
 
   actor<Kind extends keyof Props["instances"]>(kind: Kind, actorId: number) {
     type Current = InstanceType<Props["instances"][Kind]>;
@@ -70,7 +73,7 @@ export class Client<Props extends ClientProps> {
       channel: InstanceInternalEmittable[0],
       callback: (data: InstanceInternalEmittable[1]) => any,
     ) => {
-      return this.adapters.pubsub.on(channel, callback) as any;
+      return this.adapters.pubsub.on(channel, callback);
     };
 
     const actorClientAPI = {
@@ -82,7 +85,7 @@ export class Client<Props extends ClientProps> {
       },
     };
 
-    const createRemoteMethodHandler = (mode: "just" | "normal") => {
+    const createRemoteMethodHandler = (mode: InstanceEvent["mode"]) => {
       return (action: string) => {
         return async (...args: any[]) => {
           const eventId = await sendEventToActor({
@@ -91,7 +94,7 @@ export class Client<Props extends ClientProps> {
             mode,
           });
 
-          if (mode === "just") {
+          if (mode === "emit") {
             return eventId;
           }
 
@@ -101,9 +104,47 @@ export class Client<Props extends ClientProps> {
                 actorId,
                 eventId,
               );
-              const subscription = onInternalEmit(channelID, (data) => {
-                resolve(data);
-                subscription.unsubscribe();
+
+              type Subscription = ReturnType<typeof onInternalEmit>;
+              type Message = Parameters<
+                Parameters<typeof onInternalEmit>[1]
+              >[0];
+
+              const incomingStream = new Stream<any>(() => {});
+              const handleStreamMessage = (
+                subscription: Subscription,
+                message: Message,
+              ) => {
+                if ("start" in message) {
+                  incomingStream.store("start");
+                  resolve(incomingStream);
+                }
+
+                if ("data" in message) {
+                  incomingStream.store("data", message.data);
+                }
+
+                if ("end" in message) {
+                  incomingStream.store("end");
+                  subscription.unsubscribe();
+                }
+              };
+
+              const handleDefaultMessage = (
+                subscription: Subscription,
+                message: Message,
+              ) => {
+                if ("response" in message) {
+                  resolve(message.response);
+                  subscription.unsubscribe();
+                }
+              };
+
+              const subscription = onInternalEmit(channelID, (message) => {
+                if ("stream" in message)
+                  return handleStreamMessage(subscription, message);
+                if ("response" in message)
+                  return handleDefaultMessage(subscription, message);
               });
             });
           }
@@ -114,7 +155,7 @@ export class Client<Props extends ClientProps> {
     };
 
     const normalRemoteMethodHandler = createRemoteMethodHandler("normal");
-    const justRemoteMethodHandler = createRemoteMethodHandler("just");
+    const justRemoteMethodHandler = createRemoteMethodHandler("emit");
 
     const actorJustClientAPI = new Proxy(
       {},
@@ -130,7 +171,7 @@ export class Client<Props extends ClientProps> {
     // We use the Kind type here just o it to show nicely
     // in the intelissense. it will show as Remote<OrderBook> for example
     type Remote<Kind> = typeof actorClientAPI &
-      RemoteMethodes & { just: JustRemoteMethodes };
+      RemoteMethodes & { emit: JustRemoteMethodes };
 
     return new Proxy(
       actorClientAPI as Remote<InstanceType<Props["instances"][Kind]>>,
