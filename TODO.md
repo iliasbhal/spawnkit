@@ -1,3 +1,6 @@
+- Should be able to schedule calls
+- Should be able to setup a cron for a method
+
 - Remove null typings from .data. add an initialize() function that returns the initial data. OR have to defined a .data attribute.
 - error thrown during a method call should be serialized to client
 - should also emit an error event threw the this.emit function
