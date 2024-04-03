@@ -216,7 +216,6 @@ export class MessageBroker
   async publish<EventData>(id: number, event: EventData) {
     const hashID = this.getKey(id);
     const eventId = await this.redis.incr(hashID + ":uid");
-    console.log("PUBLISH EVENT", eventId, id);
     await this.redis.hset(hashID, eventId.toString(), JSON.stringify(event));
     return eventId;
   }
@@ -244,9 +243,6 @@ export class MessageBroker
     const intervalId = setInterval(async () => {
       const hash = this.getKey(actorId);
       const events = await this.redis.hgetall(hash);
-
-      console.log("HGET ALL", events);
-
       const notify = (data: any) => {
         if (active) {
           callback(data);
