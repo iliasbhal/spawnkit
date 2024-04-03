@@ -111,7 +111,11 @@ const scheduleCallExample = async () => {
     tick: "AAPL",
   });
 
-  console.log("scheduleId", scheduleId);
+  const scheduleId2 = await orderBook.delay(1000).buy({
+    tick: "AAPL",
+  });
+
+  console.log("scheduleId", scheduleId, scheduleId2);
   // orderBook.scheduled.list();
   // orderBook.scheduled.abort(scheduleId)
 
