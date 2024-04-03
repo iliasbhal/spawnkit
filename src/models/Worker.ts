@@ -1,7 +1,13 @@
 import wait from "wait";
 import { Instance } from "./Instance";
 import { Lock } from "./Lock";
-import { Adapters, ScheduleData } from "../adapters";
+import {
+  Adapters,
+  ScheduleByType,
+  ScheduleEventData,
+  ScheduleInstanceData,
+} from "../adapters";
+import { Client } from "./Client";
 
 type InstanceClass = typeof Instance<any>;
 
@@ -15,20 +21,30 @@ export class Worker<T extends InstanceClass = InstanceClass>
 {
   instances: Record<string, T>;
   adapters: Adapters;
+  client: Client<{
+    instances: Record<string, T>;
+    adapters: Adapters;
+  }>;
 
   constructor(config: ListenProps<T>) {
     this.instances = config.instances;
     this.adapters = config.adapters;
+    this.client = new Client({
+      instances: config.instances,
+      adapters: config.adapters,
+    });
   }
 
   start() {
-    const subscription = this.adapters.worker.subscribe(async (event) => {
-      const Instance = this.instances[event.kind];
-      if (!Instance) {
-        throw new Error("Machine Not implemented");
+    const subscription = this.adapters.worker.subscribe(async (type, data) => {
+      // console.log("WORKER", type);
+      if (type === "event") {
+        return await this.callInstanceMethod(data as ScheduleEventData);
       }
 
-      return await this.handleEvent(Instance, event);
+      if (type === "instance") {
+        return await this.tryInstantiateInstance(data as ScheduleInstanceData);
+      }
     });
 
     this.stopCallback = subscription.unsubscribe;
@@ -39,24 +55,48 @@ export class Worker<T extends InstanceClass = InstanceClass>
     this.stopCallback?.();
   }
 
-  private async handleEvent(Instance: InstanceClass, event: ScheduleData) {
+  private async callInstanceMethod(scheduleEvent: ScheduleByType["event"]) {
+    // console.log("scheduleEvent", scheduleEvent);
+
+    const { kind, id } = scheduleEvent.instance;
+    const { action, args } = scheduleEvent.event;
+
+    console.log("scheduled action received", kind, id, action, args);
+    const actorAPI = this.client.actor(kind, id);
+
+    // console.log("BEFORE");
+    await actorAPI.emit[action](...args);
+    // console.log("AFTER");
+  }
+
+  private async tryInstantiateInstance(
+    instanceConfig: ScheduleByType["instance"],
+  ) {
+    console.log("tryInstantiateInstance", instanceConfig);
+    const Instance = this.instances[instanceConfig.kind];
+    if (!Instance) {
+      throw new Error("Machine Not implemented");
+    }
+
     try {
-      const instance = new Instance(event, this.adapters);
       // When instantiating a new actor, we should acquire a lock
       // So that only one worker in the cloud is instantiating the actor
       // This is to prevent from executing side effects twice and race conditions.
       const MIN_LOCK_DURATION = 5_000;
 
       const lockConfig = {
-        lockId: `redlock:${event.id}`,
+        lockId: `redlock:${instanceConfig.id}`,
         duration: MIN_LOCK_DURATION,
       };
 
       // When instantiating a new actor, we should acquire a lock
       // So that only one worker in the cloud is instantiating the actor
       // This is to prevent from executing side effects twice and race conditions.
+
+      console.log("INSTANTIATE", instanceConfig.kind);
       const lock = new Lock(lockConfig, this.adapters.lock);
       const result = await lock.using(async (abortSignal) => {
+        const instance = new Instance(instanceConfig, this.adapters);
         await instance.run(abortSignal);
       });
 
@@ -70,11 +110,13 @@ export class Worker<T extends InstanceClass = InstanceClass>
         for (const waitTime of waitTimeBeforeAttemp) {
           await wait(waitTime);
 
-          const hasUnprocessedEvents = await this.adapters.events.has(event.id);
+          const hasUnprocessedEvents = await this.adapters.messages.has(
+            instanceConfig.id,
+          );
           if (hasUnprocessedEvents) {
-            this.adapters.scheduler.schedule({
-              kind: event.kind,
-              id: event.id,
+            this.adapters.scheduler.instance({
+              kind: instanceConfig.kind,
+              id: instanceConfig.id,
             });
           }
         }
@@ -100,7 +142,7 @@ export class Worker<T extends InstanceClass = InstanceClass>
 
     if (process.env.NODE_ENV !== "test") {
       Object.keys(opts.instances).forEach((kind) => {
-        console.log(`ActorWorker ready to handle "${kind}" actors`);
+        // console.log(`ActorWorker ready to handle "${kind}" actors`);
       });
     }
 

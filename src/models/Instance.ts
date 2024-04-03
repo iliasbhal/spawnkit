@@ -3,19 +3,17 @@ import { ControlledPromise } from "@/utils/ControlledPromise";
 import { AsyncDebounceHandler } from "@/utils/AsyncDebounceHandler";
 import { ControlledTimeout } from "@/utils/ControlledTimeout";
 import { Lock } from "./Lock";
-import { Adapters, ScheduleData } from "../adapters";
+import {
+  Adapters,
+  ScheduleInstanceData,
+  InstanceMethodCall,
+} from "../adapters";
 import { Client } from "./Client";
 import { Stream } from "./Stream";
 
 interface InstanceResult<V extends any> {
   data: V | undefined;
   stale: boolean;
-}
-
-interface InstanceEvent {
-  action: string;
-  args: any[];
-  mode?: "emit" | "normal";
 }
 
 interface InternalChannels {
@@ -32,7 +30,7 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
   keepAlive = new PromiseList();
   aborted = new ControlledPromise("Aborted");
 
-  config: ScheduleData;
+  config: ScheduleInstanceData;
   private adapters: Adapters;
 
   get kind() {
@@ -43,7 +41,7 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
     return this.config.id;
   }
 
-  constructor(config: ScheduleData, adapters: Adapters) {
+  constructor(config: ScheduleInstanceData, adapters: Adapters) {
     this.config = config;
     this.adapters = adapters;
   }
@@ -56,7 +54,7 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
 
   async callMethodDefinedInEvent(
     id: number,
-    event: InstanceEvent,
+    event: InstanceMethodCall,
   ): Promise<any> {
     const { action, args, mode = "normal" } = event;
 
@@ -125,6 +123,7 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
   async run(
     abortSignal: AbortSignal,
   ): Promise<InstanceResult<InstanceData | null>> {
+    console.log("STARTED");
     await this.loadData();
 
     // Start the process + start listening for events
@@ -156,6 +155,8 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
     this.onEventSubscription?.unsubscribe();
     await this.stop();
     await this.save(this.data!);
+
+    console.log("STOPPED");
   }
 
   protected async waitOnExternalEffects() {
@@ -204,21 +205,24 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
 
     timer.start(NO_EVENT_TIMEOUT);
 
-    this.onEventSubscription = this.adapters.events.subscribe<InstanceEvent>(
-      this.id,
-      async (event) => {
-        this.keepAlive.addWait(300, "Event Received");
-        timer.restart(NO_EVENT_TIMEOUT);
+    this.onEventSubscription =
+      this.adapters.messages.subscribe<InstanceMethodCall>(
+        this.id,
+        async (event) => {
+          console.log("instance received event", event);
+          this.keepAlive.addWait(300, "Event Received");
+          timer.restart(NO_EVENT_TIMEOUT);
 
-        const waitUntilFullyProcessed = Promise.all([
-          this.callMethodDefinedInEvent(event.id, event.data),
-          this.adapters.events.ack(this.id, event.id),
-        ]);
+          console.log("event.id", event.id);
+          const waitUntilFullyProcessed = Promise.all([
+            this.callMethodDefinedInEvent(event.id, event.data),
+            this.adapters.messages.ack(this.id, event.id),
+          ]);
 
-        this.keepAlive.add(waitUntilFullyProcessed);
-        await waitUntilFullyProcessed;
-      },
-    );
+          this.keepAlive.add(waitUntilFullyProcessed);
+          await waitUntilFullyProcessed;
+        },
+      );
 
     this.keepAlive.add(noMoreEventsCtl.await);
   }
@@ -226,20 +230,20 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
   /** this function is used to emit message to one client,
    * also for type safety, so that so that it doesn't show on client.on channel name autocomplete
    **/
-  async emitInternal<
-    Channel extends Exclude<keyof InternalChannels, symbol | number>,
-  >(channel: Channel, data: InternalChannels[Channel]) {
-    return this.emit(channel, data);
+  async emitInternal<Channel extends Extract<keyof InternalChannels, string>>(
+    channel: Channel,
+    data: InternalChannels[Channel],
+  ) {
+    return this.runExternalEffect(async () => {
+      return await this.adapters.pubsub.emit(channel, data);
+    });
   }
 
   /** this will send a message to all client subscribed to this actor specified channel */
-  async emitExternal<
-    Channel extends Exclude<keyof InstanceChannels, symbol | number>,
-  >(channel: Channel, data: InstanceChannels[Channel]) {
-    return this.emit(channel, data);
-  }
-
-  emit(channel: string, data: any) {
+  emit<Channel extends Extract<keyof InstanceChannels, string>>(
+    channel: Channel,
+    data: InstanceChannels[Channel],
+  ) {
     return this.runExternalEffect(async () => {
       return await this.adapters.pubsub.emit(channel, data);
     });

@@ -1,11 +1,39 @@
-type EventId = number;
-type ActorId = number;
-type ActorKind = string;
-type LockId = string;
+export type EventId = number;
+export type ActorId = number;
+export type ActorKind = string;
+export type LockId = string;
+
+export type ScheduleId = string;
+export type Cron = { cron: string };
+export type Delay = { delay: number };
+
+export interface ScheduleByType {
+  event: ScheduleEventData;
+  instance: ScheduleInstanceData;
+}
+
+export type ScheduleConfig = Cron | Delay;
+
+export interface ScheduleEventData {
+  instance: ScheduleInstanceData;
+  schedule: ScheduleConfig;
+  event: InstanceMethodCall;
+}
+
+export interface ScheduleInstanceData {
+  kind: ActorKind;
+  id: ActorId;
+}
+
+export interface InstanceMethodCall {
+  action: string;
+  args: any[];
+  mode: "normal" | "emit";
+}
 
 export interface Adapters {
   lock: AdapterLock;
-  events: AdapaterEvents;
+  messages: AdapaterMessageBroker;
   snapshot: AdapaterSnapshot;
   pubsub: AdapterPubSub;
   scheduler: AdapaterScheduler;
@@ -37,7 +65,7 @@ export abstract class AdapterPubSub {
   ): { unsubscribe: Function };
 }
 
-export abstract class AdapaterEvents {
+export abstract class AdapaterMessageBroker {
   abstract publish<EventData>(
     actorId: ActorId,
     event: EventData,
@@ -51,18 +79,18 @@ export abstract class AdapaterEvents {
   ): { unsubscribe: Function };
 }
 
-export interface ScheduleData {
-  kind: ActorKind;
-  id: ActorId;
-  input?: any;
-}
-
 export abstract class AdapaterScheduler {
-  abstract schedule(schedule: ScheduleData): Promise<true>;
+  abstract instance(schedule: ScheduleInstanceData): Promise<ScheduleId>;
+  abstract event(schedule: ScheduleEventData): Promise<ScheduleId>;
 }
 
 export abstract class AdapaterWorker {
-  abstract subscribe(callback: (config: ScheduleData) => any): {
+  abstract subscribe(
+    callback: <Type extends keyof ScheduleByType>(
+      type: Type,
+      scheduleData: ScheduleByType[Type],
+    ) => any,
+  ): {
     unsubscribe: Function;
   };
 }

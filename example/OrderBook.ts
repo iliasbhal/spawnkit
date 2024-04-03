@@ -6,7 +6,7 @@ interface OrderBookData {
 }
 
 interface OrderBookEvent {
-  change: number[];
+  orders: any[];
 }
 
 interface Stock {
@@ -21,11 +21,12 @@ export class OrderBook extends Spawnkit.Instance<
   async stop(): Promise<any> {}
 
   async buy(stock: Stock) {
+    console.log("-----BUYYYYY------");
     this.data = this.data || ({} as any);
     this.data!.count = this.data?.count || 0;
     this.data!.count++;
 
-    this.emit("change", [this.data!.count]);
+    this.emit("orders", [this.data!.count]);
 
     return {
       success: true,
@@ -33,6 +34,10 @@ export class OrderBook extends Spawnkit.Instance<
       qty: 1000,
       stock,
     };
+  }
+
+  async multiple(...stocks: Stock[]) {
+    return stocks.length;
   }
 
   async sell(stock: Stock): Promise<true> {

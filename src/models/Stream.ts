@@ -137,20 +137,20 @@ export class Stream<StreamValue> {
   }
 
   emit(data: StreamValue) {
-    this.notify("data", data);
+    this.store("data", data);
   }
 
   push(data: StreamValue) {
-    this.notify("data", data);
+    this.store("data", data);
   }
 
   error(err: Error) {
-    this.notify("error", err);
-    this.notify("end");
+    this.store("error", err);
+    this.store("end");
   }
 
   closed: boolean = false;
   close() {
-    this.notify("end");
+    this.store("end");
   }
 }

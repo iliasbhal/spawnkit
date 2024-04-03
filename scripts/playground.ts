@@ -12,7 +12,7 @@ export const adapters: Adapters = {
   lock: new Adapter.Lock(redis),
   snapshot: new Adapter.Snapshot(redis),
 
-  events: new Adapter.Event(redis),
+  messages: new Adapter.MessageBroker(redis),
   pubsub: new Adapter.PubSub(redis),
 
   scheduler: new Adapter.Scheduler(redis),
@@ -32,12 +32,17 @@ const client = Spawnkit.Client.from({
   adapters,
 });
 
-// worker.start();
-
 const main = async () => {
-  await redis.flushall();
+  await redis.flushall("SYNC");
   worker.start();
 
+  // await basicExample();
+  // await streamExample();
+  // await actorEmittedEventsExample();
+  await scheduleCallExample();
+};
+
+const streamExample = async () => {
   const agentAI = client.actor("AgentLLM", 111);
 
   const stream = await agentAI.prompt({
@@ -46,36 +51,75 @@ const main = async () => {
     taskId: "asdasd",
   });
 
-  // TWO API to consume a stream
-  for await (const data of stream) {
-    console.log("DAMN ->", data);
-  }
+  // Example 1:  consume stream using .map
+  // which returns a Promise that is resolved when the stream ends
+  await stream.map((data) => {
+    console.log("STREAM ->", data);
+  });
 
-  // await stream.map((data) => {
-  //   console.log("DAMN ->", data);
-  // });
+  // Example 2: consume stream using an async iterator
+  // for await (const data of stream) {
+  //   console.log("STREAM ->", data);
+  // }
+};
 
-  // const orderBook = client.actor("OrderBook", 111);
-  // orderBook.on("change", (event) => {
-  //   console.log("CHANGE RECEIVED", event);
-  // });
+const actorEmittedEventsExample = async () => {
+  const orderBook = client.actor("OrderBook", 222);
 
-  // const intervalId = setInterval(async () => {
-  //   const isJust = Math.random() > 0.5;
-  //   if (isJust) {
-  //     orderBook.emit.buy({ tick: "APPL" });
-  //     return;
-  //   }
+  orderBook.on("orders", (event) => {
+    console.log("CHANGE RECEIVED", event);
+  });
 
-  //   const prev = Date.now();
-  //   const response = await orderBook.buy({ tick: "APPL" });
-  //   const then = Date.now();
+  const intervalId = setInterval(async () => {
+    const isJust = Math.random() > 0.5;
+    if (isJust) {
+      orderBook.emit.buy({ tick: "APPL" });
+      return;
+    }
 
-  //   console.log("response", response, then - prev);
-  // }, 25);
+    const prev = Date.now();
+    const response = await orderBook.buy({ tick: "APPL" });
+    const then = Date.now();
 
-  // await wait(10_000);
-  // clearInterval(intervalId);
+    console.log("response", response, then - prev);
+  }, 25);
+
+  await wait(10_000);
+  clearInterval(intervalId);
+};
+
+const basicExample = async () => {
+  const orderBook = client.actor("OrderBook", 111);
+
+  orderBook.on("orders", (event) => {
+    console.log("CHANGE RECEIVED", event);
+  });
+
+  // Example 1: call methods like the its a real reference.
+  const response = await orderBook.buy({ tick: "APPL" });
+  console.log(response);
+
+  // Example 2: call the methods but don't wait for the response
+  await orderBook.emit.buy({ tick: "APPL" });
+  console.log("SENT");
+};
+
+const scheduleCallExample = async () => {
+  const orderBook = client.actor("OrderBook", 111);
+
+  const scheduleId = await orderBook.cron("* * * * *").buy({
+    tick: "AAPL",
+  });
+
+  console.log("scheduleId", scheduleId);
+  // orderBook.scheduled.list();
+  // orderBook.scheduled.abort(scheduleId)
+
+  orderBook.on("orders", (event) => {
+    console.log("CHANGE RECEIVED", event);
+  });
+
+  await wait(5000);
 };
 
 main()

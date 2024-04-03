@@ -1,8 +1,15 @@
-import type { Instance } from "./Instance";
-import { Adapters } from "../adapters";
+import type { Instance as SpawnkitInstance } from "./Instance";
+import {
+  Adapters,
+  ScheduleEventData,
+  ScheduleId,
+  ScheduleConfig,
+  Cron,
+  Delay,
+} from "../adapters";
 import { Stream } from "./Stream";
 
-type InstanceClass = typeof Instance<any>;
+type InstanceClass = typeof SpawnkitInstance<any>;
 
 interface ClientProps<T extends InstanceClass = InstanceClass> {
   instances: Record<string, T>;
@@ -27,33 +34,42 @@ export class Client<Props extends ClientProps> {
   static handleIncomingStream() {}
 
   actor<Kind extends keyof Props["instances"]>(kind: Kind, actorId: number) {
-    type Current = InstanceType<Props["instances"][Kind]>;
-    type InstanceEvent = Parameters<Current["callMethodDefinedInEvent"]>[1];
-    type InstanceEmittable = Parameters<Current["emitExternal"]>;
-    type InstanceInternalEmittable = Parameters<Current["emitInternal"]>;
+    type Instance = InstanceType<Props["instances"][Kind]>;
+    type InstanceEvent = Parameters<Instance["callMethodDefinedInEvent"]>[1];
+    type InstanceEmittable = Parameters<Instance["emit"]>;
+    type InstanceInternalEmittable = Parameters<Instance["emitInternal"]>;
 
     type ExtractMethodNames<T> = {
-      [K in keyof T]: T[K] extends (...args: any) => any ? K : never;
+      [K in keyof T]: T[K] extends (...args: any[]) => any ? K : never;
     }[keyof T];
+
     type ExtractMethods<T> = Pick<T, ExtractMethodNames<T>>;
+    type InheritedMethods = ExtractMethodNames<SpawnkitInstance>;
+    type AvailableMethods = Omit<ExtractMethods<Instance>, InheritedMethods>;
 
-    type ForbiddenMethods = ExtractMethodNames<Instance>;
-    type AvailableMethods = Omit<ExtractMethods<Current>, ForbiddenMethods>;
-    type RemoteMethodes = {
-      [key in keyof AvailableMethods]: (
-        // @ts-ignore
-        ...args: Parameters<AvailableMethods[key]>
-        //@ts-ignore
-      ) => Promise<Awaited<ReturnType<AvailableMethods[key]>>>;
+    type MakeRemote<T> = {
+      [K in keyof T]: T[K] extends (...args: any[]) => any
+        ? // If the function is sychronouse, we want to cast the return to a Promise
+          // And it it's already a promise, it's gonna stay a promise.
+          (...args: Parameters<T[K]>) => Promise<Awaited<ReturnType<T[K]>>>
+        : never;
     };
 
-    type JustRemoteMethodes = {
-      [key in keyof AvailableMethods]: (
-        // @ts-ignore
-        ...args: Parameters<AvailableMethods[key]>
-        //@ts-ignore
-      ) => Promise<true>;
+    type MakeEmitable<T> = {
+      [K in keyof T]: T[K] extends (...args: any[]) => any
+        ? (...args: Parameters<T[K]>) => Promise<boolean>
+        : never;
     };
+
+    type MakeSchedulable<T> = {
+      [K in keyof T]: T[K] extends (...args: any[]) => any
+        ? (...args: Parameters<T[K]>) => Promise<ScheduleId>
+        : never;
+    };
+
+    type RemoteMethodes = MakeRemote<AvailableMethods>;
+    type EmitRemoteMethods = MakeEmitable<AvailableMethods>;
+    type ScheduleRemoteMethods = MakeSchedulable<AvailableMethods>;
 
     let lastEventSentAt: number | null = null;
     const checkShouldScheduleWithEventSent = () => {
@@ -70,8 +86,9 @@ export class Client<Props extends ClientProps> {
 
     const sendEventToActor = async (event: InstanceEvent) => {
       const shouldScheduleInstance = checkShouldScheduleWithEventSent();
+      console.log("shouldScheduleInstance", shouldScheduleInstance);
       const [eventId] = await Promise.all([
-        this.adapters.events.publish(actorId, event),
+        this.adapters.messages.publish(actorId, event),
 
         // when sending an event, we shall always try to spawn an instance
         // to ensure that the event will be processed except In the case that we are sending a lot of events
@@ -81,13 +98,17 @@ export class Client<Props extends ClientProps> {
         // This is mainly to avoid adding unnessary pressure the the backend.
         // Scheduling too often is guarenteed to fail often as theu won't be able to acquire the locks
         shouldScheduleInstance &&
-          this.adapters.scheduler.schedule({
+          this.adapters.scheduler.instance({
             id: actorId,
             kind: kind.toString(),
           }),
       ]);
 
       return eventId;
+    };
+
+    const scheduleEvent = async (schedule: ScheduleEventData) => {
+      return await this.adapters.scheduler.event(schedule);
     };
 
     const onInternalEmit = (
@@ -106,6 +127,41 @@ export class Client<Props extends ClientProps> {
       },
     };
 
+    const createScheduledMethodHandler = (mode: "cron" | "delay") => {
+      return (scheduleArgs: any) => {
+        const scheduleConfig = {
+          [mode]: scheduleArgs,
+        } as Delay | Cron;
+
+        return new Proxy(
+          {},
+          {
+            get(target, prop, receiver) {
+              if (prop in target) return Reflect.get(target, prop, receiver);
+              if (typeof prop !== "string") return;
+
+              return async (...args: any[]) => {
+                const scheduleId = await scheduleEvent({
+                  schedule: scheduleConfig,
+                  instance: {
+                    id: actorId,
+                    kind: kind.toString(),
+                  },
+                  event: {
+                    action: prop,
+                    args,
+                    mode: "emit",
+                  },
+                });
+
+                return scheduleId;
+              };
+            },
+          },
+        );
+      };
+    };
+
     const createRemoteMethodHandler = (mode: InstanceEvent["mode"]) => {
       return (action: string) => {
         return async (...args: any[]) => {
@@ -116,6 +172,7 @@ export class Client<Props extends ClientProps> {
           });
 
           if (mode === "emit") {
+            // DO NOTHING -> simply return the eventId na don't wait for an answer
             return eventId;
           }
 
@@ -175,39 +232,49 @@ export class Client<Props extends ClientProps> {
       };
     };
 
-    const normalRemoteMethodHandler = createRemoteMethodHandler("normal");
-    const justRemoteMethodHandler = createRemoteMethodHandler("emit");
-
-    const actorJustClientAPI = new Proxy(
+    const emitRemoteMethodHandler = createRemoteMethodHandler("emit");
+    const actorEmitClientAPI = new Proxy(
       {},
       {
         get(target, prop, receiver) {
           if (prop in target) return Reflect.get(target, prop, receiver);
           if (typeof prop !== "string") return;
-          return justRemoteMethodHandler(prop);
+          return emitRemoteMethodHandler(prop);
         },
       },
     );
+
+    const cronRemoteMethodHandler = createScheduledMethodHandler("cron");
+    const delayRemoteMethodHandler = createScheduledMethodHandler("delay");
 
     // We use the Kind type here just o it to show nicely
     // in the intelissense. it will show as Remote<OrderBook> for example
-    type Remote<Kind> = typeof actorClientAPI &
-      RemoteMethodes & { emit: JustRemoteMethodes };
+    type Spawn<Kind> = RemoteMethodes &
+      typeof actorClientAPI & { emit: EmitRemoteMethods } & {
+        delay(delayMS: number): ScheduleRemoteMethods;
+        cron(crontab: string): ScheduleRemoteMethods;
+      };
 
-    return new Proxy(
-      actorClientAPI as Remote<InstanceType<Props["instances"][Kind]>>,
-      {
-        get(target, prop, receiver) {
-          if (prop in target) return Reflect.get(target, prop, receiver);
-          if (typeof prop !== "string") return;
+    const normalRemoteMethodHandler = createRemoteMethodHandler("normal");
+    return new Proxy(actorClientAPI as Spawn<Instance>, {
+      get(target, prop, receiver) {
+        if (prop in target) return Reflect.get(target, prop, receiver);
+        if (typeof prop !== "string") return;
 
-          if (prop === "just") {
-            return actorJustClientAPI;
-          }
+        if (prop === "emit") {
+          return actorEmitClientAPI;
+        }
 
-          return normalRemoteMethodHandler(prop);
-        },
+        if (prop == "delay") {
+          return delayRemoteMethodHandler;
+        }
+
+        if (prop == "cron") {
+          return cronRemoteMethodHandler;
+        }
+
+        return normalRemoteMethodHandler(prop);
       },
-    );
+    });
   }
 }

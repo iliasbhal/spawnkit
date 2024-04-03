@@ -11,7 +11,7 @@ type MachineData<M extends x.AnyStateMachine> = ReturnType<
 >;
 
 export class Machine<
-  StateMachine extends x.AnyStateMachine,
+  StateMachine extends x.AnyStateMachine = x.AnyStateMachine,
 > extends Spawnkit.Instance<MachineData<StateMachine>> {
   machine: StateMachine = null as any;
   sync?: (actor: x.Actor<typeof this.machine>) => any;

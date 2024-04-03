@@ -205,7 +205,10 @@ export class PubSub extends RedisAdapter implements Adapters.AdapterPubSub {
   }
 }
 
-export class Event extends RedisAdapter implements Adapters.AdapaterEvents {
+export class MessageBroker
+  extends RedisAdapter
+  implements Adapters.AdapaterMessageBroker
+{
   private getKey(actorId: number) {
     return `events:${actorId}`;
   }
@@ -213,9 +216,8 @@ export class Event extends RedisAdapter implements Adapters.AdapaterEvents {
   async publish<EventData>(id: number, event: EventData) {
     const hashID = this.getKey(id);
     const eventId = await this.redis.incr(hashID + ":uid");
-
-    const data = JSON.stringify(event);
-    await this.redis.hset(hashID, eventId.toString(), data);
+    console.log("PUBLISH EVENT", eventId, id);
+    await this.redis.hset(hashID, eventId.toString(), JSON.stringify(event));
     return eventId;
   }
 
@@ -238,9 +240,12 @@ export class Event extends RedisAdapter implements Adapters.AdapaterEvents {
   ): { unsubscribe: Function } {
     let active = true;
     const seenEventIds = new Set();
+
     const intervalId = setInterval(async () => {
       const hash = this.getKey(actorId);
       const events = await this.redis.hgetall(hash);
+
+      console.log("HGET ALL", events);
 
       const notify = (data: any) => {
         if (active) {
@@ -266,12 +271,18 @@ export class Event extends RedisAdapter implements Adapters.AdapaterEvents {
   }
 }
 
+type ScheduleQueue = BullMQ.Queue<
+  Adapters.ScheduleInstanceData | Adapters.ScheduleEventData,
+  any,
+  "event" | "instance"
+>;
+
 export class Scheduler
   extends RedisAdapter
   implements Adapters.AdapaterScheduler
 {
   static QUEUE_NAME = "Spawnkit";
-  private queue: BullMQ.Queue;
+  private queue: ScheduleQueue;
 
   constructor(redis: Redis) {
     super(redis);
@@ -284,28 +295,63 @@ export class Scheduler
     });
   }
 
-  async schedule(data: Adapters.ScheduleData): Promise<true> {
+  async event(data: Adapters.ScheduleEventData): Promise<string> {
+    if ("delay" in data.schedule) {
+      const job = await this.queue.add("event", data, {
+        delay: data.schedule.delay,
+      });
+
+      const jobId = job.id;
+      if (!jobId) {
+        throw new Error("Why no job id???");
+      }
+
+      return jobId;
+    }
+
+    if ("cron" in data.schedule) {
+      // CRON NOT IMPLMENTED YET
+      // throw new Error("NOT IMPLEMENTED YET");
+      const job = await this.queue.add("event", data, {
+        repeat: {
+          pattern: data.schedule.cron,
+        },
+      });
+
+      const jobId = job.id;
+      if (!jobId) {
+        throw new Error("Why no job id???");
+      }
+
+      return jobId;
+    }
+
+    throw new Error("Schedule Kind not implemented");
+  }
+
+  async instance(data: Adapters.ScheduleInstanceData): Promise<string> {
     // `bullmq` will discard job with same ids
     // We leverage this behaviour to ensure we don't schedule
     // actors instance if they  that are already in the pipeline
-    const periodId = (Date.now() / 100).toFixed(0);
+    const periodId = (Date.now() / 1000).toFixed(0);
     const job = {
       id: `${data.kind}:${data.id}:${periodId}`,
       data: {
         kind: data.kind,
         id: data.id,
-        input: data.input,
       },
     };
 
-    await this.queue.add("event", job.data, {
+    await this.queue.add("instance", job.data, {
       jobId: job.id,
     });
 
-    return true;
+    return job.id;
   }
 }
 
+type JobData = Parameters<ScheduleQueue["add"]>[1];
+type JobName = Parameters<ScheduleQueue["add"]>[0];
 export class Worker extends RedisAdapter implements Adapters.AdapaterWorker {
   private config: { concurrency?: number };
 
@@ -316,21 +362,49 @@ export class Worker extends RedisAdapter implements Adapters.AdapaterWorker {
     };
   }
 
-  subscribe(callback: (data: Adapters.ScheduleData) => any): {
-    unsubscribe: Function;
-  } {
-    const worker = new BullMQ.Worker(
+  async canProcessJob(job: BullMQ.Job<JobData, any, JobName>) {
+    const isScheduledJob = job.name === "event";
+    if (isScheduledJob) {
+      const jobData = job.data as Adapters.ScheduleByType["event"];
+      const kind = jobData.instance.kind;
+      const actorId = jobData.instance.id;
+      const jobKey = `${kind}:${actorId}:${job.id}`;
+      const executCount = await this.redis.incr(jobKey);
+      const hasAlreadyBeenExecuted = executCount > 1;
+      if (hasAlreadyBeenExecuted) {
+        // BullMQ almost guarantee "exactly once" job execution
+        // but it can happen to go execute "at least once"
+        // This is why we need to make sure the event is not processed twice
+        // As for instance, we don't care if they are instantiate twice'
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  subscribe(
+    callback: <Type extends keyof Adapters.ScheduleByType>(
+      type: Type,
+      scheduleData: Adapters.ScheduleByType[Type],
+    ) => any,
+  ): { unsubscribe: Function } {
+    const worker = new BullMQ.Worker<JobData, any, JobName>(
       Scheduler.QUEUE_NAME,
       async (job) => {
-        await callback(job.data);
+        const canProcess = this.canProcessJob(job);
+        if (!canProcess) return;
+
+        await callback(job.name, job.data);
       },
       {
-        autorun: true,
+        autorun: false,
         concurrency: this.config.concurrency,
         connection: this.redis,
       },
     );
 
+    worker.run();
     return {
       unsubscribe() {
         return worker.close();
