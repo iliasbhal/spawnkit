@@ -37,7 +37,6 @@ export interface Adapters {
   snapshot: AdapaterSnapshot;
   pubsub: AdapterPubSub;
   scheduler: AdapaterScheduler;
-  worker: AdapaterWorker;
 }
 
 export abstract class AdapterLock {
@@ -90,9 +89,6 @@ export abstract class AdapaterScheduler {
   abstract event(schedule: ScheduleEventData): Promise<ScheduleId>;
   abstract list(): Promise<ScheduleEventMetadata[]>;
   abstract cancel(scheduleId: ScheduleId): Promise<boolean>;
-}
-
-export abstract class AdapaterWorker {
   abstract subscribe(
     callback: <Type extends keyof ScheduleByType>(
       type: Type,

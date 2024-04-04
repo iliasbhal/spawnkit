@@ -11,14 +11,9 @@ import { AgentLLM } from "../example/AgentLLM";
 export const adapters: Adapters = {
   lock: new Adapter.Lock(redis),
   snapshot: new Adapter.Snapshot(redis),
-
   messages: new Adapter.MessageBroker(redis),
   pubsub: new Adapter.PubSub(redis),
-
   scheduler: new Adapter.Scheduler(redis),
-  worker: new Adapter.Worker(redis, {
-    concurrency: 50,
-  }),
 };
 
 const worker = Spawnkit.Worker.from({

@@ -29,9 +29,6 @@ function createGetAdapters() {
       messages: new RedisAdapters.MessageBroker(redisClient),
       pubsub: new RedisAdapters.PubSub(redisClient),
       scheduler: new RedisAdapters.Scheduler(redisClient),
-      worker: new RedisAdapters.Worker(redisClient, {
-        concurrency: 50,
-      }),
     };
 
     return adapters;

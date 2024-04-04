@@ -36,16 +36,20 @@ export class Worker<T extends InstanceClass = InstanceClass>
   }
 
   start() {
-    const subscription = this.adapters.worker.subscribe(async (type, data) => {
-      // console.log("WORKER", type);
-      if (type === "event") {
-        return await this.callInstanceMethod(data as ScheduleEventData);
-      }
+    const subscription = this.adapters.scheduler.subscribe(
+      async (type, data) => {
+        // console.log("WORKER", type);
+        if (type === "event") {
+          return await this.callInstanceMethod(data as ScheduleEventData);
+        }
 
-      if (type === "instance") {
-        return await this.tryInstantiateInstance(data as ScheduleInstanceData);
-      }
-    });
+        if (type === "instance") {
+          return await this.tryInstantiateInstance(
+            data as ScheduleInstanceData,
+          );
+        }
+      },
+    );
 
     this.stopCallback = subscription.unsubscribe;
   }

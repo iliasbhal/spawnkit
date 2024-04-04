@@ -273,6 +273,9 @@ type ScheduleQueue = BullMQ.Queue<
   "event" | "instance"
 >;
 
+type JobData = Parameters<ScheduleQueue["add"]>[1];
+type JobName = Parameters<ScheduleQueue["add"]>[0];
+
 export class Scheduler
   extends RedisAdapter
   implements Adapters.AdapaterScheduler
@@ -324,21 +327,16 @@ export class Scheduler
   }
 
   async event(data: Adapters.ScheduleEventData): Promise<string> {
-    const {
-      instance: { kind, id },
-      event: { action },
-    } = data;
-
     if ("delay" in data.schedule) {
       const job = await this.queue.add("event", data, {
         delay: data.schedule.delay,
       });
 
-      const jobId = job.id;
-      if (!jobId) throw new Error("Why no job id???");
+      const scheduleId = job.id;
+      if (!scheduleId) throw new Error("Why no job id???");
 
       await this.addToList(data, job);
-      return jobId;
+      return scheduleId;
     }
 
     if ("cron" in data.schedule) {
@@ -348,13 +346,13 @@ export class Scheduler
         },
       });
 
-      const jobId = job.repeatJobKey;
-      if (!jobId) {
+      const scheduleId = job.repeatJobKey;
+      if (!scheduleId) {
         throw new Error("Why no job id???");
       }
 
       await this.addToList(data, job);
-      return jobId;
+      return scheduleId;
     }
 
     throw new Error("Schedule Kind not implemented");
@@ -378,19 +376,6 @@ export class Scheduler
     });
 
     return job.id;
-  }
-}
-
-type JobData = Parameters<ScheduleQueue["add"]>[1];
-type JobName = Parameters<ScheduleQueue["add"]>[0];
-export class Worker extends RedisAdapter implements Adapters.AdapaterWorker {
-  private config: { concurrency?: number };
-
-  constructor(redis: Redis, config?: { concurrency?: number }) {
-    super(redis);
-    this.config = {
-      concurrency: config?.concurrency || 10,
-    };
   }
 
   async canProcessJob(job: BullMQ.Job<JobData, any, JobName>) {
@@ -423,6 +408,7 @@ export class Worker extends RedisAdapter implements Adapters.AdapaterWorker {
     const worker = new BullMQ.Worker<JobData, any, JobName>(
       Scheduler.QUEUE_NAME,
       async (job) => {
+        console.log(job.id, job.repeatJobKey);
         const canProcess = this.canProcessJob(job);
         if (!canProcess) return;
 
@@ -430,7 +416,7 @@ export class Worker extends RedisAdapter implements Adapters.AdapaterWorker {
       },
       {
         autorun: false,
-        concurrency: this.config.concurrency,
+        // concurrency: this.config.concurrency,
         connection: this.redis,
       },
     );

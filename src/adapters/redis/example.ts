@@ -8,7 +8,4 @@ export const adapters: Adapters = {
   messages: new Adapter.MessageBroker(redis),
   pubsub: new Adapter.PubSub(redis),
   scheduler: new Adapter.Scheduler(redis),
-  worker: new Adapter.Worker(redis, {
-    concurrency: 50,
-  }),
 };
