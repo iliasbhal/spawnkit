@@ -1,5 +1,5 @@
 export type EventId = number;
-export type ActorId = number;
+export type InstanceId = number;
 export type ActorKind = string;
 export type LockId = string;
 
@@ -22,7 +22,7 @@ export interface ScheduleEventData {
 
 export interface ScheduleInstanceData {
   kind: ActorKind;
-  id: ActorId;
+  id: InstanceId;
 }
 
 export interface InstanceMethodCall {
@@ -47,12 +47,12 @@ export abstract class AdapterLock {
 }
 
 export abstract class AdapaterSnapshot {
-  abstract get<Data>(actorId: ActorId): Promise<Data | null>;
+  abstract get<Data>(instanceId: InstanceId): Promise<Data | null>;
 
-  abstract set<Data>(actorId: ActorId, snapshot: Data): Promise<true>;
+  abstract set<Data>(instanceId: InstanceId, snapshot: Data): Promise<true>;
 
   abstract subscribe<Data>(
-    actorId: ActorId,
+    instanceId: InstanceId,
     onSnapshot: (snapshot: Data) => void,
   ): { unsubscribe: Function };
 }
@@ -67,14 +67,14 @@ export abstract class AdapterPubSub {
 
 export abstract class AdapaterMessageBroker {
   abstract publish<EventData>(
-    actorId: ActorId,
+    instanceId: InstanceId,
     event: EventData,
   ): Promise<EventId>;
 
-  abstract ack(actorId: ActorId, eventId: EventId): Promise<true>;
-  abstract has(actorId: ActorId): Promise<boolean>;
+  abstract ack(instanceId: InstanceId, eventId: EventId): Promise<true>;
+  abstract has(instanceId: InstanceId): Promise<boolean>;
   abstract subscribe<EventData>(
-    actorId: ActorId,
+    instanceId: InstanceId,
     onEvent: (event: { id: EventId; data: EventData }) => void,
   ): { unsubscribe: Function };
 }
@@ -82,6 +82,8 @@ export abstract class AdapaterMessageBroker {
 export abstract class AdapaterScheduler {
   abstract instance(schedule: ScheduleInstanceData): Promise<ScheduleId>;
   abstract event(schedule: ScheduleEventData): Promise<ScheduleId>;
+  abstract list(): Promise<ScheduleId[]>;
+  abstract cancel(scheduleId: ScheduleId): Promise<boolean>;
 }
 
 export abstract class AdapaterWorker {

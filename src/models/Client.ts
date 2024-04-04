@@ -27,13 +27,13 @@ export class Client<Props extends ClientProps> {
     return new Client(opts);
   }
 
-  static getChannelForEventResponse(actorId: number, eventId: number) {
-    return `actor:${actorId}:event:${eventId}` as const;
+  static getChannelForEventResponse(instanceId: number, eventId: number) {
+    return `actor:${instanceId}:event:${eventId}` as const;
   }
 
   static handleIncomingStream() {}
 
-  actor<Kind extends keyof Props["instances"]>(kind: Kind, actorId: number) {
+  actor<Kind extends keyof Props["instances"]>(kind: Kind, instanceId: number) {
     type Instance = InstanceType<Props["instances"][Kind]>;
     type InstanceEvent = Parameters<Instance["callMethodDefinedInEvent"]>[1];
     type InstanceEmittable = Parameters<Instance["emit"]>;
@@ -86,9 +86,8 @@ export class Client<Props extends ClientProps> {
 
     const sendEventToActor = async (event: InstanceEvent) => {
       const shouldScheduleInstance = checkShouldScheduleWithEventSent();
-      console.log("shouldScheduleInstance", shouldScheduleInstance);
       const [eventId] = await Promise.all([
-        this.adapters.messages.publish(actorId, event),
+        this.adapters.messages.publish(instanceId, event),
 
         // when sending an event, we shall always try to spawn an instance
         // to ensure that the event will be processed except In the case that we are sending a lot of events
@@ -99,7 +98,7 @@ export class Client<Props extends ClientProps> {
         // Scheduling too often is guarenteed to fail often as theu won't be able to acquire the locks
         shouldScheduleInstance &&
           this.adapters.scheduler.instance({
-            id: actorId,
+            id: instanceId,
             kind: kind.toString(),
           }),
       ]);
@@ -144,7 +143,7 @@ export class Client<Props extends ClientProps> {
                 const scheduleId = await scheduleEvent({
                   schedule: scheduleConfig,
                   instance: {
-                    id: actorId,
+                    id: instanceId,
                     kind: kind.toString(),
                   },
                   event: {
@@ -179,7 +178,7 @@ export class Client<Props extends ClientProps> {
           if (mode === "normal") {
             return new Promise((resolve) => {
               const channelID = Client.getChannelForEventResponse(
-                actorId,
+                instanceId,
                 eventId,
               );
 

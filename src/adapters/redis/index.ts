@@ -80,32 +80,32 @@ export class Snapshot
   extends RedisAdapter
   implements Adapters.AdapaterSnapshot
 {
-  private getKey(actorId: number) {
-    return `snapshot:${actorId}`;
+  private getKey(instanceId: number) {
+    return `snapshot:${instanceId}`;
   }
 
-  async get<Data>(actorId: number): Promise<Data | null> {
-    const key = this.getKey(actorId);
+  async get<Data>(instanceId: number): Promise<Data | null> {
+    const key = this.getKey(instanceId);
     const data = await this.redis.get(key);
     if (!data) return null;
     return JSON.parse(data);
   }
 
-  async set<Data>(actorId: number, snapshot: Data): Promise<true> {
-    const key = this.getKey(actorId);
+  async set<Data>(instanceId: number, snapshot: Data): Promise<true> {
+    const key = this.getKey(instanceId);
     const serialized = JSON.stringify(snapshot);
     await this.redis.set(key, serialized);
     return true;
   }
 
   subscribe<Data>(
-    actorId: number,
+    instanceId: number,
     callback: (snapshot: Data) => void,
   ): { unsubscribe: Function } {
     let active = true;
     let prevSnapshot: any = null;
     const intervalId = setInterval(async () => {
-      const snapshot = await this.get<Data>(actorId);
+      const snapshot = await this.get<Data>(instanceId);
 
       const notify = (data: any) => {
         if (active) {
@@ -209,8 +209,8 @@ export class MessageBroker
   extends RedisAdapter
   implements Adapters.AdapaterMessageBroker
 {
-  private getKey(actorId: number) {
-    return `events:${actorId}`;
+  private getKey(instanceId: number) {
+    return `events:${instanceId}`;
   }
 
   async publish<EventData>(id: number, event: EventData) {
@@ -234,14 +234,14 @@ export class MessageBroker
   }
 
   subscribe<E extends { id: number; data: any }>(
-    actorId: number,
+    instanceId: number,
     callback: (event: E) => void,
   ): { unsubscribe: Function } {
     let active = true;
     const seenEventIds = new Set();
 
     const intervalId = setInterval(async () => {
-      const hash = this.getKey(actorId);
+      const hash = this.getKey(instanceId);
       const events = await this.redis.hgetall(hash);
       const notify = (data: any) => {
         if (active) {
@@ -363,8 +363,8 @@ export class Worker extends RedisAdapter implements Adapters.AdapaterWorker {
     if (isScheduledJob) {
       const jobData = job.data as Adapters.ScheduleByType["event"];
       const kind = jobData.instance.kind;
-      const actorId = jobData.instance.id;
-      const jobKey = `${kind}:${actorId}:${job.id}`;
+      const instanceId = jobData.instance.id;
+      const jobKey = `${kind}:${instanceId}:${job.id}`;
       const executCount = await this.redis.incr(jobKey);
       const hasAlreadyBeenExecuted = executCount > 1;
       if (hasAlreadyBeenExecuted) {
