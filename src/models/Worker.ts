@@ -61,18 +61,15 @@ export class Worker<T extends InstanceClass = InstanceClass>
     const { kind, id } = scheduleEvent.instance;
     const { action, args } = scheduleEvent.event;
 
-    console.log("scheduled action received", kind, id, action, args);
     const actorAPI = this.client.actor(kind, id);
 
-    // console.log("BEFORE");
+    // @ts-ignore
     await actorAPI.emit[action](...args);
-    // console.log("AFTER");
   }
 
   private async tryInstantiateInstance(
     instanceConfig: ScheduleByType["instance"],
   ) {
-    console.log("tryInstantiateInstance", instanceConfig);
     const Instance = this.instances[instanceConfig.kind];
     if (!Instance) {
       throw new Error("Machine Not implemented");
@@ -92,8 +89,6 @@ export class Worker<T extends InstanceClass = InstanceClass>
       // When instantiating a new actor, we should acquire a lock
       // So that only one worker in the cloud is instantiating the actor
       // This is to prevent from executing side effects twice and race conditions.
-
-      console.log("INSTANTIATE", instanceConfig.kind);
       const lock = new Lock(lockConfig, this.adapters.lock);
       const result = await lock.using(async (abortSignal) => {
         const instance = new Instance(instanceConfig, this.adapters);
