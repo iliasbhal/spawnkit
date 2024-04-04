@@ -76,12 +76,11 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
       .catch((err) => [err, null]);
 
     if (mode === "emit") {
-      // NO OP
-      // TODO: we should exclude methods that return a Stream from clientAPI.emit method;
-      // Call the stream anyway but don't forward the event anywhere.
-      const promise = this.keepAlive.addControlled();
-      response.on("end", () => promise.resolve(true));
-      response.start();
+      if (response instanceof Stream) {
+        const promise = this.keepAlive.addControlled();
+        response.on("end", () => promise.resolve(true));
+        response.start();
+      }
       return;
     }
 
