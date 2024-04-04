@@ -111,21 +111,23 @@ const scheduleCallExample = async () => {
     tick: "AAPL",
   });
 
-  const scheduleId2 = await orderBook.delay(1000).buy({
+  const scheduleId2 = await orderBook.delay(3000).buy({
     tick: "AAPL",
   });
 
-  console.log("scheduleId", scheduleId, scheduleId2);
-  // orderBook.scheduled.list();
-  // orderBook.scheduled.abort(scheduleId)
+  const scheduledJobs = await orderBook.scheduled.list();
+  console.log(scheduledJobs);
 
+  orderBook.scheduled.cancel(scheduleId);
+  // orderBook.scheduled.cancel(scheduleId2);
   orderBook.on("orders", (event) => {
-    console.log("CHANGE RECEIVED", event);
+    console.log("stream: ", event);
   });
 
   await wait(5000);
 };
 
+console.log("START");
 main()
   .then((result) => console.log("DONE", result))
   .catch((err) => console.error("ERR", err));

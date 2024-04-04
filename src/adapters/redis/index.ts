@@ -292,6 +292,7 @@ export class Scheduler
   }
 
   async list(): Promise<string[]> {
+    throw new Error("TODO: IMPLEMENT A WAY TO LIST SCHEDULED ACTIONS");
     return [];
   }
 
