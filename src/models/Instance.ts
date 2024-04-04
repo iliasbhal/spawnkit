@@ -67,9 +67,13 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
       return;
     }
 
-    const channelD = Client.getChannelForEventResponse(this.id, eventId);
-    const response: unknown = await method?.(...args);
-    if (mode === "emit" || mode === "scheduled") {
+    // Wrap the method in a Promise. to ensure that if the method is sync
+    // We still catch the error if one happens.
+    const channelID = Client.getChannelForEventResponse(this.id, eventId);
+    const [error, response]: unknown = await Promise.resolve()
+      .then(() => method?.(...args))
+      .then((res) => [null, res])
+      .catch((err) => [err, null]);
       // NO OP
       // TODO: we should exclude methods that return a Stream from clientAPI.emit method;
       return;
