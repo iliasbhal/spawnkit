@@ -18,6 +18,8 @@ interface ClientProps<T extends InstanceClass = InstanceClass> {
   adapters: Omit<Adapters, "lock" | "worker">;
 }
 
+export class RemoteError extends Error {}
+
 export class Client<Props extends ClientProps> {
   private adapters: Props["adapters"];
 
@@ -31,6 +33,28 @@ export class Client<Props extends ClientProps> {
 
   static getChannelForEventResponse(instanceId: InstanceId, eventId: EventId) {
     return `instance:${instanceId}:event:${eventId}` as const;
+  }
+
+  static deserializeError(serializedError: { message: string; name: string }) {
+    const error = new RemoteError();
+    Object.assign(error, serializedError);
+    return error;
+  }
+
+  static serializeError(error: Error) {
+    return Object.assign(
+      {},
+      error,
+      {
+        message: error.message,
+        name: error.constructor.name,
+        stack: error.stack,
+      },
+      {
+        originalLine: undefined,
+        originalColumn: undefined,
+      },
+    );
   }
 
   static handleIncomingStream() {}
@@ -190,7 +214,7 @@ export class Client<Props extends ClientProps> {
           }
 
           if (mode === "normal") {
-            return new Promise((resolve) => {
+            return new Promise((resolve, reject) => {
               const channelID = Client.getChannelForEventResponse(
                 instanceId,
                 eventId,
@@ -225,6 +249,12 @@ export class Client<Props extends ClientProps> {
                 subscription: Subscription,
                 message: Message,
               ) => {
+                if ("error" in message) {
+                  const error = Client.deserializeError(message.error);
+                  reject(error);
+                  subscription.unsubscribe();
+                }
+
                 if ("response" in message) {
                   resolve(message.response);
                   subscription.unsubscribe();

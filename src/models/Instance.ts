@@ -19,7 +19,7 @@ interface InstanceResult<V extends any> {
 
 interface InternalChannels {
   [key: `instance:${string}:event:${string}`]:
-    | { response: any }
+    | { error: any; response: any }
     | { stream: true; start: true }
     | { stream: true; data: any }
     | { stream: true; end: true }
@@ -74,13 +74,20 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
       .then(() => method?.(...args))
       .then((res) => [null, res])
       .catch((err) => [err, null]);
+
+    if (mode === "emit") {
       // NO OP
       // TODO: we should exclude methods that return a Stream from clientAPI.emit method;
+      // Call the stream anyway but don't forward the event anywhere.
       return;
     }
 
+    if (mode === "scheduled") {
+      console.log(error);
+      this.emitInternal(channelID, { error, response });
+    }
+
     if (mode === "normal") {
-      const channelID = Client.getChannelForEventResponse(this.id, eventId);
       if (response instanceof Stream) {
         response.on("start", () =>
           this.emitInternal(channelID, { stream: true, start: true }),
@@ -98,7 +105,8 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
 
         response.start();
       } else {
-        this.emitInternal(channelID, { response });
+        const serializedError = Client.serializeError(error);
+        this.emitInternal(channelID, { error: serializedError, response });
       }
     }
   }
