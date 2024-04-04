@@ -79,6 +79,9 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
       // NO OP
       // TODO: we should exclude methods that return a Stream from clientAPI.emit method;
       // Call the stream anyway but don't forward the event anywhere.
+      const promise = this.keepAlive.addControlled();
+      response.on("end", () => promise.resolve(true));
+      response.start();
       return;
     }
 
@@ -89,20 +92,22 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
 
     if (mode === "normal") {
       if (response instanceof Stream) {
+        const promise = this.keepAlive.addControlled();
         response.on("start", () =>
           this.emitInternal(channelID, { stream: true, start: true }),
         );
         response.on("data", (data) =>
           this.emitInternal(channelID, { stream: true, data: data }),
         );
-        response.on("end", () =>
-          this.emitInternal(channelID, { stream: true, end: true }),
-        );
 
         response.on("error", (err) =>
           this.emitInternal(channelID, { stream: true, error: err }),
         );
 
+        response.on("end", () => {
+          this.emitInternal(channelID, { stream: true, end: true });
+          promise.resolve(true);
+        });
         response.start();
       } else {
         const serializedError = Client.serializeError(error);

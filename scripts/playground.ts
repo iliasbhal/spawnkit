@@ -33,10 +33,10 @@ const main = async () => {
   worker.start();
 
   // await basicExample();
-  // await streamExample();
+  await streamExample();
   // await emittedEventsExample();
   // await scheduleCallExample();
-  await errorHandlingExample();
+  // await errorHandlingExample();
 };
 
 const streamExample = async () => {
@@ -61,11 +61,11 @@ const streamExample = async () => {
 
   // TODO: it should call the stream anyway but the emitted values
   // should not be sent anywhere;
-  await agentAI.emit.prompt({
-    model: "claude3",
-    prompt: "blabla",
-    taskId: "asdasd",
-  });
+  // await agentAI.emit.prompt({
+  //   model: "claude3",
+  //   prompt: "blabla",
+  //   taskId: "asdasd",
+  // });
 };
 
 const emittedEventsExample = async () => {
