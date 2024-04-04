@@ -73,7 +73,9 @@ export class Machine<
   }
 
   private async handleSnapshot() {
-    const snapshot = this.actor.getPersistedSnapshot() as MachineData<Machine>;
+    const snapshot = this.actor.getPersistedSnapshot() as MachineData<
+      typeof this.machine
+    >;
     this.snapshotByActorId.set(this.actor.id, snapshot);
     this.save(snapshot);
 
@@ -112,7 +114,7 @@ export class Machine<
           this.runExternalEffect(async () => {
             this.snapshotByActorId.set(
               actor.id,
-              snapshot as MachineData<Machine>,
+              snapshot as MachineData<typeof this.machine>,
             );
             const shouldResolve = ["error", "done"].includes(snapshot.status);
             if (shouldResolve) {
