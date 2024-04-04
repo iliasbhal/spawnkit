@@ -70,7 +70,7 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
     // Wrap the method in a Promise. to ensure that if the method is sync
     // We still catch the error if one happens.
     const channelID = Client.getChannelForEventResponse(this.id, eventId);
-    const [error, response]: unknown = await Promise.resolve()
+    const [error, response] = await Promise.resolve()
       .then(() => method?.(...args))
       .then((res) => [null, res])
       .catch((err) => [err, null]);
@@ -85,7 +85,6 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
     }
 
     if (mode === "scheduled") {
-      console.log(error);
       this.emitInternal(channelID, { error, response });
     }
 
