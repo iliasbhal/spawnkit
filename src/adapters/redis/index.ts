@@ -291,6 +291,20 @@ export class Scheduler
     });
   }
 
+  async list(): Promise<string[]> {
+    return [];
+  }
+
+  async cancel(scheduleId: string): Promise<boolean> {
+    const [repeatableRemoved, delayJobStatus] = await Promise.all([
+      this.queue.removeRepeatableByKey(scheduleId),
+      this.queue.remove(scheduleId),
+    ]);
+
+    const isRemoved = repeatableRemoved || delayJobStatus == 1;
+    return isRemoved;
+  }
+
   async event(data: Adapters.ScheduleEventData): Promise<string> {
     if ("delay" in data.schedule) {
       const job = await this.queue.add("event", data, {
@@ -306,15 +320,19 @@ export class Scheduler
     }
 
     if ("cron" in data.schedule) {
-      // CRON NOT IMPLMENTED YET
-      // throw new Error("NOT IMPLEMENTED YET");
+      const {
+        instance: { kind, id },
+        event: { action },
+      } = data;
+
       const job = await this.queue.add("event", data, {
+        jobId: `cronjob:${kind}:${id}:${action}:${crypto.randomUUID()}`,
         repeat: {
           pattern: data.schedule.cron,
         },
       });
 
-      const jobId = job.id;
+      const jobId = job.repeatJobKey;
       if (!jobId) {
         throw new Error("Why no job id???");
       }

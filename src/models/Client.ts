@@ -124,6 +124,15 @@ export class Client<Props extends ClientProps> {
       ) => {
         return this.adapters.pubsub.on(channel, callback);
       },
+
+      scheduled: {
+        list: async () => {
+          return this.adapters.scheduler.list();
+        },
+        cancel: async (scheduleId: ScheduleId) => {
+          return this.adapters.scheduler.cancel(scheduleId);
+        },
+      },
     };
 
     const createScheduledMethodHandler = (mode: "cron" | "delay") => {

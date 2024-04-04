@@ -1,6 +1,5 @@
 - Add ability to list upcoming scheduled calls
   // orderBook.scheduled.list();
-  // orderBook.scheduled.abort(scheduleId)
 
 - Remove null typings from .data. add an initialize() function that returns the initial data. OR have to defined a .data attribute.
 - error thrown during a method call should be serialized to client
