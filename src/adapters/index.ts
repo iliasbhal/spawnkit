@@ -1,6 +1,6 @@
+export type InstanceId = string;
+export type InstanceKind = string;
 export type EventId = number;
-export type InstanceId = number;
-export type ActorKind = string;
 export type LockId = string;
 
 export type ScheduleId = string;
@@ -21,7 +21,7 @@ export interface ScheduleEventData {
 }
 
 export interface ScheduleInstanceData {
-  kind: ActorKind;
+  kind: InstanceKind;
   id: InstanceId;
 }
 

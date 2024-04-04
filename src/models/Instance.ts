@@ -7,6 +7,7 @@ import {
   Adapters,
   ScheduleInstanceData,
   InstanceMethodCall,
+  EventId,
 } from "../adapters";
 import { Client } from "./Client";
 import { Stream } from "./Stream";
@@ -17,7 +18,7 @@ interface InstanceResult<V extends any> {
 }
 
 interface InternalChannels {
-  [key: `actor:${string}:event:${string}`]:
+  [key: `instance:${string}:event:${string}`]:
     | { response: any }
     | { stream: true; start: true }
     | { stream: true; data: any }
@@ -46,14 +47,14 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
     this.adapters = adapters;
   }
 
-  /* This is where you initiate the actor */
+  /* This is where you initiate the instance */
   async start(): Promise<any> {}
 
   /* Dispose of all the ressources allocated */
   async stop(): Promise<any> {}
 
   async callMethodDefinedInEvent(
-    id: number,
+    eventId: EventId,
     event: InstanceMethodCall,
   ): Promise<any> {
     const { action, args, mode = "normal" } = event;
@@ -66,7 +67,7 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
       return;
     }
 
-    const channelD = Client.getChannelForEventResponse(this.id, id);
+    const channelD = Client.getChannelForEventResponse(this.id, eventId);
     const response: unknown = await method?.(...args);
     if (mode === "emit") {
       // NO OP
@@ -75,7 +76,7 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
     }
 
     if (mode === "normal") {
-      const channelID = Client.getChannelForEventResponse(this.id, id);
+      const channelID = Client.getChannelForEventResponse(this.id, eventId);
       if (response instanceof Stream) {
         response.on("start", () =>
           this.emitInternal(channelID, { stream: true, start: true }),
@@ -129,7 +130,7 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
     this.running = true;
     const current = this.start();
     this.keepAlive.add(current);
-    this.subscribeToActorEvent();
+    this.subscribeToInstanceEvent();
 
     const syncAbort = this.syncAbortSignalWithPromise(abortSignal);
     this.aborted.await.finally(() => {
@@ -192,7 +193,7 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
   }
 
   private onEventSubscription: { unsubscribe: Function } | undefined;
-  private subscribeToActorEvent() {
+  private subscribeToInstanceEvent() {
     const noMoreEventsCtl = new ControlledPromise();
 
     const NO_EVENT_TIMEOUT = 3000;
@@ -234,7 +235,7 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
     });
   }
 
-  /** this will send a message to all client subscribed to this actor specified channel */
+  /** this will send a message to all client subscribed to this instance specified channel */
   emit<Channel extends Extract<keyof InstanceChannels, string>>(
     channel: Channel,
     data: InstanceChannels[Channel],

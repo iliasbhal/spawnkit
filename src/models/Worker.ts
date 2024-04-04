@@ -65,10 +65,10 @@ export class Worker<T extends InstanceClass = InstanceClass>
     const { kind, id } = scheduleEvent.instance;
     const { action, args } = scheduleEvent.event;
 
-    const actorAPI = this.client.actor(kind, id);
+    const instanceAPI = this.client.spawn(kind, id);
 
     // @ts-ignore
-    await actorAPI.emit[action](...args);
+    await instanceAPI.emit[action](...args);
   }
 
   private async tryInstantiateInstance(
@@ -80,18 +80,14 @@ export class Worker<T extends InstanceClass = InstanceClass>
     }
 
     try {
-      // When instantiating a new actor, we should acquire a lock
-      // So that only one worker in the cloud is instantiating the actor
-      // This is to prevent from executing side effects twice and race conditions.
       const MIN_LOCK_DURATION = 5_000;
-
       const lockConfig = {
         lockId: `redlock:${instanceConfig.id}`,
         duration: MIN_LOCK_DURATION,
       };
 
-      // When instantiating a new actor, we should acquire a lock
-      // So that only one worker in the cloud is instantiating the actor
+      // When instantiating a new instance, we should acquire a lock
+      // So that only one worker in the cloud is instantiating the instance
       // This is to prevent from executing side effects twice and race conditions.
       const lock = new Lock(lockConfig, this.adapters.lock);
       const result = await lock.using(async (abortSignal) => {
@@ -141,7 +137,7 @@ export class Worker<T extends InstanceClass = InstanceClass>
 
     if (process.env.NODE_ENV !== "test") {
       Object.keys(opts.instances).forEach((kind) => {
-        // console.log(`ActorWorker ready to handle "${kind}" actors`);
+        console.log(`SpawnKit: ready to handle "${kind}" instances`);
       });
     }
 
@@ -150,7 +146,7 @@ export class Worker<T extends InstanceClass = InstanceClass>
 
   static verify(instances: ListenProps["instances"]) {
     if (Object.keys(instances).length === 0) {
-      throw new Error(`Validation Error: worker configured with 0 actors`);
+      throw new Error(`Validation Error: worker configured with 0 instances`);
     }
   }
 }

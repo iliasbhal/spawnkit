@@ -1,7 +1,8 @@
+import { InstanceKind } from "@/adapters";
 import * as x from "xstate";
 
 export const createInvokeMachine = (
-  kind: string,
+  kind: InstanceKind,
   config: {
     sync?: Function;
     invoke: () => Promise<any>;

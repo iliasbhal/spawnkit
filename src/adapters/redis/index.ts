@@ -80,18 +80,21 @@ export class Snapshot
   extends RedisAdapter
   implements Adapters.AdapaterSnapshot
 {
-  private getKey(instanceId: number) {
+  private getKey(instanceId: Adapters.InstanceId) {
     return `snapshot:${instanceId}`;
   }
 
-  async get<Data>(instanceId: number): Promise<Data | null> {
+  async get<Data>(instanceId: Adapters.InstanceId): Promise<Data | null> {
     const key = this.getKey(instanceId);
     const data = await this.redis.get(key);
     if (!data) return null;
     return JSON.parse(data);
   }
 
-  async set<Data>(instanceId: number, snapshot: Data): Promise<true> {
+  async set<Data>(
+    instanceId: Adapters.InstanceId,
+    snapshot: Data,
+  ): Promise<true> {
     const key = this.getKey(instanceId);
     const serialized = JSON.stringify(snapshot);
     await this.redis.set(key, serialized);
@@ -99,7 +102,7 @@ export class Snapshot
   }
 
   subscribe<Data>(
-    instanceId: number,
+    instanceId: Adapters.InstanceId,
     callback: (snapshot: Data) => void,
   ): { unsubscribe: Function } {
     let active = true;
@@ -209,32 +212,35 @@ export class MessageBroker
   extends RedisAdapter
   implements Adapters.AdapaterMessageBroker
 {
-  private getKey(instanceId: number) {
+  private getKey(instanceId: Adapters.InstanceId) {
     return `events:${instanceId}`;
   }
 
-  async publish<EventData>(id: number, event: EventData) {
-    const hashID = this.getKey(id);
+  async publish<EventData>(instanceId: Adapters.InstanceId, event: EventData) {
+    const hashID = this.getKey(instanceId);
     const eventId = await this.redis.incr(hashID + ":uid");
     await this.redis.hset(hashID, eventId.toString(), JSON.stringify(event));
     return eventId;
   }
 
-  async ack(id: number, eventId: number): Promise<true> {
-    const hashID = this.getKey(id);
+  async ack(
+    instanceId: Adapters.InstanceId,
+    eventId: Adapters.EventId,
+  ): Promise<true> {
+    const hashID = this.getKey(instanceId);
     await this.redis.hdel(hashID, eventId.toString());
     return true;
   }
 
-  async has(id: number): Promise<boolean> {
-    const hashID = this.getKey(id);
+  async has(instanceId: Adapters.InstanceId): Promise<boolean> {
+    const hashID = this.getKey(instanceId);
     const size = await this.redis.hlen(hashID);
     const hasUnprocessedEvents = size > 0;
     return hasUnprocessedEvents;
   }
 
   subscribe<E extends { id: number; data: any }>(
-    instanceId: number,
+    instanceId: Adapters.InstanceId,
     callback: (event: E) => void,
   ): { unsubscribe: Function } {
     let active = true;

@@ -1,19 +1,19 @@
 import wait from "wait";
+import * as Spawnkit from "@/.";
 import { Adapters } from "@/adapters";
-import * as Adapter from "@/adapters/redis";
+import * as RedisAdapter from "@/adapters/redis";
 import { redis } from "@/adapters/redis/client";
-import * as Spawnkit from "../src";
 import { OrderBook } from "../example/OrderBook";
 import { ToggleMachine } from "../example/ToggleMachine";
 import { GameSession } from "../example/GameSession";
 import { AgentLLM } from "../example/AgentLLM";
 
 export const adapters: Adapters = {
-  lock: new Adapter.Lock(redis),
-  snapshot: new Adapter.Snapshot(redis),
-  messages: new Adapter.MessageBroker(redis),
-  pubsub: new Adapter.PubSub(redis),
-  scheduler: new Adapter.Scheduler(redis),
+  lock: new RedisAdapter.Lock(redis),
+  snapshot: new RedisAdapter.Snapshot(redis),
+  messages: new RedisAdapter.MessageBroker(redis),
+  pubsub: new RedisAdapter.PubSub(redis),
+  scheduler: new RedisAdapter.Scheduler(redis),
 };
 
 const worker = Spawnkit.Worker.from({
@@ -33,12 +33,12 @@ const main = async () => {
 
   // await basicExample();
   // await streamExample();
-  // await actorEmittedEventsExample();
+  // await emittedEventsExample();
   await scheduleCallExample();
 };
 
 const streamExample = async () => {
-  const agentAI = client.actor("AgentLLM", 111);
+  const agentAI = client.spawn("AgentLLM", "Hector");
 
   const stream = await agentAI.prompt({
     model: "claude3",
@@ -58,8 +58,8 @@ const streamExample = async () => {
   // }
 };
 
-const actorEmittedEventsExample = async () => {
-  const orderBook = client.actor("OrderBook", 222);
+const emittedEventsExample = async () => {
+  const orderBook = client.spawn("OrderBook", "BTC/USD");
 
   orderBook.on("orders", (event) => {
     console.log("CHANGE RECEIVED", event);
@@ -84,7 +84,7 @@ const actorEmittedEventsExample = async () => {
 };
 
 const basicExample = async () => {
-  const orderBook = client.actor("OrderBook", 111);
+  const orderBook = client.spawn("OrderBook", "BTC/EUR");
 
   orderBook.on("orders", (event) => {
     console.log("CHANGE RECEIVED", event);
@@ -100,7 +100,7 @@ const basicExample = async () => {
 };
 
 const scheduleCallExample = async () => {
-  const orderBook = client.actor("OrderBook", 111);
+  const orderBook = client.spawn("OrderBook", "BTC/ETH");
 
   const scheduleId = await orderBook.cron("* * * * *").buy({
     tick: "AAPL",

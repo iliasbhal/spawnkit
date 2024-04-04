@@ -6,6 +6,8 @@ import {
   ScheduleConfig,
   Cron,
   Delay,
+  InstanceId,
+  EventId,
 } from "../adapters";
 import { Stream } from "./Stream";
 
@@ -27,13 +29,16 @@ export class Client<Props extends ClientProps> {
     return new Client(opts);
   }
 
-  static getChannelForEventResponse(instanceId: number, eventId: number) {
-    return `actor:${instanceId}:event:${eventId}` as const;
+  static getChannelForEventResponse(instanceId: InstanceId, eventId: EventId) {
+    return `instance:${instanceId}:event:${eventId}` as const;
   }
 
   static handleIncomingStream() {}
 
-  actor<Kind extends keyof Props["instances"]>(kind: Kind, instanceId: number) {
+  spawn<Kind extends keyof Props["instances"]>(
+    kind: Kind,
+    instanceId: InstanceId,
+  ) {
     type Instance = InstanceType<Props["instances"][Kind]>;
     type InstanceEvent = Parameters<Instance["callMethodDefinedInEvent"]>[1];
     type InstanceEmittable = Parameters<Instance["emit"]>;
@@ -84,7 +89,7 @@ export class Client<Props extends ClientProps> {
       return shouldScheduleInstance;
     };
 
-    const sendEventToActor = async (event: InstanceEvent) => {
+    const sendEventToInstance = async (event: InstanceEvent) => {
       const shouldScheduleInstance = checkShouldScheduleWithEventSent();
       const [eventId] = await Promise.all([
         this.adapters.messages.publish(instanceId, event),
@@ -117,7 +122,7 @@ export class Client<Props extends ClientProps> {
       return this.adapters.pubsub.on(channel, callback);
     };
 
-    const actorClientAPI = {
+    const instanceClientAPI = {
       on: (
         channel: InstanceEmittable[0],
         callback: (data: InstanceEmittable[1]) => any,
@@ -173,7 +178,7 @@ export class Client<Props extends ClientProps> {
     const createRemoteMethodHandler = (mode: InstanceEvent["mode"]) => {
       return (action: string) => {
         return async (...args: any[]) => {
-          const eventId = await sendEventToActor({
+          const eventId = await sendEventToInstance({
             action,
             args,
             mode,
@@ -241,7 +246,7 @@ export class Client<Props extends ClientProps> {
     };
 
     const emitRemoteMethodHandler = createRemoteMethodHandler("emit");
-    const actorEmitClientAPI = new Proxy(
+    const instanceEmitClientAPI = new Proxy(
       {},
       {
         get(target, prop, receiver) {
@@ -258,19 +263,19 @@ export class Client<Props extends ClientProps> {
     // We use the Kind type here just o it to show nicely
     // in the intelissense. it will show as Remote<OrderBook> for example
     type Spawn<Kind> = RemoteMethodes &
-      typeof actorClientAPI & { emit: EmitRemoteMethods } & {
+      typeof instanceClientAPI & { emit: EmitRemoteMethods } & {
         delay(delayMS: number): ScheduleRemoteMethods;
         cron(crontab: string): ScheduleRemoteMethods;
       };
 
     const normalRemoteMethodHandler = createRemoteMethodHandler("normal");
-    return new Proxy(actorClientAPI as Spawn<Instance>, {
+    return new Proxy(instanceClientAPI as Spawn<Instance>, {
       get(target, prop, receiver) {
         if (prop in target) return Reflect.get(target, prop, receiver);
         if (typeof prop !== "string") return;
 
         if (prop === "emit") {
-          return actorEmitClientAPI;
+          return instanceEmitClientAPI;
         }
 
         if (prop == "delay") {
