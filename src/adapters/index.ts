@@ -28,7 +28,7 @@ export interface ScheduleInstanceData {
 export interface InstanceMethodCall {
   action: string;
   args: any[];
-  mode: "normal" | "emit";
+  mode: "normal" | "emit" | "scheduled";
 }
 
 export interface Adapters {

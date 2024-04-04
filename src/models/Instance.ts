@@ -69,7 +69,7 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
 
     const channelD = Client.getChannelForEventResponse(this.id, eventId);
     const response: unknown = await method?.(...args);
-    if (mode === "emit") {
+    if (mode === "emit" || mode === "scheduled") {
       // NO OP
       // TODO: we should exclude methods that return a Stream from clientAPI.emit method;
       return;

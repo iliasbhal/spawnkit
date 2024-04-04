@@ -163,7 +163,7 @@ export class Client<Props extends ClientProps> {
                   event: {
                     action: prop,
                     args,
-                    mode: "emit",
+                    mode: "scheduled",
                   },
                 });
 
