@@ -7,6 +7,7 @@ import { OrderBook } from "../example/OrderBook";
 import { ToggleMachine } from "../example/ToggleMachine";
 import { GameSession } from "../example/GameSession";
 import { AgentLLM } from "../example/AgentLLM";
+import { ErrorExample } from "../example/ErrorExample";
 
 export const adapters: Adapters = {
   lock: new RedisAdapter.Lock(redis),
@@ -17,13 +18,13 @@ export const adapters: Adapters = {
 };
 
 const worker = Spawnkit.Worker.from({
-  instances: { OrderBook, ToggleMachine, GameSession, AgentLLM },
+  instances: { OrderBook, ToggleMachine, GameSession, AgentLLM, ErrorExample },
   adapters,
 });
 
 // import type * as instances from "./instances";
 const client = Spawnkit.Client.from({
-  instances: { OrderBook, ToggleMachine, GameSession, AgentLLM },
+  instances: { OrderBook, ToggleMachine, GameSession, AgentLLM, ErrorExample },
   adapters,
 });
 
@@ -34,7 +35,8 @@ const main = async () => {
   // await basicExample();
   // await streamExample();
   // await emittedEventsExample();
-  await scheduleCallExample();
+  // await scheduleCallExample();
+  await errorHandlingExample();
 };
 
 const streamExample = async () => {
@@ -56,6 +58,14 @@ const streamExample = async () => {
   // for await (const data of stream) {
   //   console.log("STREAM ->", data);
   // }
+
+  // TODO: it should call the stream anyway but the emitted values
+  // should not be sent anywhere;
+  await agentAI.emit.prompt({
+    model: "claude3",
+    prompt: "blabla",
+    taskId: "asdasd",
+  });
 };
 
 const emittedEventsExample = async () => {
@@ -139,6 +149,21 @@ const scheduleCallExample = async () => {
   });
 
   await wait(5000);
+};
+
+const errorHandlingExample = async () => {
+  const errorExample = client.spawn("ErrorExample", "LOL");
+
+  try {
+    const response = await errorExample.doSomething("aaa");
+  } catch (err: any) {
+    console.log(
+      "caught error",
+      err instanceof Spawnkit.RemoteError,
+      err.name === "SomeSpetialError",
+      err,
+    );
+  }
 };
 
 console.log("START");
