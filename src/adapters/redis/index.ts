@@ -331,7 +331,6 @@ export class Scheduler
 
     if ("delay" in data.schedule) {
       const job = await this.queue.add("event", data, {
-        jobId: `spawnkit-delay:${kind}:${id}:${action}:${crypto.randomUUID()}`,
         delay: data.schedule.delay,
       });
 
@@ -344,7 +343,6 @@ export class Scheduler
 
     if ("cron" in data.schedule) {
       const job = await this.queue.add("event", data, {
-        jobId: `spawnkit-cron:${kind}:${id}:${action}:${crypto.randomUUID()}`,
         repeat: {
           pattern: data.schedule.cron,
         },
