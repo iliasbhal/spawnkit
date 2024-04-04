@@ -123,7 +123,6 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
   async run(
     abortSignal: AbortSignal,
   ): Promise<InstanceResult<InstanceData | null>> {
-    console.log("STARTED");
     await this.loadData();
 
     // Start the process + start listening for events
@@ -155,8 +154,6 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
     this.onEventSubscription?.unsubscribe();
     await this.stop();
     await this.save(this.data!);
-
-    console.log("STOPPED");
   }
 
   protected async waitOnExternalEffects() {
@@ -209,11 +206,9 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
       this.adapters.messages.subscribe<InstanceMethodCall>(
         this.id,
         async (event) => {
-          console.log("instance received event", event);
           this.keepAlive.addWait(300, "Event Received");
           timer.restart(NO_EVENT_TIMEOUT);
 
-          console.log("event.id", event.id);
           const waitUntilFullyProcessed = Promise.all([
             this.callMethodDefinedInEvent(event.id, event.data),
             this.adapters.messages.ack(this.id, event.id),
