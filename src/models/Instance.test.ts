@@ -3,6 +3,8 @@ import { ControlledPromise } from "@/utils/ControlledPromise";
 import { toggle, toggleWithSync } from "../instances/fixtures";
 import { InstanceSnapshot, InstanceEvent, InstanceLock } from "../repositories";
 
+it.todo("should stay alive while a streaming is happening");
+
 describe("Instance", () => {
   const instances = {
     toggle: Machine.from(toggle),
