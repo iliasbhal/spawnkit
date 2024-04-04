@@ -291,43 +291,60 @@ export class Scheduler
     });
   }
 
-  async list(): Promise<string[]> {
-    throw new Error("TODO: IMPLEMENT A WAY TO LIST SCHEDULED ACTIONS");
-    return [];
-  }
-
   async cancel(scheduleId: string): Promise<boolean> {
+    const redisKey = "Spawnkit:scheduled-events";
     const [repeatableRemoved, delayJobStatus] = await Promise.all([
       this.queue.removeRepeatableByKey(scheduleId),
       this.queue.remove(scheduleId),
+      this.redis.hdel(redisKey, scheduleId),
     ]);
 
     const isRemoved = repeatableRemoved || delayJobStatus == 1;
     return isRemoved;
   }
 
+  async list(): Promise<Adapters.ScheduleEventMetadata[]> {
+    const redisKey = "Spawnkit:scheduled-events";
+    const rawScheduledEvents = await this.redis.hvals(redisKey);
+
+    const scheduledEvents = rawScheduledEvents.map((st) => JSON.parse(st));
+    return scheduledEvents as Adapters.ScheduleEventMetadata[];
+  }
+
+  private async addToList(data: Adapters.ScheduleEventData, job: BullMQ.Job) {
+    const jobID = job.repeatJobKey || job.id;
+    const metaData = {
+      data,
+      scheduleId: jobID,
+      created_at: Date.now(),
+    };
+
+    const redisKey = "Spawnkit:scheduled-events";
+    await this.redis.hset(redisKey, jobID!, JSON.stringify(metaData));
+  }
+
   async event(data: Adapters.ScheduleEventData): Promise<string> {
+    const {
+      instance: { kind, id },
+      event: { action },
+    } = data;
+
     if ("delay" in data.schedule) {
       const job = await this.queue.add("event", data, {
+        jobId: `spawnkit-delay:${kind}:${id}:${action}:${crypto.randomUUID()}`,
         delay: data.schedule.delay,
       });
 
       const jobId = job.id;
-      if (!jobId) {
-        throw new Error("Why no job id???");
-      }
+      if (!jobId) throw new Error("Why no job id???");
 
+      await this.addToList(data, job);
       return jobId;
     }
 
     if ("cron" in data.schedule) {
-      const {
-        instance: { kind, id },
-        event: { action },
-      } = data;
-
       const job = await this.queue.add("event", data, {
-        jobId: `cronjob:${kind}:${id}:${action}:${crypto.randomUUID()}`,
+        jobId: `spawnkit-cron:${kind}:${id}:${action}:${crypto.randomUUID()}`,
         repeat: {
           pattern: data.schedule.cron,
         },
@@ -338,6 +355,7 @@ export class Scheduler
         throw new Error("Why no job id???");
       }
 
+      await this.addToList(data, job);
       return jobId;
     }
 

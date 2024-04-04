@@ -79,10 +79,16 @@ export abstract class AdapaterMessageBroker {
   ): { unsubscribe: Function };
 }
 
+export interface ScheduleEventMetadata {
+  created_at: number;
+  scheduleId: string;
+  data: ScheduleEventData;
+}
+
 export abstract class AdapaterScheduler {
   abstract instance(schedule: ScheduleInstanceData): Promise<ScheduleId>;
   abstract event(schedule: ScheduleEventData): Promise<ScheduleId>;
-  abstract list(): Promise<ScheduleId[]>;
+  abstract list(): Promise<ScheduleEventMetadata[]>;
   abstract cancel(scheduleId: ScheduleId): Promise<boolean>;
 }
 

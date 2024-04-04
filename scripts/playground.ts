@@ -111,15 +111,34 @@ const scheduleCallExample = async () => {
     tick: "AAPL",
   });
 
+  const before = await orderBook.scheduled.list();
+  console.log("before", before.length);
+  await orderBook.scheduled.cancel(scheduleId);
+  const after = await orderBook.scheduled.list();
+  console.log("after", after.length);
+
   const scheduleId2 = await orderBook.delay(3000).buy({
     tick: "AAPL",
   });
 
-  const scheduledJobs = await orderBook.scheduled.list();
-  console.log(scheduledJobs);
+  const before2 = await orderBook.scheduled.list();
+  console.log("before", before2.length);
+  await orderBook.scheduled.cancel(scheduleId2);
+  const after2 = await orderBook.scheduled.list();
+  console.log("after", after2.length);
 
-  orderBook.scheduled.cancel(scheduleId);
-  // orderBook.scheduled.cancel(scheduleId2);
+  await orderBook.cron("* * * * *").buy({
+    tick: "AAPL",
+  });
+
+  await orderBook.delay(3000).buy({
+    tick: "AAPL",
+  });
+
+  const list = await orderBook.scheduled.list();
+  console.log("allscheduled", list);
+
+  // orderBook.scheduled.cancel(scheduleId);
   orderBook.on("orders", (event) => {
     console.log("stream: ", event);
   });
