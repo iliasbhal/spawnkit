@@ -147,6 +147,9 @@ export class Client<Props extends ClientProps> {
     };
 
     const instanceClientAPI = {
+      id: instanceId,
+      kind: kind,
+
       on: (
         channel: InstanceEmittable[0],
         callback: (data: InstanceEmittable[1]) => any,
