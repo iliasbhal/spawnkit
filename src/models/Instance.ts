@@ -209,13 +209,8 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
 
   private onEventSubscription: { unsubscribe: Function } | undefined;
   private subscribeToInstanceEvent() {
-    const noMoreEventsCtl = new ControlledPromise();
-
     const NO_EVENT_TIMEOUT = 3000;
-    const timer = new ControlledTimeout(() => {
-      noMoreEventsCtl.resolve(true);
-    });
-
+    const timer = new ControlledTimeout();
     timer.start(NO_EVENT_TIMEOUT);
 
     this.onEventSubscription =
@@ -235,7 +230,7 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
         },
       );
 
-    this.keepAlive.add(noMoreEventsCtl.await);
+    this.keepAlive.add(timer.await);
   }
 
   /** this function is used to emit message to one client,

@@ -1,8 +1,13 @@
-export class ControlledTimeout {
-  callback: () => void;
+import { ControlledPromise } from "./ControlledPromise";
 
-  constructor(callback: () => void) {
-    this.callback = callback;
+export class ControlledTimeout {
+  promiseCtl = new ControlledPromise();
+  get await() {
+    return this.promiseCtl.await;
+  }
+
+  done() {
+    this.promiseCtl.resolve(true);
   }
 
   running = false;
@@ -17,8 +22,9 @@ export class ControlledTimeout {
 
     this.timeoutId = setTimeout(() => {
       this.reset();
-      this.callback();
+      this.done();
     }, timeRemainig);
+
     this.startedAt = Date.now();
     this.running = true;
   }
@@ -37,7 +43,7 @@ export class ControlledTimeout {
       throw new Error("UH OH");
     }
 
-    this.timeoutId = setTimeout(this.callback, this.prevRemaining);
+    this.timeoutId = setTimeout(() => this.done(), this.prevRemaining);
     this.startedAt = Date.now();
     this.running = true;
     this.prevRemaining = null;
