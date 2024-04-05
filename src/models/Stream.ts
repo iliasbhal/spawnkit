@@ -33,7 +33,7 @@ export class Stream<StreamValue> {
   }
 
   storred: any[] = [];
-  store(event: any, data?: any) {
+  private store(event: any, data?: any) {
     if (this.started) {
       this.unstore();
       this.notify(event, data);

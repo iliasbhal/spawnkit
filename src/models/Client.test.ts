@@ -2,21 +2,51 @@ import * as Spawnkit from "@/.";
 import wait from "wait";
 
 describe("Client", () => {
-  it("should not try to schedule instance on every event", async () => {
-    // I added a checkShouldScheduleWithEventSent function
-    // But this need to unit tested.
+  describe("Base", () => {
+    it.todo("client can use instance methods");
+    it.todo("can call for instance method and not wait for the resonse");
+  });
 
-    expect(checkShouldScheduleWithEventSent()).toBe(true);
-    expect(checkShouldScheduleWithEventSent()).toBe(false);
+  describe("Errors", () => {
+    it.todo("forwards message, stacktrace and other attributes");
+    it.todo("forwards errors thrown during the method call (sync method)");
+    it.todo("forwards errors thrown during the method call (async method)");
+  });
 
-    await wait(1000);
+  describe("Stream", () => {
+    it.todo("forwards returned stream to client (.map)");
+    it.todo("forwards returned stream to client (async iterator)");
+  });
 
-    expect(checkShouldScheduleWithEventSent()).toBe(true);
-    expect(checkShouldScheduleWithEventSent()).toBe(false);
+  describe("Schedule", () => {
+    it.todo("can schedule method call (delay)");
+    it.todo("can cancel schedule method call (delay)");
+    it.todo("can schedule method call (cron)");
+    it.todo("can cancel schedule method call (cron)");
+    it.todo("can list all scheduled method call");
+  });
 
-    throw new Error(
-      "REPLACE THIS TEST WITH A CLIENT INSTEAD OF USING A COPY PASTED SNIPPER FROM CLIENT",
-    );
+  describe("PubSub", () => {
+    it.todo("can emit and listen to instance channels");
+  });
+
+  describe("Internal", () => {
+    it("should not try to schedule instance on every event", async () => {
+      // I added a checkShouldScheduleWithEventSent function
+      // But this need to unit tested.
+
+      expect(checkShouldScheduleWithEventSent()).toBe(true);
+      expect(checkShouldScheduleWithEventSent()).toBe(false);
+
+      await wait(1000);
+
+      expect(checkShouldScheduleWithEventSent()).toBe(true);
+      expect(checkShouldScheduleWithEventSent()).toBe(false);
+
+      throw new Error(
+        "REPLACE THIS TEST WITH A CLIENT INSTEAD OF USING A COPY PASTED SNIPPER FROM CLIENT",
+      );
+    });
   });
 });
 
