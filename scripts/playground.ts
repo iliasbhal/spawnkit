@@ -22,7 +22,6 @@ const worker = Spawnkit.Worker.from({
   adapters,
 });
 
-// import type * as instances from "./instances";
 const client = Spawnkit.Client.from({
   instances: { OrderBook, ToggleMachine, GameSession, AgentLLM, ErrorExample },
   adapters,
@@ -33,14 +32,27 @@ const main = async () => {
   worker.start();
 
   // await basicExample();
-  await streamExample();
+  // await streamExample();
   // await emittedEventsExample();
   // await scheduleCallExample();
   // await errorHandlingExample();
 };
 
+const basicExample = async () => {
+  const orderBook = client.spawn("OrderBook", "BTC/EUR");
+
+  // Example 1: call methods like the its a real reference.
+  const response = await orderBook.buy({ tick: "APPL" });
+  console.log(response);
+
+  // Example 2: call the methods but don't wait for the response
+  await orderBook.emit.buy({ tick: "APPL" });
+  console.log("SENT");
+};
+
 const streamExample = async () => {
   const agentAI = client.spawn("AgentLLM", "Hector");
+  console.log(agentAI.kind, agentAI.id);
 
   const stream = await agentAI.prompt({
     model: "claude3",
@@ -91,22 +103,6 @@ const emittedEventsExample = async () => {
 
   await wait(10_000);
   clearInterval(intervalId);
-};
-
-const basicExample = async () => {
-  const orderBook = client.spawn("OrderBook", "BTC/EUR");
-
-  orderBook.on("orders", (event) => {
-    console.log("CHANGE RECEIVED", event);
-  });
-
-  // Example 1: call methods like the its a real reference.
-  const response = await orderBook.buy({ tick: "APPL" });
-  console.log(response);
-
-  // Example 2: call the methods but don't wait for the response
-  await orderBook.emit.buy({ tick: "APPL" });
-  console.log("SENT");
 };
 
 const scheduleCallExample = async () => {
