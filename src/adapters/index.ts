@@ -46,10 +46,8 @@ export abstract class AdapterLock {
 }
 
 export abstract class AdapaterSnapshot {
-  abstract get<Data>(instanceId: InstanceId): Promise<Data | null>;
-
-  abstract set<Data>(instanceId: InstanceId, snapshot: Data): Promise<true>;
-
+  abstract load<Data>(instanceId: InstanceId): Promise<Data | null>;
+  abstract save<Data>(instanceId: InstanceId, snapshot: Data): Promise<true>;
   abstract subscribe<Data>(
     instanceId: InstanceId,
     onSnapshot: (snapshot: Data) => void,

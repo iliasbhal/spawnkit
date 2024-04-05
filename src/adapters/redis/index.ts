@@ -84,14 +84,14 @@ export class Snapshot
     return `snapshot:${instanceId}`;
   }
 
-  async get<Data>(instanceId: Adapters.InstanceId): Promise<Data | null> {
+  async load<Data>(instanceId: Adapters.InstanceId): Promise<Data | null> {
     const key = this.getKey(instanceId);
     const data = await this.redis.get(key);
     if (!data) return null;
     return JSON.parse(data);
   }
 
-  async set<Data>(
+  async save<Data>(
     instanceId: Adapters.InstanceId,
     snapshot: Data,
   ): Promise<true> {
@@ -216,7 +216,10 @@ export class MessageBroker
     return `events:${instanceId}`;
   }
 
-  async publish<EventData>(instanceId: Adapters.InstanceId, event: EventData) {
+  async publish<EventData>(
+    instanceId: Adapters.InstanceId,
+    event: EventData,
+  ): Promise<Adapters.EventId> {
     const hashID = this.getKey(instanceId);
     const eventId = await this.redis.incr(hashID + ":uid");
     await this.redis.hset(hashID, eventId.toString(), JSON.stringify(event));
@@ -414,7 +417,6 @@ export class Scheduler
     const worker = new BullMQ.Worker<JobData, any, JobName>(
       Scheduler.QUEUE_NAME,
       async (job) => {
-        console.log(job.id, job.repeatJobKey);
         const canProcess = this.canProcessJob(job);
         if (!canProcess) return;
 

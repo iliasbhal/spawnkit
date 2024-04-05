@@ -122,14 +122,14 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
 
     await this.runExternalEffect(async () => {
       await this.saveAsyncManager.onlyLastOnePerTick(async () => {
-        await this.adapters.snapshot.set(this.id, data);
+        await this.adapters.snapshot.save(this.id, data);
       });
     });
   }
 
   private async loadData() {
     // Seed data with previously stored data.
-    const currentData = await this.adapters.snapshot.get<InstanceData | null>(
+    const currentData = await this.adapters.snapshot.load<InstanceData | null>(
       this.id,
     );
 
