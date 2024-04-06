@@ -82,6 +82,27 @@ export const generateTestSuite = (
         expect(await lock.acquire("lock4", ownerId, 100)).toBe(true);
       });
 
+      it("can extend lock to several the initial lock duration", async () => {
+        const { lock } = await getAdapters();
+        const ownerId = crypto.randomUUID();
+
+        await lock.acquire("lock4-2", ownerId, 300);
+        await wait(150);
+        await lock.extend("lock4-2", ownerId, 300);
+        await wait(150);
+        await lock.extend("lock4-2", ownerId, 300);
+        await wait(150);
+        await lock.extend("lock4-2", ownerId, 300);
+        await wait(150);
+        await lock.extend("lock4-2", ownerId, 300);
+        await wait(150);
+
+        expect(await lock.acquire("lock4-2", ownerId, 300)).toBe(false);
+
+        await wait(300);
+        expect(await lock.acquire("lock4-2", ownerId, 300)).toBe(true);
+      });
+
       it("cannot extend lock duration is already expired", async () => {
         const { lock } = await getAdapters();
         const ownerId = crypto.randomUUID();
