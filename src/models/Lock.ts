@@ -144,10 +144,16 @@ export class Lock {
         routinePromise,
       ]);
 
+      routineAbortCtl.abort();
+
       return result as Awaited<typeof routinePromise>;
     } finally {
-      routineAbortCtl.abort();
-      this.release();
+      this.release().catch((err) => {
+        const routineCompleted = routineAbortCtl.signal.aborted;
+        if (!routineCompleted) {
+          throw err;
+        }
+      });
     }
   }
 }
