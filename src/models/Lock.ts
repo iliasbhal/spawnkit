@@ -1,5 +1,6 @@
 import wait from "wait";
 import { AdapterLock } from "../adapters";
+import { ControlledPromise } from "@/utils/ControlledPromise";
 
 export class LockError extends Error {}
 
@@ -131,8 +132,13 @@ export class Lock {
     );
 
     try {
-      const result = await routine(abortExtSignal);
-      return result;
+      const routinePromise = routine(abortExtSignal);
+      const result = await Promise.race([
+        ControlledPromise.wrapSignal(abortExtSignal), // <-- this never resolves, it only throws
+        routinePromise,
+      ]);
+
+      return result as Awaited<typeof routinePromise>;
     } finally {
       routineAbortCtl.abort();
       await this.release();

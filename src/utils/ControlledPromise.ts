@@ -68,4 +68,14 @@ export class ControlledPromise<T> {
     const promiseCtl = new ControlledPromise(name);
     return promiseCtl;
   }
+
+  static wrapSignal(abortsignal: AbortSignal) {
+    const promiseCtl = new ControlledPromise();
+    const throwErr = (e) => promiseCtl.reject(new Error("Aborted"));
+    abortsignal.addEventListener("abort", throwErr);
+
+    return promiseCtl.await.finally(() => {
+      abortsignal.removeEventListener("abort", throwErr);
+    });
+  }
 }
