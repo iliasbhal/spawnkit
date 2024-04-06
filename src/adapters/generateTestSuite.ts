@@ -9,6 +9,17 @@ export const generateTestSuite = (
   describe(name, () => {
     const getAdapters = createAdapters();
 
+    describe("Lock", () => {
+      it("can acquire lock only once", async () => {
+        const { lock } = await getAdapters();
+        const ownerId = crypto.randomUUID();
+
+        expect(await lock.acquire("lock1", ownerId, 1000)).toBe(true);
+        expect(await lock.acquire("lock1", ownerId, 1000)).toBe(false);
+      });
+
+    });
+
     describe("PubSub", () => {
       const creatStreamId = createStreamIdGenerator();
 

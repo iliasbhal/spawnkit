@@ -16,7 +16,9 @@ export class Lock extends RedisAdapter implements Adapters.AdapterLock {
   redlock: Redlock;
   constructor(redis: Redis) {
     super(redis);
-    this.redlock = new Redlock([redis]);
+    this.redlock = new Redlock([redis], {
+      retryCount: 0,
+    });
 
     process.on("exit", () => {
       this.releaseAll();
