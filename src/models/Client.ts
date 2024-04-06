@@ -42,6 +42,10 @@ export class Client<Props extends ClientProps> {
   }
 
   static serializeError(error: Error) {
+    if (!error) {
+      return null;
+    }
+
     return Object.assign(
       {},
       error,
