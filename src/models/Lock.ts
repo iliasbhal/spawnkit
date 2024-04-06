@@ -84,7 +84,7 @@ export class Lock {
 
   async extend() {
     const { lockId, duration } = this.config;
-    const expireAt = this.expireAt + duration;
+    const expireAt = Date.now() + duration;
     const extended = await this.lock.extend(lockId, this.ownerId, duration);
     if (!extended) throw new LockExtendError(lockId, this.ownerId);
 
