@@ -2,6 +2,7 @@ export type InstanceId = string;
 export type InstanceKind = string;
 export type EventId = number;
 export type LockId = string;
+export type LockOwnerId = string;
 
 export type ScheduleId = string;
 export type Cron = { cron: string };
@@ -40,9 +41,23 @@ export interface Adapters {
 }
 
 export abstract class AdapterLock {
-  abstract acquire(lockId: LockId, duration: number): Promise<boolean>;
-  abstract extend(lockId: LockId, duration: number): Promise<boolean>;
-  abstract release(lockId: LockId): Promise<boolean>;
+  /*
+   *
+   */
+  abstract acquire(
+    lockId: LockId,
+    /* The owner id is a string that cannot be used by other processes claiming the lock
+     *  It should be a unique value across the entire cluster.
+     */
+    ownerId: LockOwnerId,
+    duration: number,
+  ): Promise<boolean>;
+  abstract extend(
+    lockId: LockId,
+    ownerId: LockOwnerId,
+    duration: number,
+  ): Promise<boolean>;
+  abstract release(lockId: LockId, ownerId: LockOwnerId): Promise<boolean>;
 }
 
 export abstract class AdapaterSnapshot {

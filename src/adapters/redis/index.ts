@@ -19,24 +19,23 @@ export class Lock extends RedisAdapter implements Adapters.AdapterLock {
     this.redlock = new Redlock([redis], {
       retryCount: 0,
     });
-
-    process.on("exit", () => {
-      this.releaseAll();
-    });
   }
 
-  lockById = new Map<string, RedlockLock>();
+  lockByOwnerKey = new Map<string, RedlockLock>();
 
-  private releaseAll() {
-    Array.from(this.lockById.keys()).forEach((lockId) => {
-      this.release(lockId);
-    });
+  private getOwnerKey(lockId: string, ownerId: string) {
+    return `lockId:${lockId}:ownerId:${ownerId}`;
   }
 
-  async acquire(lockId: string, duration: number): Promise<boolean> {
+  async acquire(
+    lockId: string,
+    ownerId: string,
+    duration: number,
+  ): Promise<boolean> {
     try {
       const lock = await this.redlock.acquire([lockId], duration);
-      this.lockById.set(lockId, lock);
+      const ownerKey = this.getOwnerKey(lockId, ownerId);
+      this.lockByOwnerKey.set(ownerKey, lock);
       return true;
     } catch (err) {
       if (err instanceof Error) {
@@ -49,22 +48,28 @@ export class Lock extends RedisAdapter implements Adapters.AdapterLock {
     }
   }
 
-  async extend(lockId: string, duration: number): Promise<boolean> {
-    const lock = this.lockById.get(lockId);
+  async extend(
+    lockId: string,
+    ownerId: string,
+    duration: number,
+  ): Promise<boolean> {
+    const ownerKey = this.getOwnerKey(lockId, ownerId);
+    const lock = this.lockByOwnerKey.get(ownerKey);
     if (!lock) return false;
 
     try {
       const newLock = await this.redlock.extend(lock, duration);
-      this.lockById.set(lockId, newLock);
+      this.lockByOwnerKey.set(lockId, newLock);
       return true;
     } catch (err) {
-      this.lockById.delete(lockId);
+      this.lockByOwnerKey.delete(lockId);
       return false;
     }
   }
 
-  async release(lockId: string): Promise<boolean> {
-    const lock = this.lockById.get(lockId);
+  async release(lockId: string, ownerId: string): Promise<boolean> {
+    const ownerKey = this.getOwnerKey(lockId, ownerId);
+    const lock = this.lockByOwnerKey.get(ownerKey);
     if (!lock) return false;
 
     try {
@@ -73,7 +78,7 @@ export class Lock extends RedisAdapter implements Adapters.AdapterLock {
     } catch (err) {
       return false;
     } finally {
-      this.lockById.delete(lockId);
+      this.lockByOwnerKey.delete(lockId);
     }
   }
 }
@@ -110,7 +115,7 @@ export class Snapshot
     let active = true;
     let prevSnapshot: any = null;
     const intervalId = setInterval(async () => {
-      const snapshot = await this.get<Data>(instanceId);
+      const snapshot = await this.load<Data>(instanceId);
 
       const notify = (data: any) => {
         if (active) {

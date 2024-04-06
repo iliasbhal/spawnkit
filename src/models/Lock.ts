@@ -40,6 +40,7 @@ export class Lock {
 
   config: InstanceLockConfig;
   lock: AdapterLock;
+  ownerId: string;
 
   getConfig(input: InstanceLockConfigInput): InstanceLockConfig {
     const config = input;
@@ -64,26 +65,27 @@ export class Lock {
 
   constructor(config: InstanceLockConfigInput, adapterLock: AdapterLock) {
     this.config = this.getConfig(config);
+    this.ownerId = crypto.randomUUID();
     this.lock = adapterLock;
   }
 
   async acquire() {
     const { lockId, duration } = this.config;
 
-    const acquired = await this.lock.acquire(lockId, duration);
+    const acquired = await this.lock.acquire(lockId, this.ownerId, duration);
     if (!acquired) throw new AcquireLockError(lockId);
     return acquired;
   }
 
   async extend() {
     const { lockId, duration } = this.config;
-    const extended = await this.lock.extend(lockId, duration);
+    const extended = await this.lock.extend(lockId, this.ownerId, duration);
     if (!extended) throw new LockExtendError(lockId);
   }
 
   async release() {
     const { lockId } = this.config;
-    const released = await this.lock.release(lockId);
+    const released = await this.lock.release(lockId, this.ownerId);
     if (!released) throw new LockReleaseError(lockId);
   }
 
