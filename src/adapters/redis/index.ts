@@ -59,10 +59,10 @@ export class Lock extends RedisAdapter implements Adapters.AdapterLock {
 
     try {
       const newLock = await this.redlock.extend(lock, duration);
-      this.lockByOwnerKey.set(lockId, newLock);
+      this.lockByOwnerKey.set(ownerKey, newLock);
       return true;
     } catch (err) {
-      this.lockByOwnerKey.delete(lockId);
+      this.lockByOwnerKey.delete(ownerKey);
       return false;
     }
   }
@@ -78,7 +78,7 @@ export class Lock extends RedisAdapter implements Adapters.AdapterLock {
     } catch (err) {
       return false;
     } finally {
-      this.lockByOwnerKey.delete(lockId);
+      this.lockByOwnerKey.delete(ownerKey);
     }
   }
 }
