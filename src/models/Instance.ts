@@ -19,7 +19,8 @@ interface InstanceResult<V extends any> {
 
 interface InternalChannels {
   [key: `instance:${string}:event:${string}`]:
-    | { error: any; response: any }
+    | { error: any }
+    | { response: any }
     | { stream: true; start: true }
     | { stream: true; data: any }
     | { stream: true; end: true }
@@ -108,8 +109,12 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
         });
         response.start();
       } else {
-        const serializedError = Client.serializeError(error);
-        this.emitInternal(channelID, { error: serializedError, response });
+        if (error) {
+          const serializedError = Client.serializeError(error);
+          this.emitInternal(channelID, { error: serializedError });
+        } else {
+          this.emitInternal(channelID, { response });
+        }
       }
     }
   }
