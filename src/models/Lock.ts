@@ -5,20 +5,20 @@ import { ControlledPromise } from "@/utils/ControlledPromise";
 export class LockError extends Error {}
 
 export class AcquireLockError extends LockError {
-  constructor(lockId: string) {
-    super(`Couldn\'t acquire lock (${lockId})`);
+  constructor(lockId: string, ownerId: string) {
+    super(`Couldn\'t acquire lock (${lockId} | ${ownerId})`);
   }
 }
 
 export class LockReleaseError extends LockError {
-  constructor(lockId: string) {
-    super(`Couldn\'t release lock (${lockId})`);
+  constructor(lockId: string, ownerId: string) {
+    super(`Couldn\'t release lock (${lockId} | ${ownerId})`);
   }
 }
 
 export class LockExtendError extends LockError {
-  constructor(lockId: string) {
-    super(`Couldn\'t extend lock (${lockId})`);
+  constructor(lockId: string, ownerId: string) {
+    super(`Couldn\'t extend lock (${lockId} | ${ownerId})`);
   }
 }
 
@@ -42,6 +42,7 @@ export class Lock {
   config: InstanceLockConfig;
   lock: AdapterLock;
   ownerId: string;
+  expireAt: number = 0;
 
   getConfig(input: InstanceLockConfigInput): InstanceLockConfig {
     const config = input;
@@ -73,21 +74,29 @@ export class Lock {
   async acquire() {
     const { lockId, duration } = this.config;
 
+    const expireAt = Date.now() + duration;
     const acquired = await this.lock.acquire(lockId, this.ownerId, duration);
-    if (!acquired) throw new AcquireLockError(lockId);
+    if (!acquired) throw new AcquireLockError(lockId, this.ownerId);
+
+    this.expireAt = expireAt;
     return acquired;
   }
 
   async extend() {
     const { lockId, duration } = this.config;
+    const expireAt = this.expireAt + duration;
     const extended = await this.lock.extend(lockId, this.ownerId, duration);
-    if (!extended) throw new LockExtendError(lockId);
+    if (!extended) throw new LockExtendError(lockId, this.ownerId);
+
+    this.expireAt = expireAt;
   }
 
   async release() {
     const { lockId } = this.config;
     const released = await this.lock.release(lockId, this.ownerId);
-    if (!released) throw new LockReleaseError(lockId);
+    if (!released) throw new LockReleaseError(lockId, this.ownerId);
+
+    this.expireAt = 0;
   }
 
   autoExtendLockInBackground(stopExtendingSignal: AbortSignal) {
@@ -96,17 +105,14 @@ export class Lock {
     Promise.resolve()
       .then(async () => {
         const { extendBeforeThreshold } = this.config;
-        let expireAt = Date.now();
 
         loop: while (true) {
-          const timeBeforeExpire = expireAt - Date.now();
+          const timeBeforeExpire = this.expireAt - Date.now();
           const timeBeforeExtend = timeBeforeExpire - extendBeforeThreshold;
-
           if (stopExtendingSignal.aborted) break loop;
           await wait(timeBeforeExtend);
 
           if (stopExtendingSignal.aborted) break loop;
-          expireAt = Date.now();
           await this.extend();
         }
       })
@@ -141,7 +147,7 @@ export class Lock {
       return result as Awaited<typeof routinePromise>;
     } finally {
       routineAbortCtl.abort();
-      await this.release();
+      this.release();
     }
   }
 }
