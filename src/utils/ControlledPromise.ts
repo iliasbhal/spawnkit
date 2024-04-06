@@ -71,7 +71,7 @@ export class ControlledPromise<T> {
 
   static wrapSignal(abortsignal: AbortSignal) {
     const promiseCtl = new ControlledPromise();
-    const throwErr = (e) => promiseCtl.reject(new Error("Aborted"));
+    const throwErr = (e) => promiseCtl.reject(e.target.reason);
     abortsignal.addEventListener("abort", throwErr);
 
     return promiseCtl.await.finally(() => {
