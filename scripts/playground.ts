@@ -162,7 +162,12 @@ const errorHandlingExample = async () => {
   }
 };
 
+const startTime = Date.now();
 console.log("START");
 main()
   .then((result) => console.log("DONE", result))
-  .catch((err) => console.error("ERR", err));
+  .catch((err) => console.error("ERR", err))
+  .finally(() => {
+    const timeSpent = Date.now() - startTime;
+    console.log(timeSpent / 1000, "ms");
+  });
