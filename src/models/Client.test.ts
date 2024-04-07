@@ -11,6 +11,8 @@ describe("Client", () => {
     it.todo("forwards message, stacktrace and other attributes");
     it.todo("forwards errors thrown during the method call (sync method)");
     it.todo("forwards errors thrown during the method call (async method)");
+    it.todo("forwards error if happen during stream ( .map )");
+    it.todo("forwards error if happen during stream ( for await )");
   });
 
   describe("Stream", () => {
