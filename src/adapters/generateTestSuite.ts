@@ -140,8 +140,8 @@ export const generateTestSuite = (
 
         const streamId = creatStreamId();
         const callback = jest.fn();
-        const sub = pubsub.on(streamId, callback);
-        await pubsub.emit(streamId, { aaa: true });
+        const sub = pubsub.subscribe(streamId, callback);
+        await pubsub.publish(streamId, { aaa: true });
 
         await waitUntilOK(() => {
           expect(callback).toHaveBeenCalled();
@@ -157,8 +157,8 @@ export const generateTestSuite = (
         const streamId = creatStreamId();
         const streamId2 = creatStreamId();
         const callback = jest.fn();
-        const sub = pubsub.on(streamId, callback);
-        await pubsub.emit(streamId2, { aaa: true });
+        const sub = pubsub.subscribe(streamId, callback);
+        await pubsub.publish(streamId2, { aaa: true });
 
         await wait(1000);
         expect(callback).not.toHaveBeenCalled();
@@ -170,16 +170,16 @@ export const generateTestSuite = (
 
         const streamId = creatStreamId();
         const callback = jest.fn();
-        const sub = pubsub.on(streamId, callback);
-        await pubsub.emit(streamId, { test: 1 });
+        const sub = pubsub.subscribe(streamId, callback);
+        await pubsub.publish(streamId, { test: 1 });
         await wait(10);
 
-        await pubsub.emit(streamId, { test: 2 });
-        await pubsub.emit(streamId, { test: 3 });
+        await pubsub.publish(streamId, { test: 2 });
+        await pubsub.publish(streamId, { test: 3 });
 
         await wait(10);
 
-        await pubsub.emit(streamId, { test: 4 });
+        await pubsub.publish(streamId, { test: 4 });
 
         await waitUntilOK(() => {
           expect(callback).toHaveBeenCalled();
@@ -196,14 +196,14 @@ export const generateTestSuite = (
 
         const subscribers = Array.from({ length: 16 }).map(() => {
           const callback = jest.fn();
-          const subscription = pubsub.on(streamId, callback);
+          const subscription = pubsub.subscribe(streamId, callback);
           return {
             callback,
             subscription,
           };
         });
 
-        await pubsub.emit(streamId, { aaa: true });
+        await pubsub.publish(streamId, { aaa: true });
 
         await waitUntilOK(() => {
           subscribers.forEach(({ callback, subscription }) => {

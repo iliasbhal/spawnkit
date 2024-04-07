@@ -154,7 +154,7 @@ export class PubSub extends RedisAdapter implements Adapters.AdapterPubSub {
     return `events-bus:${channel}`;
   }
 
-  async emit(channel: string, event: any): Promise<true> {
+  async publish(channel: string, event: any): Promise<true> {
     const streamId = this.getKey(channel);
     const key = "event";
     const value = JSON.stringify(event);
@@ -163,7 +163,10 @@ export class PubSub extends RedisAdapter implements Adapters.AdapterPubSub {
     return true;
   }
 
-  on(channel: string, callback: (data: any) => any): { unsubscribe: Function } {
+  subscribe(
+    channel: string,
+    callback: (data: any) => any,
+  ): { unsubscribe: Function } {
     const streamId = this.getKey(channel);
     let active = true;
     const seenTimestampIds = new Set();

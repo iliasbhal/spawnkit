@@ -70,8 +70,8 @@ export abstract class AdapaterSnapshot {
 }
 
 export abstract class AdapterPubSub {
-  abstract emit(channel: string, data: any): Promise<true>;
-  abstract on(
+  abstract publish(channel: string, data: any): Promise<true>;
+  abstract subscribe(
     channel: string,
     callback: (data: any) => any,
   ): { unsubscribe: Function };
