@@ -136,12 +136,12 @@ export const generateTestSuite = (
       const creatStreamId = createStreamIdGenerator();
 
       it("should be able to emit and receive events ", async () => {
-        const { messages } = await getAdapters();
+        const adapters = await getAdapters();
 
         const streamId = creatStreamId();
         const callback = jest.fn();
-        const sub = messages.subscribe(streamId, callback);
-        await messages.publish(streamId, { aaa: true });
+        const sub = adapters.messages.subscribe(streamId, callback);
+        await adapters.messages.publish(streamId, { aaa: true });
 
         await waitUntilOK(() => {
           expect(callback).toHaveBeenCalled();
@@ -154,13 +154,13 @@ export const generateTestSuite = (
       });
 
       it("should not receive event on different channels ", async () => {
-        const { messages } = await getAdapters();
+        const adapters = await getAdapters();
 
         const streamId = creatStreamId();
         const streamId2 = creatStreamId();
         const callback = jest.fn();
-        const sub = messages.subscribe(streamId, callback);
-        await messages.publish(streamId2, { aaa: true });
+        const sub = adapters.messages.subscribe(streamId, callback);
+        await adapters.messages.publish(streamId2, { aaa: true });
 
         await wait(1000);
         expect(callback).not.toHaveBeenCalled();
@@ -168,23 +168,20 @@ export const generateTestSuite = (
       });
 
       it("should trigger the callback on every emitted value once", async () => {
-        const { messages } = await getAdapters();
+        const adapters = await getAdapters();
 
         const streamId = creatStreamId();
         const callback = jest.fn();
-        const sub = messages.subscribe(streamId, (message) => {
-          console.log("message", message);
-          callback(message);
-        });
-        await messages.publish(streamId, { test: 1 });
+        const sub = adapters.messages.subscribe(streamId, callback);
+        await adapters.messages.publish(streamId, { test: 1 });
         await wait(10);
 
-        await messages.publish(streamId, { test: 2 });
-        await messages.publish(streamId, { test: 3 });
+        await adapters.messages.publish(streamId, { test: 2 });
+        await adapters.messages.publish(streamId, { test: 3 });
 
         await wait(10);
 
-        await messages.publish(streamId, { test: 4 });
+        await adapters.messages.publish(streamId, { test: 4 });
 
         await waitUntilOK(() => {
           expect(callback).toHaveBeenCalled();
@@ -206,20 +203,20 @@ export const generateTestSuite = (
       });
 
       it("should allow for several subscriber to receive events", async () => {
-        const { messages } = await getAdapters();
+        const adapters = await getAdapters();
 
         const streamId = creatStreamId();
 
         const subscribers = Array.from({ length: 16 }).map(() => {
           const callback = jest.fn();
-          const subscription = messages.subscribe(streamId, callback);
+          const subscription = adapters.messages.subscribe(streamId, callback);
           return {
             callback,
             subscription,
           };
         });
 
-        await messages.publish(streamId, { aaa: true });
+        await adapters.messages.publish(streamId, { aaa: true });
 
         await waitUntilOK(() => {
           subscribers.forEach(({ callback, subscription }) => {
