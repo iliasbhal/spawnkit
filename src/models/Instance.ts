@@ -2,7 +2,7 @@ import { PromiseList } from "@/utils/PromiseList";
 import { ControlledPromise } from "@/utils/ControlledPromise";
 import { AsyncDebounceHandler } from "@/utils/AsyncDebounceHandler";
 import { ControlledTimeout } from "@/utils/ControlledTimeout";
-import { Lock } from "./Lock";
+import { Stream } from "@/utils/Stream";
 import {
   Adapters,
   ScheduleInstanceData,
@@ -10,14 +10,13 @@ import {
   EventId,
 } from "../adapters";
 import { Client } from "./Client";
-import { Stream } from "./Stream";
 
 interface InstanceResult<V extends any> {
   data: V | undefined;
   stale: boolean;
 }
 
-interface InternalChannels {
+export interface InternalChannels {
   [key: `instance:${string}:event:${string}`]:
     | { error: any }
     | { response: any }
@@ -99,9 +98,13 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
           this.emitInternal(channelID, { stream: true, data: data }),
         );
 
-        response.on("error", (err) =>
-          this.emitInternal(channelID, { stream: true, error: err }),
-        );
+        response.on("error", (err) => {
+          const serializedError = Client.serializeError(err);
+          this.emitInternal(channelID, {
+            stream: true,
+            error: serializedError,
+          });
+        });
 
         response.on("end", () => {
           this.emitInternal(channelID, { stream: true, end: true });
@@ -177,13 +180,6 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
     await this.save(this.data!);
   }
 
-  protected async waitOnExternalEffects() {
-    await this.keepAlive.waitOnAll();
-    if (this.aborted.fulfilled) {
-      throw new Lock.ExtendError(this.id.toString());
-    }
-  }
-
   get live() {
     if (!this.running) return false;
     if (this.keepAlive.fulfilled) return false;
@@ -225,13 +221,11 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
           this.keepAlive.addWait(300, "Event Received");
           timer.restart(NO_EVENT_TIMEOUT);
 
-          const waitUntilFullyProcessed = Promise.all([
-            this.callMethodDefinedInEvent(event.id, event.data),
-            this.adapters.messages.ack(this.id, event.id),
-          ]);
+          const processed = Promise.resolve()
+            .then(() => this.callMethodDefinedInEvent(event.id, event.data))
+            .then(() => this.adapters.messages.ack(this.id, event.id));
 
-          this.keepAlive.add(waitUntilFullyProcessed);
-          await waitUntilFullyProcessed;
+          this.keepAlive.add(processed);
         },
       );
 
@@ -246,7 +240,7 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
     data: InternalChannels[Channel],
   ) {
     return this.runExternalEffect(async () => {
-      return await this.adapters.pubsub.emit(channel, data);
+      return await this.adapters.pubsub.publish(channel, data);
     });
   }
 
@@ -256,7 +250,7 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
     data: InstanceChannels[Channel],
   ) {
     return this.runExternalEffect(async () => {
-      return await this.adapters.pubsub.emit(channel, data);
+      return await this.adapters.pubsub.publish(channel, data);
     });
   }
 

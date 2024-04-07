@@ -1,4 +1,8 @@
-import type { Instance as SpawnkitInstance } from "./Instance";
+import type {
+  InternalChannels,
+  Instance as SpawnkitInstance,
+} from "./Instance";
+import { Stream } from "@/utils/Stream";
 import {
   Adapters,
   ScheduleEventData,
@@ -9,7 +13,6 @@ import {
   InstanceId,
   EventId,
 } from "../adapters";
-import { Stream } from "./Stream";
 
 type InstanceClass = typeof SpawnkitInstance<any>;
 
@@ -63,6 +66,21 @@ export class Client<Props extends ClientProps> {
 
   static handleIncomingStream() {}
 
+  timesampByInstnace = new Map<InstanceId, number>();
+  private shouldScheduleInstance(instanceId: InstanceId) {
+    const lastSentEventTimesamp = this.timesampByInstnace.get(instanceId);
+    if (!lastSentEventTimesamp) {
+      this.timesampByInstnace.set(instanceId, Date.now());
+      return true;
+    }
+
+    const now = Date.now();
+    const timeSinceLastEventSent = now - lastSentEventTimesamp;
+    const shouldScheduleInstance = timeSinceLastEventSent > 1000;
+    this.timesampByInstnace.set(instanceId, now);
+    return shouldScheduleInstance;
+  }
+
   spawn<Kind extends keyof Props["instances"]>(
     kind: Kind,
     instanceId: InstanceId,
@@ -104,21 +122,8 @@ export class Client<Props extends ClientProps> {
     type EmitRemoteMethods = MakeEmitable<AvailableMethods>;
     type ScheduleRemoteMethods = MakeSchedulable<AvailableMethods>;
 
-    let lastEventSentAt: number | null = null;
-    const checkShouldScheduleWithEventSent = () => {
-      if (!lastEventSentAt) {
-        lastEventSentAt = Date.now();
-        return true;
-      }
-
-      const timeSinceLastEventSent = Date.now() - lastEventSentAt;
-      const shouldScheduleInstance = timeSinceLastEventSent > 1000;
-      lastEventSentAt = Date.now();
-      return shouldScheduleInstance;
-    };
-
     const sendEventToInstance = async (event: InstanceEvent) => {
-      const shouldScheduleInstance = checkShouldScheduleWithEventSent();
+      const shouldScheduleInstance = this.shouldScheduleInstance(instanceId);
       const [eventId] = await Promise.all([
         this.adapters.messages.publish(instanceId, event),
 
@@ -143,22 +148,20 @@ export class Client<Props extends ClientProps> {
       return await this.adapters.scheduler.event(schedule);
     };
 
-    const onInternalEmit = (
-      channel: InstanceInternalEmittable[0],
-      callback: (data: InstanceInternalEmittable[1]) => any,
-    ) => {
-      return this.adapters.pubsub.on(channel, callback);
-    };
+    type InternalMessageChannel = InstanceInternalEmittable[0];
+    type InternalMessageData = InstanceInternalEmittable[1];
+    type PublicMessageChannel = InstanceEmittable[0];
+    type PublicMessageData = InstanceEmittable[1];
 
     const instanceClientAPI = {
       id: instanceId,
       kind: kind,
 
       on: (
-        channel: InstanceEmittable[0],
-        callback: (data: InstanceEmittable[1]) => any,
+        channel: PublicMessageChannel,
+        callback: (data: PublicMessageData) => any,
       ) => {
-        return this.adapters.pubsub.on(channel, callback);
+        return this.adapters.pubsub.subscribe(channel, callback);
       },
 
       scheduled: {
@@ -227,34 +230,19 @@ export class Client<Props extends ClientProps> {
                 eventId,
               );
 
-              type Subscription = ReturnType<typeof onInternalEmit>;
-              type Message = Parameters<
-                Parameters<typeof onInternalEmit>[1]
-              >[0];
-
-              const incomingStream = new Stream<any>(() => {});
+              const internalStream = new ClientStream();
               const handleStreamMessage = (
-                subscription: Subscription,
-                message: Message,
+                subscription: { unsubscribe: Function },
+                message: InternalMessageData,
               ) => {
-                if ("start" in message) {
-                  incomingStream.store("start");
-                  resolve(incomingStream);
-                }
-
-                if ("data" in message) {
-                  incomingStream.store("data", message.data);
-                }
-
-                if ("end" in message) {
-                  incomingStream.store("end");
-                  subscription.unsubscribe();
-                }
+                if ("start" in message) resolve(internalStream);
+                internalStream.forward(message);
+                if ("end" in message) subscription.unsubscribe();
               };
 
               const handleDefaultMessage = (
-                subscription: Subscription,
-                message: Message,
+                subscription: { unsubscribe: Function },
+                message: InternalMessageData,
               ) => {
                 if ("error" in message) {
                   const error = Client.deserializeError(message.error);
@@ -268,12 +256,15 @@ export class Client<Props extends ClientProps> {
                 }
               };
 
-              const subscription = onInternalEmit(channelID, (message) => {
-                if ("stream" in message)
-                  return handleStreamMessage(subscription, message);
-                if ("response" in message)
-                  return handleDefaultMessage(subscription, message);
-              });
+              const subscription = this.adapters.pubsub.subscribe(
+                channelID,
+                (message) => {
+                  if ("stream" in message)
+                    return handleStreamMessage(subscription, message);
+                  if ("response" in message)
+                    return handleDefaultMessage(subscription, message);
+                },
+              );
             });
           }
 
@@ -326,5 +317,23 @@ export class Client<Props extends ClientProps> {
         return normalRemoteMethodHandler(prop);
       },
     });
+  }
+}
+
+class ClientStream extends Stream<any> {
+  constructor() {
+    super(() => {});
+  }
+
+  forward(message: InternalChannels[keyof InternalChannels]) {
+    if ("start" in message) this.store("start");
+    if ("data" in message) this.store("data", message.data);
+
+    if ("error" in message) {
+      const error = Client.deserializeError(message.error);
+      this.error(error);
+    }
+
+    if ("end" in message) this.store("end");
   }
 }

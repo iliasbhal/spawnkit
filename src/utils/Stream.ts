@@ -33,7 +33,7 @@ export class Stream<StreamValue> {
   }
 
   storred: any[] = [];
-  private store(event: any, data?: any) {
+  protected store(event: any, data?: any) {
     if (this.started) {
       this.unstore();
       this.notify(event, data);
@@ -66,6 +66,8 @@ export class Stream<StreamValue> {
   createIterator() {
     const stream = this;
 
+    // The iterator should be able to Buffer the incoming messages
+    // and deliver them in order
     return async function* () {
       if (stream.closed) return;
 
@@ -78,8 +80,6 @@ export class Stream<StreamValue> {
 
       stream.on("data", (data) => {
         incomingData.push(data);
-
-        // Reset Promise
         promiseCtl.resolve(true);
         promiseCtl = new ControlledPromise();
       });
@@ -137,10 +137,6 @@ export class Stream<StreamValue> {
   }
 
   emit(data: StreamValue) {
-    this.store("data", data);
-  }
-
-  push(data: StreamValue) {
     this.store("data", data);
   }
 
