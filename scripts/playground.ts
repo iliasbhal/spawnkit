@@ -8,6 +8,7 @@ import { ToggleMachine } from "../example/ToggleMachine";
 import { GameSession } from "../example/GameSession";
 import { AgentLLM } from "../example/AgentLLM";
 import { ErrorExample } from "../example/ErrorExample";
+import { StreamExample } from "../example/StreamExample";
 
 export const adapters: Adapters = {
   lock: new RedisAdapter.Lock(redis),
@@ -18,12 +19,26 @@ export const adapters: Adapters = {
 };
 
 const worker = Spawnkit.Worker.from({
-  instances: { OrderBook, ToggleMachine, GameSession, AgentLLM, ErrorExample },
+  instances: {
+    OrderBook,
+    ToggleMachine,
+    GameSession,
+    AgentLLM,
+    ErrorExample,
+    StreamExample,
+  },
   adapters,
 });
 
 const client = Spawnkit.Client.from({
-  instances: { OrderBook, ToggleMachine, GameSession, AgentLLM, ErrorExample },
+  instances: {
+    OrderBook,
+    ToggleMachine,
+    GameSession,
+    AgentLLM,
+    ErrorExample,
+    StreamExample,
+  },
   adapters,
 });
 
@@ -31,11 +46,18 @@ const main = async () => {
   await redis.flushall("SYNC");
   worker.start();
 
+  // attributeExample()
   // await basicExample();
   // await streamExample();
+  await streamWithErrors();
   // await emittedEventsExample();
   // await scheduleCallExample();
   // await errorHandlingExample();
+};
+
+const attributeExample = () => {
+  const exampleInst = client.spawn("StreamExample", "Hector");
+  console.log(exampleInst.kind, exampleInst.id);
 };
 
 const basicExample = async () => {
@@ -51,33 +73,61 @@ const basicExample = async () => {
 };
 
 const streamExample = async () => {
-  const agentAI = client.spawn("AgentLLM", "Hector");
-  console.log(agentAI.kind, agentAI.id);
+  const exampleInst = client.spawn("StreamExample", "Hector");
+  console.log(exampleInst.kind, exampleInst.id);
 
-  const stream = await agentAI.prompt({
-    model: "claude3",
-    prompt: "blabla",
-    taskId: "asdasd",
-  });
+  // const stream = await exampleInst.startStream({
+  //   count: 4,
+  // });
 
   // Example 1:  consume stream using .map
   // which returns a Promise that is resolved when the stream ends
-  await stream.map((data) => {
-    console.log("STREAM ->", data);
-  });
+  // await stream.map((data) => {
+  //   console.log("RECEIVED ->", data);
+  // });
 
   // Example 2: consume stream using an async iterator
   // for await (const data of stream) {
   //   console.log("STREAM ->", data);
   // }
 
-  // TODO: it should call the stream anyway but the emitted values
-  // should not be sent anywhere;
-  // await agentAI.emit.prompt({
-  //   model: "claude3",
-  //   prompt: "blabla",
-  //   taskId: "asdasd",
+  // We can also just emit and not read the stream
+  // This will ensure the backend doesn't send message across the network
+  // if the client doesn't intend to read them.
+  // await exampleInst.emit.startStream({
+  //   count: 4,
   // });
+};
+
+const streamWithErrors = async () => {
+  const exampleInst = client.spawn("StreamExample", "Hector");
+  console.log(exampleInst.kind, exampleInst.id);
+
+  const erroredStream = await exampleInst.startFaultyStreamStart();
+  try {
+    // await erroredStream.map((data) => {
+    //   console.log("RECEIVED ->", data);
+    // });
+
+    for await (const data of erroredStream) {
+      console.log("STREAM ->", data);
+    }
+  } catch (err) {
+    console.log("AN ERROR HANNPED", err);
+  }
+
+  // const erroredStream2 = await exampleInst.startFaultyStreamDuring();
+  // try {
+  //   await erroredStream2.map((data) => {
+  //     console.log("RECEIVED ->", data);
+  //   });
+
+  //   // for await (const data of erroredStream2) {
+  //   //   console.log("STREAM ->", data);
+  //   // }
+  // } catch (err) {
+  //   console.log("AN ERROR HANNPED", err);
+  // }
 };
 
 const emittedEventsExample = async () => {

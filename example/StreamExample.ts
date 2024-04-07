@@ -1,7 +1,7 @@
 import * as Spawnkit from "@/.";
 import wait from "wait";
 
-export class StreamInstance extends Spawnkit.Instance {
+export class StreamExample extends Spawnkit.Instance {
   async start(): Promise<any> {
     console.log("AGENT START");
   }
@@ -9,17 +9,32 @@ export class StreamInstance extends Spawnkit.Instance {
     console.log("AGENT STOP");
   }
 
-  startStream() {
+  startStream(someData: { count: number }) {
     return new Spawnkit.Stream<string>(async (stream) => {
-      stream.emit("FIRST");
-      console.log("EMITTED FIRST");
-      await wait(1000);
-      stream.emit("passssamld;");
-      console.log("EMITTED passssamld;");
-      await wait(1000);
-      stream.emit("albacore");
-      console.log("EMITTED albacore");
-      await wait(1000);
+      for (let i = 0; i < someData.count; i++) {
+        stream.emit(`EMMITED VALUE: ${i + 1}/${someData.count}`);
+        console.log("EMITTED");
+        await wait(1000);
+      }
+    });
+  }
+
+  startFaultyStreamStart() {
+    return new Spawnkit.Stream<string>(async (stream) => {
+      throw new Error("OUPS");
+    });
+  }
+
+  startFaultyStreamDuring() {
+    return new Spawnkit.Stream<string>(async (stream) => {
+      for (let i = 0; i < 4; i++) {
+        if (i === 2) {
+          throw new Error("OUPS");
+        }
+        stream.emit(`EMMITED VALUE: ${i + 1}/4`);
+        console.log("EMITTED");
+        await wait(1000);
+      }
     });
   }
 }
