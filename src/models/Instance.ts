@@ -223,7 +223,7 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
 
           const processed = Promise.resolve()
             .then(() => this.callMethodDefinedInEvent(event.id, event.data))
-            .then(() => this.adapters.messages.ack(this.id, event.id));
+            .then(() => this.adapters.messages.ack(this.id, event));
 
           this.keepAlive.add(processed);
         },
@@ -240,7 +240,7 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
     data: InternalChannels[Channel],
   ) {
     return this.runExternalEffect(async () => {
-      return await this.adapters.pubsub.publish(channel, data);
+      return await this.adapters.messages.publish(channel, data);
     });
   }
 
@@ -250,7 +250,7 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
     data: InstanceChannels[Channel],
   ) {
     return this.runExternalEffect(async () => {
-      return await this.adapters.pubsub.publish(channel, data);
+      return await this.adapters.messages.publish(channel, data);
     });
   }
 

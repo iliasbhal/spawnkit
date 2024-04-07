@@ -161,7 +161,7 @@ export class Client<Props extends ClientProps> {
         channel: PublicMessageChannel,
         callback: (data: PublicMessageData) => any,
       ) => {
-        return this.adapters.pubsub.subscribe(channel, callback);
+        return this.adapters.messages.subscribe(channel, callback);
       },
 
       scheduled: {
@@ -256,15 +256,16 @@ export class Client<Props extends ClientProps> {
                 }
               };
 
-              const subscription = this.adapters.pubsub.subscribe(
-                channelID,
-                (message) => {
-                  if ("stream" in message)
-                    return handleStreamMessage(subscription, message);
-                  if ("response" in message)
-                    return handleDefaultMessage(subscription, message);
-                },
-              );
+              const subscription =
+                this.adapters.messages.subscribe<InternalMessageData>(
+                  channelID,
+                  (message) => {
+                    if ("stream" in message.data)
+                      return handleStreamMessage(subscription, message.data);
+                    if ("response" in message.data)
+                      return handleDefaultMessage(subscription, message.data);
+                  },
+                );
             });
           }
 

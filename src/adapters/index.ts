@@ -1,6 +1,6 @@
 export type InstanceId = string;
 export type InstanceKind = string;
-export type EventId = number;
+export type EventId = string;
 export type LockId = string;
 export type LockOwnerId = string;
 
@@ -36,7 +36,6 @@ export interface Adapters {
   lock: AdapterLock;
   messages: AdapaterMessageBroker;
   snapshot: AdapaterSnapshot;
-  pubsub: AdapterPubSub;
   scheduler: AdapaterScheduler;
 }
 
@@ -69,21 +68,16 @@ export abstract class AdapaterSnapshot {
   ): { unsubscribe: Function };
 }
 
-export abstract class AdapterPubSub {
-  abstract publish(channel: string, data: any): Promise<true>;
-  abstract subscribe(
-    channel: string,
-    callback: (data: any) => any,
-  ): { unsubscribe: Function };
-}
-
 export abstract class AdapaterMessageBroker {
   abstract publish<EventData>(
     instanceId: InstanceId,
     event: EventData,
   ): Promise<EventId>;
 
-  abstract ack(instanceId: InstanceId, eventId: EventId): Promise<true>;
+  abstract ack<EventData>(
+    instanceId: InstanceId,
+    event: { id: EventId; data: EventData },
+  ): Promise<true>;
   abstract has(instanceId: InstanceId): Promise<boolean>;
   abstract subscribe<EventData>(
     instanceId: InstanceId,

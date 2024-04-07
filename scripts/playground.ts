@@ -14,7 +14,6 @@ export const adapters: Adapters = {
   lock: new RedisAdapter.Lock(redis),
   snapshot: new RedisAdapter.Snapshot(redis),
   messages: new RedisAdapter.MessageBroker(redis),
-  pubsub: new RedisAdapter.PubSub(redis),
   scheduler: new RedisAdapter.Scheduler(redis),
 };
 

@@ -149,75 +149,6 @@ export class Snapshot
   }
 }
 
-export class PubSub extends RedisAdapter implements Adapters.AdapterPubSub {
-  private getKey(channel: string) {
-    return `events-bus:${channel}`;
-  }
-
-  async publish(channel: string, event: any): Promise<true> {
-    const streamId = this.getKey(channel);
-    const key = "event";
-    const value = JSON.stringify(event);
-
-    await this.redis.xadd(streamId, "*", key, value);
-    return true;
-  }
-
-  subscribe(
-    channel: string,
-    callback: (data: any) => any,
-  ): { unsubscribe: Function } {
-    const streamId = this.getKey(channel);
-    let active = true;
-    const seenTimestampIds = new Set();
-
-    let prevTimetampKey = Date.now();
-
-    Promise.resolve().then(async () => {
-      while (active) {
-        const before = Date.now() - 100;
-        const elements = await this.redis.xread(
-          "STREAMS",
-          streamId,
-          prevTimetampKey,
-        );
-
-        prevTimetampKey = before;
-
-        const notify = (data: any) => {
-          if (active) callback(data);
-        };
-
-        if (elements) {
-          elements.forEach(([streamId, eventsByTimestampKey]) => {
-            eventsByTimestampKey.forEach(([timestampKey, events]) => {
-              if (seenTimestampIds.has(timestampKey)) return;
-              seenTimestampIds.add(timestampKey);
-
-              // eventKey should be "event" as per .emit method;
-              // But we don't need it
-              const eventKey = events[0];
-              const rawEventData = events[1];
-              if (rawEventData) {
-                const eventData = JSON.parse(rawEventData);
-                notify(eventData);
-              }
-            });
-          });
-        }
-
-        await wait(25);
-      }
-    });
-
-    return {
-      unsubscribe: () => {
-        active = false;
-      },
-    };
-  }
-}
-
 export class MessageBroker
   extends RedisAdapter
   implements Adapters.AdapaterMessageBroker
@@ -227,60 +158,75 @@ export class MessageBroker
   }
 
   async publish<EventData>(
-    instanceId: Adapters.InstanceId,
+    channel: string,
     event: EventData,
   ): Promise<Adapters.EventId> {
-    const hashID = this.getKey(instanceId);
-    const eventId = await this.redis.incr(hashID + ":uid");
-    await this.redis.hset(hashID, eventId.toString(), JSON.stringify(event));
+    const hashID = this.getKey(channel);
+    const eventId = crypto.randomUUID();
+    const zmember = JSON.stringify({
+      id: eventId,
+      data: event,
+    });
+
+    await this.redis.zadd(hashID, Date.now(), zmember);
     return eventId;
   }
 
-  async ack(
-    instanceId: Adapters.InstanceId,
-    eventId: Adapters.EventId,
+  async ack<EventData>(
+    channel: string,
+    event: { id: Adapters.EventId; data: EventData },
   ): Promise<true> {
-    const hashID = this.getKey(instanceId);
-    await this.redis.hdel(hashID, eventId.toString());
+    const hashID = this.getKey(channel);
+    const zmember = JSON.stringify(event);
+    await this.redis.zrem(hashID, zmember);
     return true;
   }
 
-  async has(instanceId: Adapters.InstanceId): Promise<boolean> {
-    const hashID = this.getKey(instanceId);
-    const size = await this.redis.hlen(hashID);
+  async has(channel: string): Promise<boolean> {
+    const hashID = this.getKey(channel);
+    const size = await this.redis.zcard(hashID);
     const hasUnprocessedEvents = size > 0;
     return hasUnprocessedEvents;
   }
 
-  subscribe<E extends { id: number; data: any }>(
-    instanceId: Adapters.InstanceId,
-    callback: (event: E) => void,
+  subscribe<E>(
+    channel: string,
+    callback: (event: E) => any,
   ): { unsubscribe: Function } {
-    let active = true;
-    const seenEventIds = new Set();
+    const subscription = {
+      active: true,
+      after: 0,
+    };
+    const hashID = this.getKey(channel);
+    const previousEventsIds = new Set();
 
-    const intervalId = setInterval(async () => {
-      const hash = this.getKey(instanceId);
-      const events = await this.redis.hgetall(hash);
-      const notify = (data: any) => {
-        if (active) {
-          callback(data);
-        }
-      };
+    Promise.resolve().then(async () => {
+      while (subscription.active) {
+        const timestampBeforeRequest = Date.now();
+        const from = subscription.after;
+        const until = Infinity;
+        subscription.after = timestampBeforeRequest;
+        const rawEvents = await this.redis.zrangebyscore(hashID, from, until);
+        const events = rawEvents.map((rawEvent) => JSON.parse(rawEvent));
 
-      for (const [eventId, eventData] of Object.entries(events)) {
-        if (!active) return;
-        if (seenEventIds.has(eventId)) continue;
+        events.forEach((event) => {
+          if (!subscription.active) return;
+          if (previousEventsIds.has(event.id)) return;
+          callback(event as any);
+        });
 
-        notify({ id: eventId, data: JSON.parse(eventData) });
-        seenEventIds.add(eventId);
+        events.forEach((event) => {
+          previousEventsIds.add(event.id);
+        });
+
+        subscription.after = timestampBeforeRequest;
+        await wait(100);
       }
-    }, 100);
+    });
 
     return {
       unsubscribe: () => {
-        active = false;
-        clearInterval(intervalId);
+        subscription.active = false;
       },
     };
   }

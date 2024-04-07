@@ -132,84 +132,102 @@ export const generateTestSuite = (
       });
     });
 
-    describe("PubSub", () => {
+    describe("MessageBroker", () => {
       const creatStreamId = createStreamIdGenerator();
 
       it("should be able to emit and receive events ", async () => {
-        const { pubsub } = await getAdapters();
+        const { messages } = await getAdapters();
 
         const streamId = creatStreamId();
         const callback = jest.fn();
-        const sub = pubsub.subscribe(streamId, callback);
-        await pubsub.publish(streamId, { aaa: true });
+        const sub = messages.subscribe(streamId, callback);
+        await messages.publish(streamId, { aaa: true });
 
         await waitUntilOK(() => {
           expect(callback).toHaveBeenCalled();
           expect(callback).toHaveBeenCalledTimes(1);
-          expect(callback).toHaveBeenCalledWith({ aaa: true });
+          expect(callback).toHaveBeenCalledWith(
+            expect.objectContaining({ data: { aaa: true } }),
+          );
           sub.unsubscribe();
         });
       });
 
       it("should not receive event on different channels ", async () => {
-        const { pubsub } = await getAdapters();
+        const { messages } = await getAdapters();
 
         const streamId = creatStreamId();
         const streamId2 = creatStreamId();
         const callback = jest.fn();
-        const sub = pubsub.subscribe(streamId, callback);
-        await pubsub.publish(streamId2, { aaa: true });
+        const sub = messages.subscribe(streamId, callback);
+        await messages.publish(streamId2, { aaa: true });
 
         await wait(1000);
         expect(callback).not.toHaveBeenCalled();
         sub.unsubscribe();
       });
 
-      it("should trigger the callback on every emitted value", async () => {
-        const { pubsub } = await getAdapters();
+      it("should trigger the callback on every emitted value once", async () => {
+        const { messages } = await getAdapters();
 
         const streamId = creatStreamId();
         const callback = jest.fn();
-        const sub = pubsub.subscribe(streamId, callback);
-        await pubsub.publish(streamId, { test: 1 });
+        const sub = messages.subscribe(streamId, (message) => {
+          console.log("message", message);
+          callback(message);
+        });
+        await messages.publish(streamId, { test: 1 });
         await wait(10);
 
-        await pubsub.publish(streamId, { test: 2 });
-        await pubsub.publish(streamId, { test: 3 });
+        await messages.publish(streamId, { test: 2 });
+        await messages.publish(streamId, { test: 3 });
 
         await wait(10);
 
-        await pubsub.publish(streamId, { test: 4 });
+        await messages.publish(streamId, { test: 4 });
 
         await waitUntilOK(() => {
           expect(callback).toHaveBeenCalled();
           expect(callback).toHaveBeenCalledTimes(4);
-          expect(callback).toHaveBeenCalledWith({ test: 1 });
+          expect(callback).toHaveBeenCalledWith(
+            expect.objectContaining({ data: { test: 1 } }),
+          );
+          expect(callback).toHaveBeenCalledWith(
+            expect.objectContaining({ data: { test: 2 } }),
+          );
+          expect(callback).toHaveBeenCalledWith(
+            expect.objectContaining({ data: { test: 3 } }),
+          );
+          expect(callback).toHaveBeenCalledWith(
+            expect.objectContaining({ data: { test: 4 } }),
+          );
           sub.unsubscribe();
         });
       });
 
       it("should allow for several subscriber to receive events", async () => {
-        const { pubsub } = await getAdapters();
+        const { messages } = await getAdapters();
 
         const streamId = creatStreamId();
 
         const subscribers = Array.from({ length: 16 }).map(() => {
           const callback = jest.fn();
-          const subscription = pubsub.subscribe(streamId, callback);
+          const subscription = messages.subscribe(streamId, callback);
           return {
             callback,
             subscription,
           };
         });
 
-        await pubsub.publish(streamId, { aaa: true });
+        await messages.publish(streamId, { aaa: true });
 
         await waitUntilOK(() => {
           subscribers.forEach(({ callback, subscription }) => {
             expect(callback).toHaveBeenCalled();
             expect(callback).toHaveBeenCalledTimes(1);
-            expect(callback).toHaveBeenCalledWith({ aaa: true });
+            expect(callback).toHaveBeenCalledWith(
+              expect.objectContaining({ data: { aaa: true } }),
+            );
             subscription.unsubscribe();
           });
         });
