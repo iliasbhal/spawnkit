@@ -23,7 +23,7 @@ export class Lock extends RedisAdapter implements Adapters.AdapterLock {
 
   lockByOwnerKey = new Map<string, RedlockLock>();
 
-  private getOwnerKey(lockId: string, ownerId: string) {
+  private createOwnerKey(lockId: string, ownerId: string) {
     return `lockId:${lockId}:ownerId:${ownerId}`;
   }
 
@@ -34,7 +34,7 @@ export class Lock extends RedisAdapter implements Adapters.AdapterLock {
   ): Promise<boolean> {
     try {
       const lock = await this.redlock.acquire([lockId], duration);
-      const ownerKey = this.getOwnerKey(lockId, ownerId);
+      const ownerKey = this.createOwnerKey(lockId, ownerId);
       this.lockByOwnerKey.set(ownerKey, lock);
       return true;
     } catch (err) {
@@ -53,7 +53,7 @@ export class Lock extends RedisAdapter implements Adapters.AdapterLock {
     ownerId: string,
     duration: number,
   ): Promise<boolean> {
-    const ownerKey = this.getOwnerKey(lockId, ownerId);
+    const ownerKey = this.createOwnerKey(lockId, ownerId);
     const lock = this.lockByOwnerKey.get(ownerKey);
     if (!lock) return false;
 
@@ -68,7 +68,7 @@ export class Lock extends RedisAdapter implements Adapters.AdapterLock {
   }
 
   async release(lockId: string, ownerId: string): Promise<boolean> {
-    const ownerKey = this.getOwnerKey(lockId, ownerId);
+    const ownerKey = this.createOwnerKey(lockId, ownerId);
     const lock = this.lockByOwnerKey.get(ownerKey);
     if (!lock) return false;
 
@@ -84,15 +84,15 @@ export class Lock extends RedisAdapter implements Adapters.AdapterLock {
 }
 
 export class Data extends RedisAdapter implements Adapters.AdapaterData {
-  private getKey(instanceId: Adapters.InstanceId) {
-    return `snapshot:${instanceId}`;
+  private withPrevix(string: Adapters.InstanceId) {
+    return `data:${string}`;
   }
 
   async get<Data>(
     instanceId: Adapters.InstanceId,
     key: string,
   ): Promise<Data | null> {
-    const redisKey = this.getKey(instanceId + ":key+" + key);
+    const redisKey = this.withPrevix(instanceId + ":key+" + key);
     const data = await this.redis.get(redisKey);
     if (!data) return null;
     return JSON.parse(data);
@@ -103,7 +103,7 @@ export class Data extends RedisAdapter implements Adapters.AdapaterData {
     key: string,
     value: Data,
   ): Promise<true> {
-    const redisKey = this.getKey(instanceId + ":key+" + key);
+    const redisKey = this.withPrevix(instanceId + ":key+" + key);
     const serialized = JSON.stringify(value);
     await this.redis.set(redisKey, serialized);
     return true;
@@ -114,15 +114,15 @@ export class MessageBroker
   extends RedisAdapter
   implements Adapters.AdapaterMessageBroker
 {
-  private getKey(instanceId: Adapters.InstanceId) {
-    return `events:${instanceId}`;
+  private withPrefix(channelName: string) {
+    return `messages:${channelName}`;
   }
 
   async publish<EventData>(
     channel: string,
     event: EventData,
   ): Promise<Adapters.EventId> {
-    const hashID = this.getKey(channel);
+    const hashID = this.withPrefix(channel);
     const eventId = crypto.randomUUID();
     const zmember = JSON.stringify({
       id: eventId,
@@ -137,57 +137,72 @@ export class MessageBroker
     channel: string,
     event: { id: Adapters.EventId; data: EventData },
   ): Promise<true> {
-    const hashID = this.getKey(channel);
+    const hashID = this.withPrefix(channel);
     const zmember = JSON.stringify(event);
     await this.redis.zrem(hashID, zmember);
     return true;
   }
 
   async has(channel: string): Promise<boolean> {
-    const hashID = this.getKey(channel);
+    const hashID = this.withPrefix(channel);
     const size = await this.redis.zcard(hashID);
     const hasUnprocessedEvents = size > 0;
     return hasUnprocessedEvents;
+  }
+
+  private async getLatestMessages(
+    channel: string,
+    range: { from: number; to: number },
+  ) {
+    const hashID = this.withPrefix(channel);
+    const rawEvents = await this.redis.zrangebyscore(
+      hashID,
+      range.from,
+      range.to,
+    );
+    const events = rawEvents.map((rawEvent) => JSON.parse(rawEvent));
+    return events;
   }
 
   subscribe<E>(
     channel: string,
     callback: (event: E) => any,
   ): { unsubscribe: Function } {
-    const subscription = {
-      active: true,
-      after: 0,
-    };
-    const hashID = this.getKey(channel);
-    const previousEventsIds = new Set();
+    const abortCtl = new AbortController();
+    const abortSignal = abortCtl.signal;
 
     Promise.resolve().then(async () => {
-      while (subscription.active) {
+      const previousEventsIds = new Set();
+      const range = {
+        from: 0,
+        to: Infinity,
+      };
+
+      while (!abortSignal.aborted) {
         const timestampBeforeRequest = Date.now();
-        const from = subscription.after;
-        const until = Infinity;
-        subscription.after = timestampBeforeRequest;
-        const rawEvents = await this.redis.zrangebyscore(hashID, from, until);
-        const events = rawEvents.map((rawEvent) => JSON.parse(rawEvent));
+        const events = await this.getLatestMessages(channel, range);
+        range.from = timestampBeforeRequest;
 
-        events.forEach((event) => {
-          if (!subscription.active) return;
-          if (previousEventsIds.has(event.id)) return;
-          callback(event as any);
-        });
+        if (events.length) {
+          events.forEach((event) => {
+            if (abortSignal.aborted) return;
+            if (previousEventsIds.has(event.id)) return;
+            callback(event as any);
+          });
 
-        events.forEach((event) => {
-          previousEventsIds.add(event.id);
-        });
+          previousEventsIds.clear();
+          events.forEach((event) => {
+            previousEventsIds.add(event.id);
+          });
+        }
 
-        subscription.after = timestampBeforeRequest;
         await wait(100);
       }
     });
 
     return {
       unsubscribe: () => {
-        subscription.active = false;
+        abortCtl.abort();
       },
     };
   }
