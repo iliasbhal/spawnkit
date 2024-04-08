@@ -8,6 +8,7 @@ export const ToggleMachine = Machine.from({
   },
   machine: setup({
     types: {
+      input: {} as [number, number, number],
       events: {} as { type: "TOGGLE" },
       context: {} as { count: number },
     },

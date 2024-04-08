@@ -47,7 +47,14 @@ export class Machine<
     return actor.getSnapshot();
   }
 
-  public async create(input: any) {
+  initializedWithInput = false;
+
+  public async create(
+    input: Exclude<
+      Parameters<StateMachine["getInitialSnapshot"]>[1],
+      undefined
+    >,
+  ) {
     const actor = await this.getOrInitializeActor(async () => {
       return { input };
     });
