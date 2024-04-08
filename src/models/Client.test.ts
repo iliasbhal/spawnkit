@@ -1,4 +1,4 @@
-import * as Spawnkit from "@/.";
+import { Client } from "./Client";
 import wait from "wait";
 
 describe("Client", () => {
@@ -13,6 +13,10 @@ describe("Client", () => {
     it.todo("forwards errors thrown during the method call (async method)");
     it.todo("forwards error if happen during stream ( .map )");
     it.todo("forwards error if happen during stream ( for await )");
+  });
+
+  describe("Data", () => {
+    it.todo("can use .data.get() remotely");
   });
 
   describe("Stream", () => {

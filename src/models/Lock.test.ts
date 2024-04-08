@@ -1,5 +1,4 @@
-import * as Spawnkit from "@/.";
-import wait from "wait";
+import { Lock } from "./Lock";
 
 describe("Lock", () => {
   it.todo("should throw if cannot acquire lock");
