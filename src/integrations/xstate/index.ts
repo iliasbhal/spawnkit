@@ -12,7 +12,7 @@ type MachineData<M extends x.AnyStateMachine> = ReturnType<
 
 export class Machine<
   StateMachine extends x.AnyStateMachine = x.AnyStateMachine,
-> extends Spawnkit.Instance<MachineData<StateMachine>> {
+> extends Spawnkit.Instance<{ snapshot: MachineData<StateMachine> }> {
   machine: StateMachine = null as any;
   sync?: (actor: x.Actor<typeof this.machine>) => any;
   actor: x.Actor<StateMachine> = null as any;
@@ -20,44 +20,79 @@ export class Machine<
   subscriptonByActor = new Map<string, x.Subscription>();
   snapshotByActorId = new Map<string, MachineData<StateMachine>>();
 
-  static from<StateMachine extends x.AnyStateMachine>(
-    machine: StateMachine,
-    config?: { sync?: Machine<typeof machine>["sync"] },
-  ) {
+  static from<StateMachine extends x.AnyStateMachine>(config: {
+    sync?: Machine<StateMachine>["sync"];
+    machine: StateMachine;
+  }) {
     // simply preconfigure the class with the machine object
-    return class extends Machine<typeof machine> {
-      machine = machine;
+    return class extends Machine<StateMachine> {
+      machine = config.machine;
       sync = config?.sync;
     };
   }
 
-  eventProcessing = new Map<
+  private eventProcessing = new Map<
     MachineEvent<StateMachine>,
     ControlledPromise<true>
   >();
-  async send(event: MachineEvent<StateMachine>) {
+
+  public async send(event: MachineEvent<StateMachine>) {
+    const actor = await this.getActor();
     const eventProcessed = new ControlledPromise<true>();
 
     this.eventProcessing.set(event, eventProcessed);
-    this.actor.send(event);
+    actor.send(event);
 
     await eventProcessed.await;
-    return this.actor.getSnapshot();
+    return actor.getSnapshot();
   }
 
-  async start() {
-    this.actor = this.createActor();
-    this.actor.start();
+  public async create(input: any) {
+    const actor = await this.getOrInitializeActor(async () => {
+      return { input };
+    });
+
+    return actor.getSnapshot();
   }
 
-  async stop() {
-    this.actor.stop();
+  private async getActor() {
+    const actor = await this.getOrInitializeActor(async () => {
+      return { snapshot: await this.data.get("snapshot") };
+    });
+
+    return actor;
   }
 
-  private createActor() {
+  private actorPromise: ControlledPromise<
+    Awaited<ReturnType<typeof this.initializeActor>>
+  > | null = null;
+
+  private async getOrInitializeActor(getConfig: () => Promise<any>) {
+    if (this.actorPromise) {
+      return this.actorPromise.await;
+    }
+
+    this.actorPromise = new ControlledPromise<
+      Awaited<ReturnType<typeof this.initializeActor>>
+    >();
+
+    const initConfig = await getConfig();
+    this.initializeActor(initConfig)
+      .then((actor) => {
+        this.actor = actor;
+        this.actor.start();
+        this.actorPromise?.resolve(actor);
+      })
+      .catch((err) => {
+        this.actorPromise?.reject(err);
+      });
+
+    return this.actorPromise.await;
+  }
+
+  private async initializeActor(config: { snapshot?: any; input?: any }) {
     return x.createActor(this.machine, {
-      snapshot: this.data as any,
-      input: this.config.input,
+      ...config,
       id: `${this.id}`,
       inspect: (inspectionEvent) => {
         switch (inspectionEvent.type) {
@@ -73,15 +108,14 @@ export class Machine<
   }
 
   private async handleSnapshot() {
-    const snapshot = this.actor.getPersistedSnapshot() as MachineData<
-      typeof this.machine
-    >;
+    const snapshot = this.actor.getPersistedSnapshot();
     this.snapshotByActorId.set(this.actor.id, snapshot);
-    this.save(snapshot);
 
     this.runExternalEffect(async () => {
-      await this.sync?.(this.actor);
-    }, `handleActorCreatedEvent/rootActor`);
+      await this.data
+        .set("snapshot", snapshot)
+        .then(() => this.sync?.(this.actor));
+    });
   }
 
   childActorDoneByActor = new Map<x.AnyActorRef, ControlledPromise<any>>();
@@ -111,17 +145,15 @@ export class Machine<
       actor.subscribe({
         next: () => {
           const snapshot = actor.getPersistedSnapshot();
-          this.runExternalEffect(async () => {
-            this.snapshotByActorId.set(
-              actor.id,
-              snapshot as MachineData<typeof this.machine>,
-            );
-            const shouldResolve = ["error", "done"].includes(snapshot.status);
-            if (shouldResolve) {
-              const pending = this.childActorDoneByActor.get(actor);
-              pending?.resolve(true);
-            }
-          }, `handleChildActorCreateEvent/shildActor`);
+          this.snapshotByActorId.set(
+            actor.id,
+            snapshot as MachineData<typeof this.machine>,
+          );
+          const shouldResolve = ["error", "done"].includes(snapshot.status);
+          if (shouldResolve) {
+            const pending = this.childActorDoneByActor.get(actor);
+            pending?.resolve(true);
+          }
         },
         error: (err) => {
           const pending = this.childActorDoneByActor.get(actor);

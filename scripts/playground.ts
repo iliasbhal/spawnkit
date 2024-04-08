@@ -3,41 +3,35 @@ import * as Spawnkit from "@/.";
 import { Adapters } from "@/adapters";
 import * as RedisAdapter from "@/adapters/redis";
 import { redis } from "@/adapters/redis/client";
-import { OrderBook } from "../example/OrderBook";
-import { ToggleMachine } from "../example/ToggleMachine";
-import { GameSession } from "../example/GameSession";
-import { AgentLLM } from "../example/AgentLLM";
-import { ErrorExample } from "../example/ErrorExample";
-import { StreamExample } from "../example/StreamExample";
+import {
+  StreamExample,
+  AgentLLM,
+  OrderBook,
+  ToggleMachine,
+  ErrorExample,
+} from "../example/_index";
 
 export const adapters: Adapters = {
   lock: new RedisAdapter.Lock(redis),
-  snapshot: new RedisAdapter.Snapshot(redis),
+  data: new RedisAdapter.Data(redis),
   messages: new RedisAdapter.MessageBroker(redis),
   scheduler: new RedisAdapter.Scheduler(redis),
 };
 
 const worker = Spawnkit.Worker.from({
-  instances: {
-    OrderBook,
-    ToggleMachine,
-    GameSession,
-    AgentLLM,
-    ErrorExample,
-    StreamExample,
-  },
   adapters,
+  instances: {
+    StreamExample,
+    AgentLLM,
+    ToggleMachine,
+    OrderBook,
+    ErrorExample,
+  },
 });
 
-const client = Spawnkit.Client.from({
-  instances: {
-    OrderBook,
-    ToggleMachine,
-    GameSession,
-    AgentLLM,
-    ErrorExample,
-    StreamExample,
-  },
+type Worker = typeof worker;
+
+const client = Spawnkit.Client.from<Worker>({
   adapters,
 });
 
@@ -48,16 +42,23 @@ const main = async () => {
   // attributeExample()
   // await basicExample();
   // await streamExample();
-  await streamWithErrors();
+  // await streamWithErrors();
   // await emittedEventsExample();
   // await scheduleCallExample();
   // await errorHandlingExample();
+  await exampleXState();
 };
 
 const attributeExample = () => {
   const exampleInst = client.spawn("StreamExample", "Hector");
   console.log(exampleInst.kind, exampleInst.id);
 };
+
+// class OrderBuuk {
+//   static withId(sss: stirng) {}
+// }
+
+// const orderBook = OrderBuuk.spawn("BTC/EUR");
 
 const basicExample = async () => {
   const orderBook = client.spawn("OrderBook", "BTC/EUR");
@@ -131,9 +132,14 @@ const streamWithErrors = async () => {
 
 const emittedEventsExample = async () => {
   const orderBook = client.spawn("OrderBook", "BTC/USD");
+  const orderBook2 = client.spawn("OrderBook", "ETH/USD");
+
+  orderBook2.on("orders", (event) => {
+    console.log("CHANGE RECEIVED on 2", event);
+  });
 
   orderBook.on("orders", (event) => {
-    console.log("CHANGE RECEIVED", event);
+    console.log("CHANGE RECEIVED on 1", event);
   });
 
   const intervalId = setInterval(async () => {
@@ -209,6 +215,30 @@ const errorHandlingExample = async () => {
       err,
     );
   }
+};
+
+const exampleXState = async () => {
+  const toggle = client.spawn("ToggleMachine", "AAAA");
+
+  const before = await toggle.data.get("snapshot");
+  console.log("before", before);
+
+  const snap1 = await toggle.create(undefined);
+  console.log("snap1", snap1);
+
+  const snap2 = await toggle.data.get("snapshot");
+  console.log("snap2", snap2);
+
+  toggle.send({ type: "TOGGLE" });
+  toggle.send({ type: "TOGGLE" });
+  toggle.send({ type: "TOGGLE" });
+  toggle.send({ type: "TOGGLE" });
+  const response = await toggle.send({ type: "TOGGLE" });
+  console.log(response);
+
+  const after = await toggle.data.get("snapshot");
+  console.log("after", after);
+  // toggle.data.get();
 };
 
 const startTime = Date.now();
