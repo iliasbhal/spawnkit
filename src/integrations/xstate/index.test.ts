@@ -111,4 +111,8 @@ describe("Instance", () => {
       value: "ERRORED", // The name of the state is "ERRORED"
     });
   });
+
+  it.todo(
+    "should not emit a new snaphot when actor is reconstrctued with a snapshot",
+  );
 });

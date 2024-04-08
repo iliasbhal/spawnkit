@@ -37,7 +37,7 @@ export class Machine<
   >();
 
   public async send(event: MachineEvent<StateMachine>) {
-    const actor = await this.getActor();
+    const actor = await this.ensureInitializedActor();
     const eventProcessed = new ControlledPromise<true>();
 
     this.eventProcessing.set(event, eventProcessed);
@@ -49,22 +49,32 @@ export class Machine<
 
   initializedWithInput = false;
 
-  public async create(
+  public async init(
     input: Exclude<
       Parameters<StateMachine["getInitialSnapshot"]>[1],
       undefined
     >,
   ) {
+    const snapshot = await this.data.get("snapshot");
+    console.log("CREATE SNAP", snapshot);
+    if (snapshot) {
+      throw new Error("Cannot Create Actor Already Created");
+    }
+
     const actor = await this.getOrInitializeActor(async () => {
+      this.initializedWithInput = true;
       return { input };
     });
 
     return actor.getSnapshot();
   }
 
-  private async getActor() {
+  initializedWithSnapshot = false;
+  private async ensureInitializedActor() {
     const actor = await this.getOrInitializeActor(async () => {
-      return { snapshot: await this.data.get("snapshot") };
+      this.initializedWithSnapshot = true;
+      const snapshot = await this.data.get("snapshot");
+      return { snapshot };
     });
 
     return actor;
@@ -114,11 +124,22 @@ export class Machine<
     });
   }
 
+  skippedInitialSnapshot = false;
   private async handleSnapshot() {
     const snapshot = this.actor.getPersistedSnapshot();
     this.snapshotByActorId.set(this.actor.id, snapshot);
 
     this.runExternalEffect(async () => {
+      // We should emitting a new snapshot event only when the actor is created or when a transition happens.
+      // or when state or context changed. Not when the actor is recosturcted with a snapshot.
+      // This is because there is no new data. We only emit when there is new data basicaly.
+      const shouldSkipFirstSnapshotEmit =
+        this.initializedWithSnapshot && !this.skippedInitialSnapshot;
+      if (shouldSkipFirstSnapshotEmit) {
+        this.skippedInitialSnapshot = true;
+        return;
+      }
+
       await this.data
         .set("snapshot", snapshot)
         .then(() => this.sync?.(this.actor));
