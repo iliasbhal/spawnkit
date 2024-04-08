@@ -16,17 +16,12 @@ interface ListenProps<T extends InstanceClass = InstanceClass> {
   adapters: Adapters;
 }
 
-export class Worker<T extends InstanceClass = InstanceClass>
-  implements ListenProps<T>
-{
-  instances: Record<string, T>;
+export class Worker<O extends ListenProps> {
+  instances: O["instances"];
   adapters: Adapters;
-  client: Client<{
-    instances: Record<string, T>;
-    adapters: Adapters;
-  }>;
+  client: Client<O["instances"], any>;
 
-  constructor(config: ListenProps<T>) {
+  constructor(config: ListenProps) {
     this.instances = config.instances;
     this.adapters = config.adapters;
     this.client = new Client({
@@ -141,7 +136,7 @@ export class Worker<T extends InstanceClass = InstanceClass>
       });
     }
 
-    return new Worker(opts);
+    return new Worker<O>(opts);
   }
 
   static verify(instances: ListenProps["instances"]) {
