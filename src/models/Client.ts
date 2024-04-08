@@ -295,6 +295,8 @@ export class Client<W extends Worker<any>> {
                       return handleStreamMessage(subscription, message.data);
                     if ("response" in message.data)
                       return handleDefaultMessage(subscription, message.data);
+                    if ("error" in message.data)
+                      return handleDefaultMessage(subscription, message.data);
                   },
                 );
             });
