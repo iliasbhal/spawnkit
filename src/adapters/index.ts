@@ -34,8 +34,8 @@ export interface InstanceMethodCall {
 
 export interface Adapters {
   lock: AdapterLock;
+  data: AdapaterData;
   messages: AdapaterMessageBroker;
-  snapshot: AdapaterSnapshot;
   scheduler: AdapaterScheduler;
 }
 
@@ -59,13 +59,13 @@ export abstract class AdapterLock {
   abstract release(lockId: LockId, ownerId: LockOwnerId): Promise<boolean>;
 }
 
-export abstract class AdapaterSnapshot {
-  abstract load<Data>(instanceId: InstanceId): Promise<Data | null>;
-  abstract save<Data>(instanceId: InstanceId, snapshot: Data): Promise<true>;
-  abstract subscribe<Data>(
+export abstract class AdapaterData {
+  abstract get<Data>(instanceId: InstanceId, key: string): Promise<Data | null>;
+  abstract set<Data>(
     instanceId: InstanceId,
-    onSnapshot: (snapshot: Data) => void,
-  ): { unsubscribe: Function };
+    key: string,
+    value: Data,
+  ): Promise<boolean>;
 }
 
 export abstract class AdapaterMessageBroker {

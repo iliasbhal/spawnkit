@@ -3,6 +3,7 @@ import type {
   Instance as SpawnkitInstance,
 } from "./Instance";
 import { Stream } from "@/utils/Stream";
+import type { Worker } from "./Worker";
 import {
   Adapters,
   ScheduleEventData,
@@ -12,30 +13,47 @@ import {
   Delay,
   InstanceId,
   EventId,
+  InstanceKind,
 } from "../adapters";
+import { Data } from "./Data";
 
 type InstanceClass = typeof SpawnkitInstance<any>;
 
-interface ClientProps<T extends InstanceClass = InstanceClass> {
-  instances: Record<string, T>;
-  adapters: Omit<Adapters, "lock" | "worker">;
+type ClientAdapter<A extends Adapters> = Omit<A, "lock" | "worker">;
+
+interface ClientProps<W extends Worker<any>> {
+  adapters: Omit<W["adapters"], "lock" | "worker">;
 }
 
 export class RemoteError extends Error {}
 
-export class Client<Props extends ClientProps> {
-  private adapters: Props["adapters"];
+export class Client<W extends Worker<any>> {
+  private adapters: ClientProps<W>["adapters"];
 
-  constructor(opts: Props) {
+  constructor(opts: ClientProps<W>) {
     this.adapters = opts.adapters;
   }
 
-  static from<P extends ClientProps>(opts: P) {
-    return new Client(opts);
+  static from<I extends Worker<any>>(opts: {
+    adapters: ClientAdapter<I["adapters"]>;
+  }) {
+    return new Client<I>(opts);
   }
 
-  static getChannelForEventResponse(instanceId: InstanceId, eventId: EventId) {
-    return `instance:${instanceId}:event:${eventId}` as const;
+  static getChannelForEventResponse(
+    kind: InstanceKind,
+    id: InstanceId,
+    eventId: EventId,
+  ) {
+    return Client.getChannel(kind, id, `event:${eventId}`);
+  }
+
+  static getChannel<Channel extends string>(
+    kind: InstanceKind,
+    id: InstanceId,
+    channel: Channel,
+  ) {
+    return `kind:${kind}:id:${id}:${channel}` as const;
   }
 
   static deserializeError(serializedError: { message: string; name: string }) {
@@ -64,8 +82,6 @@ export class Client<Props extends ClientProps> {
     );
   }
 
-  static handleIncomingStream() {}
-
   timesampByInstnace = new Map<InstanceId, number>();
   private shouldScheduleInstance(instanceId: InstanceId) {
     const lastSentEventTimesamp = this.timesampByInstnace.get(instanceId);
@@ -81,11 +97,8 @@ export class Client<Props extends ClientProps> {
     return shouldScheduleInstance;
   }
 
-  spawn<Kind extends keyof Props["instances"]>(
-    kind: Kind,
-    instanceId: InstanceId,
-  ) {
-    type Instance = InstanceType<Props["instances"][Kind]>;
+  spawn<Kind extends keyof W["instances"]>(kind: Kind, instanceId: InstanceId) {
+    type Instance = InstanceType<W["instances"][Kind]>;
     type InstanceEvent = Parameters<Instance["callMethodDefinedInEvent"]>[1];
     type InstanceEmittable = Parameters<Instance["emit"]>;
     type InstanceInternalEmittable = Parameters<Instance["emitInternal"]>;
@@ -153,6 +166,11 @@ export class Client<Props extends ClientProps> {
     type PublicMessageChannel = InstanceEmittable[0];
     type PublicMessageData = InstanceEmittable[1];
 
+    const data = new Data({
+      adapters: this.adapters,
+      instanceId,
+    });
+
     const instanceClientAPI = {
       id: instanceId,
       kind: kind,
@@ -161,7 +179,21 @@ export class Client<Props extends ClientProps> {
         channel: PublicMessageChannel,
         callback: (data: PublicMessageData) => any,
       ) => {
-        return this.adapters.messages.subscribe(channel, callback);
+        const channelID = Client.getChannel(
+          kind as string,
+          instanceId,
+          channel,
+        );
+        return this.adapters.messages.subscribe<PublicMessageData>(
+          channelID,
+          (message) => {
+            callback(message.data);
+          },
+        );
+      },
+
+      data: {
+        get: data.get.bind(data),
       },
 
       scheduled: {
@@ -226,6 +258,7 @@ export class Client<Props extends ClientProps> {
           if (mode === "normal") {
             return new Promise((resolve, reject) => {
               const channelID = Client.getChannelForEventResponse(
+                kind as string,
                 instanceId,
                 eventId,
               );

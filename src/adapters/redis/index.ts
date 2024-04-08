@@ -83,69 +83,30 @@ export class Lock extends RedisAdapter implements Adapters.AdapterLock {
   }
 }
 
-export class Snapshot
-  extends RedisAdapter
-  implements Adapters.AdapaterSnapshot
-{
+export class Data extends RedisAdapter implements Adapters.AdapaterData {
   private getKey(instanceId: Adapters.InstanceId) {
     return `snapshot:${instanceId}`;
   }
 
-  async load<Data>(instanceId: Adapters.InstanceId): Promise<Data | null> {
-    const key = this.getKey(instanceId);
-    const data = await this.redis.get(key);
+  async get<Data>(
+    instanceId: Adapters.InstanceId,
+    key: string,
+  ): Promise<Data | null> {
+    const redisKey = this.getKey(instanceId + ":key+" + key);
+    const data = await this.redis.get(redisKey);
     if (!data) return null;
     return JSON.parse(data);
   }
 
-  async save<Data>(
+  async set<Data>(
     instanceId: Adapters.InstanceId,
-    snapshot: Data,
+    key: string,
+    value: Data,
   ): Promise<true> {
-    const key = this.getKey(instanceId);
-    const serialized = JSON.stringify(snapshot);
-    await this.redis.set(key, serialized);
+    const redisKey = this.getKey(instanceId + ":key+" + key);
+    const serialized = JSON.stringify(value);
+    await this.redis.set(redisKey, serialized);
     return true;
-  }
-
-  subscribe<Data>(
-    instanceId: Adapters.InstanceId,
-    callback: (snapshot: Data) => void,
-  ): { unsubscribe: Function } {
-    let active = true;
-    let prevSnapshot: any = null;
-    const intervalId = setInterval(async () => {
-      const snapshot = await this.load<Data>(instanceId);
-
-      const notify = (data: any) => {
-        if (active) {
-          callback(data);
-        }
-      };
-
-      const hashObj = (data: any) =>
-        JSON.stringify(JSON.parse(JSON.stringify(data)));
-
-      if (snapshot) {
-        if (prevSnapshot) {
-          const left = hashObj(snapshot);
-          const right = hashObj(prevSnapshot);
-          const hasChanged = left !== right;
-          if (hasChanged) notify(snapshot);
-        } else {
-          notify(snapshot);
-        }
-      }
-
-      prevSnapshot = snapshot;
-    }, 100);
-
-    return {
-      unsubscribe: () => {
-        active = false;
-        clearInterval(intervalId);
-      },
-    };
   }
 }
 

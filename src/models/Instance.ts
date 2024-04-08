@@ -10,6 +10,7 @@ import {
   EventId,
 } from "../adapters";
 import { Client } from "./Client";
+import { Data } from "./Data";
 
 interface InstanceResult<V extends any> {
   data: V | undefined;
@@ -17,7 +18,8 @@ interface InstanceResult<V extends any> {
 }
 
 export interface InternalChannels {
-  [key: `instance:${string}:event:${string}`]:
+  [key: `kind:${string}:id:${string}:data`]: { data: any };
+  [key: `kind:${string}:id:${string}:event:${string}`]:
     | { error: any }
     | { response: any }
     | { stream: true; start: true }
@@ -26,12 +28,15 @@ export interface InternalChannels {
     | { stream: true; error: Error };
 }
 
-export class Instance<InstanceData = {}, InstanceChannels = {}> {
-  running: boolean = false;
-  keepAlive = new PromiseList();
-  aborted = new ControlledPromise("Aborted");
+export class Instance<
+  InstanceData extends Record<string, any> = Record<string, any>,
+  InstanceChannels extends Record<string, any> = Record<string, any>,
+> {
+  private running: boolean = false;
+  public keepAlive = new PromiseList();
+  public aborted = new ControlledPromise("Aborted");
 
-  config: ScheduleInstanceData;
+  private config: ScheduleInstanceData;
   private adapters: Adapters;
 
   get kind() {
@@ -42,9 +47,12 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
     return this.config.id;
   }
 
+  data: Data<InstanceData>;
+
   constructor(config: ScheduleInstanceData, adapters: Adapters) {
     this.config = config;
     this.adapters = adapters;
+    this.data = new Data({ adapters, instanceId: this.id });
   }
 
   /* This is where you initiate the instance */
@@ -53,7 +61,7 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
   /* Dispose of all the ressources allocated */
   async stop(): Promise<any> {}
 
-  async callMethodDefinedInEvent(
+  private async callMethodDefinedInEvent(
     eventId: EventId,
     event: InstanceMethodCall,
   ): Promise<any> {
@@ -69,7 +77,11 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
 
     // Wrap the method in a Promise. to ensure that if the method is sync
     // We still catch the error if one happens.
-    const channelID = Client.getChannelForEventResponse(this.id, eventId);
+    const channelID = Client.getChannelForEventResponse(
+      this.kind,
+      this.id,
+      eventId,
+    );
     const [error, response] = await Promise.resolve()
       .then(() => method?.(...args))
       .then((res) => [null, res])
@@ -122,32 +134,8 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
     }
   }
 
-  data: InstanceData | null = null;
-
-  saveAsyncManager = new AsyncDebounceHandler();
-  async save(data: InstanceData) {
-    this.data = data;
-
-    await this.runExternalEffect(async () => {
-      await this.saveAsyncManager.onlyLastOnePerTick(async () => {
-        await this.adapters.snapshot.save(this.id, data);
-      });
-    });
-  }
-
-  private async loadData() {
-    // Seed data with previously stored data.
-    const currentData = await this.adapters.snapshot.load<InstanceData | null>(
-      this.id,
-    );
-
-    this.data = currentData;
-  }
-
-  async run(
-    abortSignal: AbortSignal,
-  ): Promise<InstanceResult<InstanceData | null>> {
-    await this.loadData();
+  private async run(abortSignal: AbortSignal) {
+    // await this.loadData();
 
     // Start the process + start listening for events
     this.running = true;
@@ -166,21 +154,22 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
       syncAbort.dispose();
     });
 
-    return {
-      data: this.data,
-      stale: false,
-    };
+    // return {
+    //   data: this.data,
+    //   stale: false,
+    // };
   }
 
-  async stopRun() {
+  private async stopRun() {
     if (!this.running) return;
     this.running = false;
     this.onEventSubscription?.unsubscribe();
     await this.stop();
-    await this.save(this.data!);
+
+    // We should not attempt to this.kv.set() here as the lock is probably lost
   }
 
-  get live() {
+  private get live() {
     if (!this.running) return false;
     if (this.keepAlive.fulfilled) return false;
     if (this.aborted.fulfilled) return false;
@@ -189,16 +178,14 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
 
   protected async runExternalEffect<T>(
     callback: () => Promise<T>,
-    name?: string,
+    debugId?: string,
   ): Promise<void> {
     if (this.aborted.fulfilled) {
       // silence attempt
       return;
     }
 
-    const pending = this.keepAlive.addControlled(
-      `External: ${name || "no-name"}`,
-    );
+    const pending = this.keepAlive.addControlled(debugId);
 
     Promise.resolve()
       .then(callback)
@@ -235,22 +222,22 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
   /** this function is used to emit message to one client,
    * also for type safety, so that so that it doesn't show on client.on channel name autocomplete
    **/
-  async emitInternal<Channel extends Extract<keyof InternalChannels, string>>(
-    channel: Channel,
-    data: InternalChannels[Channel],
-  ) {
+  private async emitInternal<
+    Channel extends Extract<keyof InternalChannels, string>,
+  >(channel: Channel, data: InternalChannels[Channel]) {
     return this.runExternalEffect(async () => {
       return await this.adapters.messages.publish(channel, data);
     });
   }
 
   /** this will send a message to all client subscribed to this instance specified channel */
-  emit<Channel extends Extract<keyof InstanceChannels, string>>(
+  public emit<Channel extends Extract<keyof InstanceChannels, string>>(
     channel: Channel,
     data: InstanceChannels[Channel],
   ) {
     return this.runExternalEffect(async () => {
-      return await this.adapters.messages.publish(channel, data);
+      const channelID = Client.getChannel(this.kind, this.id, channel);
+      return await this.adapters.messages.publish(channelID, data);
     });
   }
 
@@ -275,7 +262,7 @@ export class Instance<InstanceData = {}, InstanceChannels = {}> {
     };
   }
 
-  protected async keepAliveUntilNothingHappens() {
+  private async keepAliveUntilNothingHappens() {
     await this.keepAlive.waitOnAll();
     await this.stopRun();
 
