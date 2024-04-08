@@ -70,17 +70,17 @@ export abstract class AdapaterData {
 
 export abstract class AdapaterMessageBroker {
   abstract publish<EventData>(
-    instanceId: InstanceId,
+    channel: string,
     event: EventData,
   ): Promise<EventId>;
 
   abstract ack<EventData>(
-    instanceId: InstanceId,
+    channel: string,
     event: { id: EventId; data: EventData },
   ): Promise<true>;
-  abstract has(instanceId: InstanceId): Promise<boolean>;
+  abstract has(channel: string): Promise<boolean>;
   abstract subscribe<EventData>(
-    instanceId: InstanceId,
+    channel: string,
     onEvent: (event: { id: EventId; data: EventData }) => void,
   ): { unsubscribe: Function };
 }

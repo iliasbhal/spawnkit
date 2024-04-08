@@ -169,7 +169,7 @@ export class Client<W extends Worker<any>> {
     const data = new Data({
       adapters: this.adapters,
       instanceId,
-    });
+    }) as Instance["data"];
 
     const instanceClientAPI = {
       id: instanceId,
@@ -192,9 +192,7 @@ export class Client<W extends Worker<any>> {
         );
       },
 
-      data: {
-        get: data.get.bind(data),
-      },
+      data: data,
 
       scheduled: {
         list: async () => {

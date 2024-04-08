@@ -219,6 +219,9 @@ const errorHandlingExample = async () => {
 
 const exampleXState = async () => {
   const toggle = client.spawn("ToggleMachine", "AAAA");
+  toggle.data.on("snapshot", (next) => {
+    console.log("SUBSCRIBE", "KEY", "snapshot", next);
+  });
 
   const before = await toggle.data.get("snapshot");
   console.log("before", before);
@@ -237,6 +240,7 @@ const exampleXState = async () => {
   console.log(response);
 
   const after = await toggle.data.get("snapshot");
+
   console.log("after", after);
   // toggle.data.get();
 };

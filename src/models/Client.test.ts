@@ -17,6 +17,7 @@ describe("Client", () => {
 
   describe("Data", () => {
     it.todo("can use .data.get() remotely");
+    it.todo("can subscribe to data changes via .data.on('key', subscriber)");
   });
 
   describe("Stream", () => {
