@@ -1,6 +1,5 @@
 import { PromiseList } from "@/utils/PromiseList";
 import { ControlledPromise } from "@/utils/ControlledPromise";
-import { AsyncDebounceHandler } from "@/utils/AsyncDebounceHandler";
 import { ControlledTimeout } from "@/utils/ControlledTimeout";
 import { Stream } from "@/utils/Stream";
 import {
@@ -11,11 +10,6 @@ import {
 } from "../adapters";
 import { Client } from "./Client";
 import { Data } from "./Data";
-
-interface InstanceResult<V extends any> {
-  data: V | undefined;
-  stale: boolean;
-}
 
 export interface InternalChannels {
   [key: `kind:${string}:id:${string}:data`]: { data: any };
@@ -32,12 +26,17 @@ export class Instance<
   InstanceData extends Record<string, any> = Record<string, any>,
   InstanceChannels extends Record<string, any> = Record<string, any>,
 > {
-  private running: boolean = false;
+  _types = {} as {
+    InstanceData: InstanceData;
+    InstanceChannels: InstanceChannels;
+  };
+
+  public running: boolean = false;
   public keepAlive = new PromiseList();
   public aborted = new ControlledPromise("Aborted");
 
-  private config: ScheduleInstanceData;
-  private adapters: Adapters;
+  public config: ScheduleInstanceData;
+  public adapters: Adapters;
 
   get kind() {
     return this.config.kind;
@@ -61,7 +60,7 @@ export class Instance<
   /* Dispose of all the ressources allocated */
   async stop(): Promise<any> {}
 
-  private async callMethodDefinedInEvent(
+  public async callMethodDefinedInEvent(
     eventId: EventId,
     event: InstanceMethodCall,
   ): Promise<any> {
@@ -134,7 +133,7 @@ export class Instance<
     }
   }
 
-  private async run(abortSignal: AbortSignal) {
+  public async run(abortSignal: AbortSignal) {
     // await this.loadData();
 
     // Start the process + start listening for events
@@ -160,7 +159,7 @@ export class Instance<
     // };
   }
 
-  private async stopRun() {
+  public async stopRun() {
     if (!this.running) return;
     this.running = false;
     this.onEventSubscription?.unsubscribe();
@@ -169,7 +168,7 @@ export class Instance<
     // We should not attempt to this.kv.set() here as the lock is probably lost
   }
 
-  private get live() {
+  public get live() {
     if (!this.running) return false;
     if (this.keepAlive.fulfilled) return false;
     if (this.aborted.fulfilled) return false;
@@ -195,8 +194,8 @@ export class Instance<
     await pending.await;
   }
 
-  private onEventSubscription: { unsubscribe: Function } | undefined;
-  private subscribeToInstanceEvent() {
+  public onEventSubscription: { unsubscribe: Function } | undefined;
+  public subscribeToInstanceEvent() {
     const NO_EVENT_TIMEOUT = 3000;
     const timer = new ControlledTimeout();
     timer.start(NO_EVENT_TIMEOUT);
@@ -222,10 +221,11 @@ export class Instance<
   /** this function is used to emit message to one client,
    * also for type safety, so that so that it doesn't show on client.on channel name autocomplete
    **/
-  private async emitInternal<
+  public async emitInternal<
     Channel extends Extract<keyof InternalChannels, string>,
   >(channel: Channel, data: InternalChannels[Channel]) {
     return this.runExternalEffect(async () => {
+      console.log("channel", channel);
       return await this.adapters.messages.publish(channel, data);
     });
   }
@@ -241,7 +241,7 @@ export class Instance<
     });
   }
 
-  private syncAbortSignalWithPromise(abortCtl: AbortSignal) {
+  public syncAbortSignalWithPromise(abortCtl: AbortSignal) {
     const onAbortCallback = () => {
       if (!this.live) {
         return;
@@ -262,7 +262,7 @@ export class Instance<
     };
   }
 
-  private async keepAliveUntilNothingHappens() {
+  public async keepAliveUntilNothingHappens() {
     await this.keepAlive.waitOnAll();
     await this.stopRun();
 

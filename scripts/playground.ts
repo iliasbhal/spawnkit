@@ -1,6 +1,5 @@
 import wait from "wait";
 import * as Spawnkit from "@/.";
-import { Adapters } from "@/adapters";
 import * as RedisAdapter from "@/adapters/redis";
 import { redis } from "@/adapters/redis/client";
 import {
@@ -11,15 +10,13 @@ import {
   ErrorExample,
 } from "../example/_index";
 
-export const adapters: Adapters = {
-  lock: new RedisAdapter.Lock(redis),
-  data: new RedisAdapter.Data(redis),
-  messages: new RedisAdapter.MessageBroker(redis),
-  scheduler: new RedisAdapter.Scheduler(redis),
-};
-
-const worker = Spawnkit.Worker.from({
-  adapters,
+const spawnConfig = {
+  adapters: {
+    lock: new RedisAdapter.Lock(redis),
+    data: new RedisAdapter.Data(redis),
+    messages: new RedisAdapter.MessageBroker(redis),
+    scheduler: new RedisAdapter.Scheduler(redis),
+  },
   instances: {
     StreamExample,
     AgentLLM,
@@ -27,13 +24,10 @@ const worker = Spawnkit.Worker.from({
     OrderBook,
     ErrorExample,
   },
-});
+};
 
-type Worker = typeof worker;
-
-const client = Spawnkit.Client.from<Worker>({
-  adapters,
-});
+const worker = Spawnkit.Worker.from(spawnConfig);
+const client = Spawnkit.Client.from(spawnConfig);
 
 const main = async () => {
   await redis.flushall("SYNC");
@@ -218,39 +212,45 @@ const errorHandlingExample = async () => {
 };
 
 const exampleXState = async () => {
-  const toggle = client.spawn("ToggleMachine", "AAAA");
-  toggle.data.on("snapshot", (next) => {
-    console.log("SUBSCRIBE", "KEY", "snapshot", next);
-  });
+  const toggle = client.spawn("OrderBook", "AAAA");
+  // toggle.data.on("snapshot", (next) => {
+  //   console.log("SUBSCRIBE", "KEY", "snapshot", next);
+  // });
+  await toggle.init([1, 2, 3]);
+  // await toggle.init([1, 2, 3]);
+  // const before = await toggle.data.get("snapshot");
+  // console.log("before", before);
 
-  const before = await toggle.data.get("snapshot");
-  console.log("before", before);
+  // const snap1 = await toggle.create(undefined);
+  // console.log("snap1", snap1);
 
-  const snap1 = await toggle.create(undefined);
-  console.log("snap1", snap1);
+  // const snap2 = await toggle.data.get("snapshot");
+  // console.log("snap2", snap2);
 
-  const snap2 = await toggle.data.get("snapshot");
-  console.log("snap2", snap2);
+  await Promise.all(
+    Array.from({ length: 1000 }).map(() => {
+      return toggle.send({ type: "TOGGLE" });
+    }),
+  );
 
-  toggle.send({ type: "TOGGLE" });
-  toggle.send({ type: "TOGGLE" });
-  toggle.send({ type: "TOGGLE" });
-  toggle.send({ type: "TOGGLE" });
-  const response = await toggle.send({ type: "TOGGLE" });
-  console.log(response);
+  // for (let i = 0; i < 100; i++) {
+  //   await toggle.send({ type: "TOGGLE" });
+  // }
+  // const response = await toggle.send({ type: "TOGGLE" });
+  // console.log(response);
 
-  const after = await toggle.data.get("snapshot");
+  // const after = await toggle.data.get("snapshot");
 
-  console.log("after", after);
+  // console.log("after", after);
   // toggle.data.get();
 };
 
 const startTime = Date.now();
 console.log("START");
 main()
-  .then((result) => console.log("DONE", result))
+  .then((result) => console.log("DONE"))
   .catch((err) => console.error("ERR", err))
   .finally(() => {
     const timeSpent = Date.now() - startTime;
-    console.log(timeSpent / 1000, "ms");
+    console.log(timeSpent, "ms");
   });

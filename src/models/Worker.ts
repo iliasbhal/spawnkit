@@ -7,26 +7,19 @@ import {
   ScheduleEventData,
   ScheduleInstanceData,
 } from "../adapters";
-import { Client } from "./Client";
+import { Client, SpawnkitConfig } from "./Client";
 
-type InstanceClass = typeof Instance<any>;
-
-interface ListenProps<T extends InstanceClass = InstanceClass> {
-  instances: Record<string, T>;
-  adapters: Adapters;
-}
-
-export class Worker<O extends ListenProps> {
+export class Worker<O extends SpawnkitConfig> {
   instances: O["instances"];
-  adapters: Adapters;
-  client: Client<O["instances"], any>;
+  adapters: O["adapters"];
+  client: Client<O>;
 
-  constructor(config: ListenProps) {
+  constructor(config: SpawnkitConfig) {
     this.instances = config.instances;
     this.adapters = config.adapters;
     this.client = new Client({
+      adapters: config.adapters as any,
       instances: config.instances,
-      adapters: config.adapters,
     });
   }
 
@@ -127,7 +120,7 @@ export class Worker<O extends ListenProps> {
     }
   }
 
-  static from<O extends ListenProps>(opts: O) {
+  static from<O extends SpawnkitConfig>(opts: O) {
     Worker.verify(opts.instances);
 
     if (process.env.NODE_ENV !== "test") {
@@ -139,7 +132,7 @@ export class Worker<O extends ListenProps> {
     return new Worker<O>(opts);
   }
 
-  static verify(instances: ListenProps["instances"]) {
+  static verify(instances: SpawnkitConfig["instances"]) {
     if (Object.keys(instances).length === 0) {
       throw new Error(`Validation Error: worker configured with 0 instances`);
     }

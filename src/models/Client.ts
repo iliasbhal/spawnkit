@@ -1,43 +1,40 @@
 import type {
+  Instance,
   InternalChannels,
   Instance as SpawnkitInstance,
 } from "./Instance";
 import { Stream } from "@/utils/Stream";
-import type { Worker } from "./Worker";
 import {
   Adapters,
   ScheduleEventData,
   ScheduleId,
-  ScheduleConfig,
   Cron,
   Delay,
   InstanceId,
   EventId,
   InstanceKind,
+  InstanceMethodCall,
 } from "../adapters";
 import { Data } from "./Data";
 
-type InstanceClass = typeof SpawnkitInstance<any>;
-
-type ClientAdapter<A extends Adapters> = Omit<A, "lock" | "worker">;
-
-interface ClientProps<W extends Worker<any>> {
-  adapters: Omit<W["adapters"], "lock" | "worker">;
+export interface SpawnkitConfig {
+  adapters: Adapters;
+  instances: { [key: string]: typeof Instance<any> };
 }
 
 export class RemoteError extends Error {}
 
-export class Client<W extends Worker<any>> {
-  private adapters: ClientProps<W>["adapters"];
+export class Client<CP extends SpawnkitConfig> {
+  private adapters: SpawnkitConfig["adapters"];
+  private instances: SpawnkitConfig["instances"];
 
-  constructor(opts: ClientProps<W>) {
+  constructor(opts: SpawnkitConfig) {
     this.adapters = opts.adapters;
+    this.instances = opts.instances;
   }
 
-  static from<I extends Worker<any>>(opts: {
-    adapters: ClientAdapter<I["adapters"]>;
-  }) {
-    return new Client<I>(opts);
+  static from<CP extends SpawnkitConfig>(opts: CP) {
+    return new Client<CP>(opts);
   }
 
   static getChannelForEventResponse(
@@ -97,8 +94,11 @@ export class Client<W extends Worker<any>> {
     return shouldScheduleInstance;
   }
 
-  spawn<Kind extends keyof W["instances"]>(kind: Kind, instanceId: InstanceId) {
-    type Instance = InstanceType<W["instances"][Kind]>;
+  spawn<Kind extends keyof CP["instances"]>(
+    kind: Kind,
+    instanceId: InstanceId,
+  ) {
+    type Instance = InstanceType<CP["instances"][Kind]>;
     type InstanceEvent = Parameters<Instance["callMethodDefinedInEvent"]>[1];
     type InstanceEmittable = Parameters<Instance["emit"]>;
     type InstanceInternalEmittable = Parameters<Instance["emitInternal"]>;
@@ -135,6 +135,18 @@ export class Client<W extends Worker<any>> {
     type EmitRemoteMethods = MakeEmitable<AvailableMethods>;
     type ScheduleRemoteMethods = MakeSchedulable<AvailableMethods>;
 
+    type InternalMessageChannel = InstanceInternalEmittable[0];
+    type InternalMessageData = InstanceInternalEmittable[1];
+    type PublicMessageChannel = InstanceEmittable[0];
+    type PublicMessageData = InstanceEmittable[1];
+
+    // return {} as {
+    //   InternalMessageChannel: InternalMessageChannel;
+    //   InternalMessageData: InternalMessageData;
+    //   PublicMessageChannel: PublicMessageChannel;
+    //   PublicMessageData: PublicMessageData;
+    // };
+
     const sendEventToInstance = async (event: InstanceEvent) => {
       const shouldScheduleInstance = this.shouldScheduleInstance(instanceId);
       const [eventId] = await Promise.all([
@@ -160,11 +172,6 @@ export class Client<W extends Worker<any>> {
     const scheduleEvent = async (schedule: ScheduleEventData) => {
       return await this.adapters.scheduler.event(schedule);
     };
-
-    type InternalMessageChannel = InstanceInternalEmittable[0];
-    type InternalMessageData = InstanceInternalEmittable[1];
-    type PublicMessageChannel = InstanceEmittable[0];
-    type PublicMessageData = InstanceEmittable[1];
 
     const data = new Data({
       adapters: this.adapters,
@@ -239,7 +246,7 @@ export class Client<W extends Worker<any>> {
       };
     };
 
-    const createRemoteMethodHandler = (mode: InstanceEvent["mode"]) => {
+    const createRemoteMethodHandler = (mode: InstanceMethodCall["mode"]) => {
       return (action: string) => {
         return async (...args: any[]) => {
           const eventId = await sendEventToInstance({
@@ -287,18 +294,19 @@ export class Client<W extends Worker<any>> {
                 }
               };
 
-              const subscription =
-                this.adapters.messages.subscribe<InternalMessageData>(
-                  channelID,
-                  (message) => {
-                    if ("stream" in message.data)
-                      return handleStreamMessage(subscription, message.data);
-                    if ("response" in message.data)
-                      return handleDefaultMessage(subscription, message.data);
-                    if ("error" in message.data)
-                      return handleDefaultMessage(subscription, message.data);
-                  },
-                );
+              const subscription: ReturnType<
+                typeof this.adapters.messages.subscribe<InternalMessageData>
+              > = this.adapters.messages.subscribe<InternalMessageData>(
+                channelID,
+                (message) => {
+                  if ("stream" in message.data)
+                    return handleStreamMessage(subscription, message.data);
+                  if ("response" in message.data)
+                    return handleDefaultMessage(subscription, message.data);
+                  if ("error" in message.data)
+                    return handleDefaultMessage(subscription, message.data);
+                },
+              );
             });
           }
 
