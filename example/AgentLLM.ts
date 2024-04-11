@@ -1,5 +1,5 @@
 import * as Spawnkit from "@/.";
-import { InstanceSignalEvent } from "@/models/InstanceProxy";
+import { SignalEvent } from "@/models/InstanceProxy";
 import wait from "wait";
 
 interface AgentAIData {
@@ -15,7 +15,7 @@ interface Prompt {
 }
 
 export class AgentLLM extends Spawnkit.Instance<AgentAIData, AgenAIChannels> {
-  on(event: InstanceSignalEvent) {
+  on(event: SignalEvent) {
     if (event == "start") {
       console.log("AGENT START");
     }

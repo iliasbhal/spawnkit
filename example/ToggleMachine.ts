@@ -13,9 +13,9 @@ export const ToggleMachine = Machine.from({
       context: {} as { count: number },
     },
   }).createMachine({
-    context: {
+    context: ({ input }) => ({
       count: 0,
-    },
+    }),
     initial: "TRUE",
     states: {
       TRUE: {

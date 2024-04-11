@@ -1,4 +1,4 @@
-import type { InstanceSignalEvent, InterfaceAPI } from "./InstanceProxy";
+import type { SignalEvent, InterfaceAPI } from "./InstanceProxy";
 
 export class Instance<
   InstanceData extends Record<string, any> = Record<string, any>,
@@ -9,7 +9,7 @@ export class Instance<
     InstanceChannels: InstanceChannels;
   };
 
-  on?(event: InstanceSignalEvent): any;
+  on?(event: SignalEvent): any;
 
   id!: string;
   kind!: string;

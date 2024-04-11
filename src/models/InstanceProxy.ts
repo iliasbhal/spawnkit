@@ -12,7 +12,7 @@ import {
 import { Client } from "./Client";
 import { Data } from "./Data";
 
-export type InstanceSignalEvent = "abort" | "start" | "dispose";
+export type SignalEvent = "abort" | "start" | "dispose";
 
 export interface InstanceProps {
   kind: string;

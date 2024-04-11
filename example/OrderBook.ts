@@ -1,5 +1,5 @@
 import * as Spawnkit from "@/.";
-import { InstanceSignalEvent } from "@/models/InstanceProxy";
+import { SignalEvent } from "@/models/InstanceProxy";
 
 interface OrderBookData {
   orderBook: string[];
@@ -18,7 +18,7 @@ export class OrderBook extends Spawnkit.Instance<
   OrderBookData,
   OrderBookEvent
 > {
-  on(event: InstanceSignalEvent) {
+  on(event: SignalEvent) {
     console.log("ON", event);
   }
   async buy(stock: Stock) {

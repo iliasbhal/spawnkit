@@ -1,12 +1,12 @@
 import * as Spawnkit from "@/.";
-import { InstanceSignalEvent } from "@/models/InstanceProxy";
+import { SignalEvent } from "@/models/InstanceProxy";
 
 interface ChatRoomData {
   messages: string[];
 }
 
 export class ChatRoom extends Spawnkit.Instance<ChatRoomData> {
-  on(event: InstanceSignalEvent) {
+  on(event: SignalEvent) {
     if (event == "start") {
       console.log("Chat ROOM WAKEN UP");
     }
