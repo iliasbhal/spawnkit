@@ -9,8 +9,5 @@ interface DocumentChange {
 }
 
 export class LiveDocument extends Spawnkit.Instance<LiveDocumentData> {
-  async start(): Promise<any> {}
-  async stop(): Promise<any> {}
-
   update(change: DocumentChange) {}
 }

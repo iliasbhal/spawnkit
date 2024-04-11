@@ -1,8 +1,8 @@
+import type { Instance } from "./Instance";
 import type {
-  Instance,
-  InternalChannels,
-  Instance as SpawnkitInstance,
-} from "./Instance";
+  InstanceEventChannels,
+  InstanceEventStreamMessage,
+} from "./InstanceProxy";
 import { Stream } from "@/utils/Stream";
 import {
   Adapters,
@@ -15,20 +15,22 @@ import {
   InstanceKind,
   InstanceMethodCall,
 } from "../adapters";
-import { Data } from "./Data";
+import { RemoteData } from "./Data";
 
 export interface SpawnkitConfig {
   adapters: Adapters;
-  instances: { [key: string]: typeof Instance<any> };
+  instances: { [key: string]: typeof Instance<any, any> };
 }
 
 export class RemoteError extends Error {}
 
-export class Client<CP extends SpawnkitConfig> {
-  private adapters: SpawnkitConfig["adapters"];
-  private instances: SpawnkitConfig["instances"];
+type InternalMessageData = InstanceEventChannels[keyof InstanceEventChannels];
 
-  constructor(opts: SpawnkitConfig) {
+export class Client<CP extends SpawnkitConfig> {
+  private adapters: CP["adapters"];
+  private instances: CP["instances"];
+
+  constructor(opts: CP) {
     this.adapters = opts.adapters;
     this.instances = opts.instances;
   }
@@ -42,10 +44,10 @@ export class Client<CP extends SpawnkitConfig> {
     id: InstanceId,
     eventId: EventId,
   ) {
-    return Client.getChannel(kind, id, `event:${eventId}`);
+    return Client.getChannelForInstance(kind, id, `event:${eventId}`);
   }
 
-  static getChannel<Channel extends string>(
+  static getChannelForInstance<Channel extends string>(
     kind: InstanceKind,
     id: InstanceId,
     channel: Channel,
@@ -94,63 +96,25 @@ export class Client<CP extends SpawnkitConfig> {
     return shouldScheduleInstance;
   }
 
-  spawn<Kind extends keyof CP["instances"]>(
+  spawn<Kind extends Extract<keyof CP["instances"], string>>(
     kind: Kind,
     instanceId: InstanceId,
   ) {
-    type Instance = InstanceType<CP["instances"][Kind]>;
-    type InstanceEvent = Parameters<Instance["callMethodDefinedInEvent"]>[1];
-    type InstanceEmittable = Parameters<Instance["emit"]>;
-    type InstanceInternalEmittable = Parameters<Instance["emitInternal"]>;
-
-    type ExtractMethodNames<T> = {
-      [K in keyof T]: T[K] extends (...args: any[]) => any ? K : never;
-    }[keyof T];
-
-    type ExtractMethods<T> = Pick<T, ExtractMethodNames<T>>;
-    type InheritedMethods = ExtractMethodNames<SpawnkitInstance>;
-    type AvailableMethods = Omit<ExtractMethods<Instance>, InheritedMethods>;
-
-    type MakeRemote<T> = {
-      [K in keyof T]: T[K] extends (...args: any[]) => any
-        ? // If the function is sychronouse, we want to cast the return to a Promise
-          // And it it's already a promise, it's gonna stay a promise.
-          (...args: Parameters<T[K]>) => Promise<Awaited<ReturnType<T[K]>>>
-        : never;
-    };
-
-    type MakeEmitable<T> = {
-      [K in keyof T]: T[K] extends (...args: any[]) => any
-        ? (...args: Parameters<T[K]>) => Promise<boolean>
-        : never;
-    };
-
-    type MakeSchedulable<T> = {
-      [K in keyof T]: T[K] extends (...args: any[]) => any
-        ? (...args: Parameters<T[K]>) => Promise<ScheduleId>
-        : never;
-    };
-
+    type Inst = InstanceType<CP["instances"][Kind]>;
+    type InstanceData = Inst["__types"]["InstanceData"];
+    type InstanceChannels = Inst["__types"]["InstanceChannels"];
+    type InheritedMethods = Exclude<ExtractMethodNames<Instance>, undefined>;
+    type AvailableMethods = Omit<ExtractMethods<Inst>, InheritedMethods>;
     type RemoteMethodes = MakeRemote<AvailableMethods>;
     type EmitRemoteMethods = MakeEmitable<AvailableMethods>;
     type ScheduleRemoteMethods = MakeSchedulable<AvailableMethods>;
 
-    type InternalMessageChannel = InstanceInternalEmittable[0];
-    type InternalMessageData = InstanceInternalEmittable[1];
-    type PublicMessageChannel = InstanceEmittable[0];
-    type PublicMessageData = InstanceEmittable[1];
-
-    // return {} as {
-    //   InternalMessageChannel: InternalMessageChannel;
-    //   InternalMessageData: InternalMessageData;
-    //   PublicMessageChannel: PublicMessageChannel;
-    //   PublicMessageData: PublicMessageData;
-    // };
-
-    const sendEventToInstance = async (event: InstanceEvent) => {
+    const sendEventToInstance = async (
+      methodCallConfig: InstanceMethodCall,
+    ) => {
       const shouldScheduleInstance = this.shouldScheduleInstance(instanceId);
       const [eventId] = await Promise.all([
-        this.adapters.messages.publish(instanceId, event),
+        this.adapters.messages.publish(instanceId, methodCallConfig),
 
         // when sending an event, we shall always try to spawn an instance
         // to ensure that the event will be processed except In the case that we are sending a lot of events
@@ -161,8 +125,8 @@ export class Client<CP extends SpawnkitConfig> {
         // Scheduling too often is guarenteed to fail often as theu won't be able to acquire the locks
         shouldScheduleInstance &&
           this.adapters.scheduler.instance({
-            id: instanceId,
             kind: kind.toString(),
+            id: instanceId,
           }),
       ]);
 
@@ -173,43 +137,10 @@ export class Client<CP extends SpawnkitConfig> {
       return await this.adapters.scheduler.event(schedule);
     };
 
-    const data = new Data({
+    const data = new RemoteData<InstanceData>({
       adapters: this.adapters,
       instanceId,
-    }) as Instance["data"];
-
-    const instanceClientAPI = {
-      id: instanceId,
-      kind: kind,
-
-      on: (
-        channel: PublicMessageChannel,
-        callback: (data: PublicMessageData) => any,
-      ) => {
-        const channelID = Client.getChannel(
-          kind as string,
-          instanceId,
-          channel,
-        );
-        return this.adapters.messages.subscribe<PublicMessageData>(
-          channelID,
-          (message) => {
-            callback(message.data);
-          },
-        );
-      },
-
-      data: data,
-
-      scheduled: {
-        list: async () => {
-          return this.adapters.scheduler.list();
-        },
-        cancel: async (scheduleId: ScheduleId) => {
-          return this.adapters.scheduler.cancel(scheduleId);
-        },
-      },
-    };
+    });
 
     const createScheduledMethodHandler = (mode: "cron" | "delay") => {
       return (scheduleArgs: any) => {
@@ -217,32 +148,29 @@ export class Client<CP extends SpawnkitConfig> {
           [mode]: scheduleArgs,
         } as Delay | Cron;
 
-        return new Proxy(
-          {},
-          {
-            get(target, prop, receiver) {
-              if (prop in target) return Reflect.get(target, prop, receiver);
-              if (typeof prop !== "string") return;
+        return new Proxy({} as ScheduleRemoteMethods, {
+          get(target, prop, receiver) {
+            if (prop in target) return Reflect.get(target, prop, receiver);
+            if (typeof prop !== "string") return;
 
-              return async (...args: any[]) => {
-                const scheduleId = await scheduleEvent({
-                  schedule: scheduleConfig,
-                  instance: {
-                    id: instanceId,
-                    kind: kind.toString(),
-                  },
-                  event: {
-                    action: prop,
-                    args,
-                    mode: "scheduled",
-                  },
-                });
+            return async (...args: any[]) => {
+              const scheduleId = await scheduleEvent({
+                schedule: scheduleConfig,
+                instance: {
+                  id: instanceId,
+                  kind: kind.toString(),
+                },
+                event: {
+                  action: prop,
+                  args,
+                  mode: "scheduled",
+                },
+              });
 
-                return scheduleId;
-              };
-            },
+              return scheduleId;
+            };
           },
-        );
+        });
       };
     };
 
@@ -271,7 +199,7 @@ export class Client<CP extends SpawnkitConfig> {
               const internalStream = new ClientStream();
               const handleStreamMessage = (
                 subscription: { unsubscribe: Function },
-                message: InternalMessageData,
+                message: InstanceEventStreamMessage,
               ) => {
                 if ("start" in message) resolve(internalStream);
                 internalStream.forward(message);
@@ -315,20 +243,60 @@ export class Client<CP extends SpawnkitConfig> {
       };
     };
 
-    const emitRemoteMethodHandler = createRemoteMethodHandler("emit");
-    const instanceEmitClientAPI = new Proxy(
-      {},
-      {
-        get(target, prop, receiver) {
-          if (prop in target) return Reflect.get(target, prop, receiver);
-          if (typeof prop !== "string") return;
-          return emitRemoteMethodHandler(prop);
-        },
-      },
-    );
-
     const cronRemoteMethodHandler = createScheduledMethodHandler("cron");
     const delayRemoteMethodHandler = createScheduledMethodHandler("delay");
+    const normalRemoteMethodHandler = createRemoteMethodHandler("normal");
+    const emitRemoteMethodHandler = createRemoteMethodHandler("emit");
+
+    const instanceClientAPI = {
+      id: instanceId,
+      kind: kind,
+
+      on: <Channel extends keyof InstanceChannels>(
+        channel: Channel,
+        callback: (data: InstanceChannels[Channel]) => any,
+      ) => {
+        const channelID = Client.getChannelForInstance(
+          kind.toString(),
+          instanceId,
+          channel.toString(),
+        );
+
+        console.log("SUB", channelID);
+
+        return this.adapters.messages.subscribe<InstanceChannels[Channel]>(
+          channelID,
+          (message) => {
+            callback(message.data);
+          },
+        );
+      },
+
+      data: data,
+
+      emit: new Proxy(
+        {},
+        {
+          get(target, prop, receiver) {
+            if (prop in target) return Reflect.get(target, prop, receiver);
+            if (typeof prop !== "string") return;
+            return emitRemoteMethodHandler(prop);
+          },
+        },
+      ),
+
+      cron: cronRemoteMethodHandler,
+      delay: delayRemoteMethodHandler,
+
+      scheduled: {
+        list: async () => {
+          return this.adapters.scheduler.list();
+        },
+        cancel: async (scheduleId: ScheduleId) => {
+          return this.adapters.scheduler.cancel(scheduleId);
+        },
+      },
+    } as const;
 
     // We use the Kind type here just o it to show nicely
     // in the intelissense. it will show as Remote<OrderBook> for example
@@ -338,27 +306,13 @@ export class Client<CP extends SpawnkitConfig> {
         cron(crontab: string): ScheduleRemoteMethods;
       };
 
-    const normalRemoteMethodHandler = createRemoteMethodHandler("normal");
-    return new Proxy(instanceClientAPI as Spawn<Instance>, {
+    return new Proxy(instanceClientAPI, {
       get(target, prop, receiver) {
         if (prop in target) return Reflect.get(target, prop, receiver);
         if (typeof prop !== "string") return;
-
-        if (prop === "emit") {
-          return instanceEmitClientAPI;
-        }
-
-        if (prop == "delay") {
-          return delayRemoteMethodHandler;
-        }
-
-        if (prop == "cron") {
-          return cronRemoteMethodHandler;
-        }
-
         return normalRemoteMethodHandler(prop);
       },
-    });
+    }) as Spawn<Inst>;
   }
 }
 
@@ -367,7 +321,7 @@ class ClientStream extends Stream<any> {
     super(() => {});
   }
 
-  forward(message: InternalChannels[keyof InternalChannels]) {
+  forward(message: InternalMessageData) {
     if ("start" in message) this.store("start");
     if ("data" in message) this.store("data", message.data);
 
@@ -379,3 +333,31 @@ class ClientStream extends Stream<any> {
     if ("end" in message) this.store("end");
   }
 }
+
+// Utility Types:
+
+type ExtractMethodNames<T> = {
+  [K in keyof T]: T[K] extends (...args: any[]) => any ? K : never;
+}[keyof T];
+
+type ExtractMethods<T> = Pick<T, ExtractMethodNames<T>>;
+
+type MakeRemote<T> = {
+  [K in keyof T]: T[K] extends (...args: any[]) => any
+    ? // If the function is sychronouse, we want to cast the return to a Promise
+      // And it it's already a promise, it's gonna stay a promise.
+      (...args: Parameters<T[K]>) => Promise<Awaited<ReturnType<T[K]>>>
+    : never;
+};
+
+type MakeEmitable<T> = {
+  [K in keyof T]: T[K] extends (...args: any[]) => any
+    ? (...args: Parameters<T[K]>) => Promise<boolean>
+    : never;
+};
+
+type MakeSchedulable<T> = {
+  [K in keyof T]: T[K] extends (...args: any[]) => any
+    ? (...args: Parameters<T[K]>) => Promise<ScheduleId>
+    : never;
+};

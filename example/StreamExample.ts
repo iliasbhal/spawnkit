@@ -2,13 +2,6 @@ import * as Spawnkit from "@/.";
 import wait from "wait";
 
 export class StreamExample extends Spawnkit.Instance {
-  async start(): Promise<any> {
-    console.log("AGENT START");
-  }
-  async stop(): Promise<any> {
-    console.log("AGENT STOP");
-  }
-
   startStream(someData: { count: number }) {
     return new Spawnkit.Stream<string>(async (stream) => {
       for (let i = 0; i < someData.count; i++) {

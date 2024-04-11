@@ -56,7 +56,6 @@ export class Machine<
     >,
   ) {
     const snapshot = await this.data.get("snapshot");
-    console.log("CREATE SNAP", snapshot);
     if (snapshot) {
       throw new Error("Cannot Create Actor Already Created");
     }
@@ -129,21 +128,19 @@ export class Machine<
     const snapshot = this.actor.getPersistedSnapshot();
     this.snapshotByActorId.set(this.actor.id, snapshot);
 
-    this.runExternalEffect(async () => {
-      // We should emitting a new snapshot event only when the actor is created or when a transition happens.
-      // or when state or context changed. Not when the actor is recosturcted with a snapshot.
-      // This is because there is no new data. We only emit when there is new data basicaly.
-      const shouldSkipFirstSnapshotEmit =
-        this.initializedWithSnapshot && !this.skippedInitialSnapshot;
-      if (shouldSkipFirstSnapshotEmit) {
-        this.skippedInitialSnapshot = true;
-        return;
-      }
+    // We should emitting a new snapshot event only when the actor is created or when a transition happens.
+    // or when state or context changed. Not when the actor is recosturcted with a snapshot.
+    // This is because there is no new data. We only emit when there is new data basicaly.
+    const shouldSkipFirstSnapshotEmit =
+      this.initializedWithSnapshot && !this.skippedInitialSnapshot;
+    if (shouldSkipFirstSnapshotEmit) {
+      this.skippedInitialSnapshot = true;
+      return;
+    }
 
-      await this.data
-        .set("snapshot", snapshot)
-        .then(() => this.sync?.(this.actor));
-    });
+    await this.data
+      .set("snapshot", snapshot)
+      .then(() => this.sync?.(this.actor));
   }
 
   childActorDoneByActor = new Map<x.AnyActorRef, ControlledPromise<any>>();
@@ -162,21 +159,21 @@ export class Machine<
 
     const alreadyWaitingOnCompletiong = this.childActorDoneByActor.has(actor);
     if (!alreadyWaitingOnCompletiong) {
-      const pending = this.keepAlive.addControlled(
+      const actorPending = new ControlledPromise(
         `child actor pending (id: ${actor.id})`,
       );
-      this.childActorDoneByActor.set(actor, pending);
+      this.waitFor(actorPending.await);
+      this.childActorDoneByActor.set(actor, actorPending);
     }
 
     this.subscriptonByActor.set(
       actor.id,
       actor.subscribe({
         next: () => {
-          const snapshot = actor.getPersistedSnapshot();
-          this.snapshotByActorId.set(
-            actor.id,
-            snapshot as MachineData<typeof this.machine>,
-          );
+          const snapshot = actor.getPersistedSnapshot() as MachineData<
+            typeof this.machine
+          >;
+          this.snapshotByActorId.set(actor.id, snapshot);
           const shouldResolve = ["error", "done"].includes(snapshot.status);
           if (shouldResolve) {
             const pending = this.childActorDoneByActor.get(actor);

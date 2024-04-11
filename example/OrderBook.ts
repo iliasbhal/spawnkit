@@ -1,4 +1,5 @@
 import * as Spawnkit from "@/.";
+import { InstanceSignalEvent } from "@/models/InstanceProxy";
 
 interface OrderBookData {
   orderBook: string[];
@@ -17,20 +18,20 @@ export class OrderBook extends Spawnkit.Instance<
   OrderBookData,
   OrderBookEvent
 > {
-  async start(): Promise<any> {}
-  async stop(): Promise<any> {}
-
+  on(event: InstanceSignalEvent) {
+    console.log("ON", event);
+  }
   async buy(stock: Stock) {
     console.log("-----BUYYYYY------");
-    this.data = this.data || ({} as any);
-    this.data!.count = this.data?.count || 0;
-    this.data!.count++;
+    // this.data = this.data || ({} as any);
+    // this.data!.count = this.data?.count || 0;
+    // this.data!.count++;
 
-    this.emit("orders", [this.data!.count]);
+    this.emit("orders", ["AAA"]);
 
     return {
       success: true,
-      count: this.data!.count,
+      // count: this.data!.count,
       qty: 1000,
       stock,
     };

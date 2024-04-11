@@ -1,26 +1,22 @@
 import wait from "wait";
-import { Instance } from "./Instance";
 import { Lock } from "./Lock";
 import {
-  Adapters,
   ScheduleByType,
   ScheduleEventData,
   ScheduleInstanceData,
 } from "../adapters";
 import { Client, SpawnkitConfig } from "./Client";
+import { InstanceProxy } from "./InstanceProxy";
 
 export class Worker<O extends SpawnkitConfig> {
   instances: O["instances"];
   adapters: O["adapters"];
   client: Client<O>;
 
-  constructor(config: SpawnkitConfig) {
+  constructor(config: O) {
     this.instances = config.instances;
     this.adapters = config.adapters;
-    this.client = new Client({
-      adapters: config.adapters as any,
-      instances: config.instances,
-    });
+    this.client = new Client(config);
   }
 
   start() {
@@ -53,24 +49,21 @@ export class Worker<O extends SpawnkitConfig> {
     const { kind, id } = scheduleEvent.instance;
     const { action, args } = scheduleEvent.event;
 
-    const instanceAPI = this.client.spawn(kind, id);
-
-    // @ts-ignore
-    await instanceAPI.emit[action](...args);
+    const remoteInstance = this.client.spawn<any>(kind, id);
+    // @ts-expect-error
+    await remoteInstance.emit[action](...args);
   }
 
-  private async tryInstantiateInstance(
-    instanceConfig: ScheduleByType["instance"],
-  ) {
-    const Instance = this.instances[instanceConfig.kind];
+  private async tryInstantiateInstance(config: ScheduleByType["instance"]) {
+    const Instance = this.instances[config.kind];
     if (!Instance) {
       throw new Error("Machine Not implemented");
     }
 
     try {
-      const MIN_LOCK_DURATION = 5_000;
+      const MIN_LOCK_DURATION = 2_000;
       const lockConfig = {
-        lockId: `redlock:${instanceConfig.id}`,
+        lockId: `redlock:${config.id}`,
         duration: MIN_LOCK_DURATION,
       };
 
@@ -79,8 +72,14 @@ export class Worker<O extends SpawnkitConfig> {
       // This is to prevent from executing side effects twice and race conditions.
       const lock = new Lock(lockConfig, this.adapters.lock);
       const result = await lock.using(async (abortSignal) => {
-        const instance = new Instance(instanceConfig, this.adapters);
-        await instance.run(abortSignal);
+        const instance = new Instance();
+        const manager = new InstanceProxy(
+          instance,
+          config,
+          this.adapters,
+          abortSignal,
+        );
+        await manager.run();
       });
 
       // // In order to make sure that we didn't miss any event and to avoid any race conditions
@@ -94,12 +93,12 @@ export class Worker<O extends SpawnkitConfig> {
           await wait(waitTime);
 
           const hasUnprocessedEvents = await this.adapters.messages.has(
-            instanceConfig.id,
+            config.id,
           );
           if (hasUnprocessedEvents) {
             this.adapters.scheduler.instance({
-              kind: instanceConfig.kind,
-              id: instanceConfig.id,
+              kind: config.kind,
+              id: config.id,
             });
           }
         }

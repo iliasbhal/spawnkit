@@ -1,12 +1,20 @@
 import * as Spawnkit from "@/.";
+import { InstanceSignalEvent } from "@/models/InstanceProxy";
 
 interface ChatRoomData {
   messages: string[];
 }
 
 export class ChatRoom extends Spawnkit.Instance<ChatRoomData> {
-  async start(): Promise<any> {}
-  async stop(): Promise<any> {}
+  on(event: InstanceSignalEvent) {
+    if (event == "start") {
+      console.log("Chat ROOM WAKEN UP");
+    }
+
+    if (event == "dispose") {
+      console.log("Chat ROOM WAKEN CHUTDOWN");
+    }
+  }
 
   sendMessage(msg: string) {}
 }

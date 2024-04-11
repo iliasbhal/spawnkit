@@ -26,9 +26,12 @@ export interface ScheduleInstanceData {
   id: InstanceId;
 }
 
-export interface InstanceMethodCall {
-  action: string;
-  args: any[];
+export interface InstanceMethodCall<
+  Action extends string = string,
+  Args extends any[] = any[],
+> {
+  action: Action;
+  args: Args;
   mode: "normal" | "emit" | "scheduled";
 }
 

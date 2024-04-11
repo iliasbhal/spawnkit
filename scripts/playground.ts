@@ -24,23 +24,23 @@ const spawnConfig = {
     OrderBook,
     ErrorExample,
   },
-};
+} satisfies Spawnkit.SpawnkitConfig;
 
 const worker = Spawnkit.Worker.from(spawnConfig);
 const client = Spawnkit.Client.from(spawnConfig);
 
 const main = async () => {
-  await redis.flushall("SYNC");
+  // await redis.flushall("SYNC");
   worker.start();
 
   // attributeExample()
-  // await basicExample();
+  await basicExample();
   // await streamExample();
   // await streamWithErrors();
   // await emittedEventsExample();
   // await scheduleCallExample();
   // await errorHandlingExample();
-  await exampleXState();
+  // await exampleXState();
 };
 
 const attributeExample = () => {
@@ -62,25 +62,23 @@ const basicExample = async () => {
   console.log(response);
 
   // Example 2: call the methods but don't wait for the response
-  await orderBook.emit.buy({ tick: "APPL" });
-  console.log("SENT");
+  // await orderBook.emit.buy({ tick: "APPL" });
+  // console.log("SENT");
 };
 
 const streamExample = async () => {
   const exampleInst = client.spawn("StreamExample", "Hector");
   console.log(exampleInst.kind, exampleInst.id);
 
-  // const stream = await exampleInst.startStream({
-  //   count: 4,
-  // });
-
   // Example 1:  consume stream using .map
   // which returns a Promise that is resolved when the stream ends
+  // const stream = await exampleInst.startStream({ count: 4 });
   // await stream.map((data) => {
   //   console.log("RECEIVED ->", data);
   // });
 
   // Example 2: consume stream using an async iterator
+  // const stream = await exampleInst.startStream({ count: 4 });
   // for await (const data of stream) {
   //   console.log("STREAM ->", data);
   // }
@@ -97,31 +95,31 @@ const streamWithErrors = async () => {
   const exampleInst = client.spawn("StreamExample", "Hector");
   console.log(exampleInst.kind, exampleInst.id);
 
-  const erroredStream = await exampleInst.startFaultyStreamStart();
-  try {
-    // await erroredStream.map((data) => {
-    //   console.log("RECEIVED ->", data);
-    // });
-
-    for await (const data of erroredStream) {
-      console.log("STREAM ->", data);
-    }
-  } catch (err) {
-    console.log("AN ERROR HANNPED", err);
-  }
-
-  // const erroredStream2 = await exampleInst.startFaultyStreamDuring();
+  // const erroredStream = await exampleInst.startFaultyStreamStart();
   // try {
-  //   await erroredStream2.map((data) => {
+  //   await erroredStream.map((data) => {
   //     console.log("RECEIVED ->", data);
   //   });
 
-  //   // for await (const data of erroredStream2) {
+  //   // for await (const data of erroredStream) {
   //   //   console.log("STREAM ->", data);
   //   // }
   // } catch (err) {
   //   console.log("AN ERROR HANNPED", err);
   // }
+
+  const erroredStream2 = await exampleInst.startFaultyStreamDuring();
+  try {
+    await erroredStream2.map((data) => {
+      console.log("RECEIVED ->", data);
+    });
+
+    // for await (const data of erroredStream2) {
+    //   console.log("STREAM ->", data);
+    // }
+  } catch (err) {
+    console.log("AN ERROR HANNPED", err);
+  }
 };
 
 const emittedEventsExample = async () => {
@@ -212,11 +210,11 @@ const errorHandlingExample = async () => {
 };
 
 const exampleXState = async () => {
-  const toggle = client.spawn("OrderBook", "AAAA");
+  const toggle = client.spawn("ToggleMachine", "AAAA");
   // toggle.data.on("snapshot", (next) => {
   //   console.log("SUBSCRIBE", "KEY", "snapshot", next);
   // });
-  await toggle.init([1, 2, 3]);
+  // await toggle.init([1, 2, 3]);
   // await toggle.init([1, 2, 3]);
   // const before = await toggle.data.get("snapshot");
   // console.log("before", before);
@@ -227,15 +225,12 @@ const exampleXState = async () => {
   // const snap2 = await toggle.data.get("snapshot");
   // console.log("snap2", snap2);
 
-  await Promise.all(
-    Array.from({ length: 1000 }).map(() => {
-      return toggle.send({ type: "TOGGLE" });
-    }),
-  );
+  for (let i = 0; i < 1000; i++) {
+    await wait(0);
+    console.log(i);
+    await toggle.send({ type: "TOGGLE" });
+  }
 
-  // for (let i = 0; i < 100; i++) {
-  //   await toggle.send({ type: "TOGGLE" });
-  // }
   // const response = await toggle.send({ type: "TOGGLE" });
   // console.log(response);
 

@@ -1,4 +1,5 @@
-export * from "./models/Worker";
-export * from "./models/Client";
-export * from "./models/Instance";
-export * from "./utils/Stream";
+export { Worker } from "./models/Worker";
+export { Client, RemoteError } from "./models/Client";
+export type { SpawnkitConfig } from "./models/Client";
+export { Instance } from "./models/Instance";
+export { Stream } from "./utils/Stream";

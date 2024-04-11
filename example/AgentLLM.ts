@@ -1,4 +1,5 @@
 import * as Spawnkit from "@/.";
+import { InstanceSignalEvent } from "@/models/InstanceProxy";
 import wait from "wait";
 
 interface AgentAIData {
@@ -14,11 +15,14 @@ interface Prompt {
 }
 
 export class AgentLLM extends Spawnkit.Instance<AgentAIData, AgenAIChannels> {
-  async start(): Promise<any> {
-    console.log("AGENT START");
-  }
-  async stop(): Promise<any> {
-    console.log("AGENT STOP");
+  on(event: InstanceSignalEvent) {
+    if (event == "start") {
+      console.log("AGENT START");
+    }
+
+    if (event == "dispose") {
+      console.log("AGENT STOP");
+    }
   }
 
   prompt(config: Prompt) {
