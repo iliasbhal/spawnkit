@@ -6,7 +6,7 @@ import type {
 import { Stream } from "@/utils/Stream";
 import {
   Adapters,
-  ScheduleEventData,
+  ScheduleEventConfig,
   ScheduleId,
   Cron,
   Delay,
@@ -133,7 +133,7 @@ export class Client<CP extends SpawnkitConfig> {
       return eventId;
     };
 
-    const scheduleEvent = async (schedule: ScheduleEventData) => {
+    const scheduleEvent = async (schedule: ScheduleEventConfig) => {
       return await this.adapters.scheduler.event(schedule);
     };
 
@@ -295,6 +295,9 @@ export class Client<CP extends SpawnkitConfig> {
         },
         cancel: async (scheduleId: ScheduleId) => {
           return this.adapters.scheduler.cancel(kind, instanceId, scheduleId);
+        },
+        delete: async (scheduleId: ScheduleId) => {
+          return this.adapters.scheduler.delete(kind, instanceId, scheduleId);
         },
         get: async (scheduleId: ScheduleId) => {
           return this.adapters.scheduler.get(kind, instanceId, scheduleId);

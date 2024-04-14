@@ -209,7 +209,7 @@ export class MessageBroker
 }
 
 type ScheduleQueue = BullMQ.Queue<
-  Adapters.ScheduleInstanceData | Adapters.ScheduleEventData,
+  Adapters.ScheduleInstanceData | Adapters.ScheduleEventConfig,
   any,
   `event:${string}` | "instance"
 >;
@@ -235,6 +235,26 @@ export class Scheduler
     });
   }
 
+  async delete(
+    kind: Adapters.InstanceKind,
+    id: Adapters.InstanceId,
+    scheduleId: string,
+  ) {
+    const instanceKey = `${kind}:${id}`;
+    const scheduleKey = `${kind}:${id}:scheduleId:${scheduleId}`;
+    const redisKey = `Spawnkit:scheduled-events:${instanceKey}`;
+    const scheduleRedisKey = `Spawnkit:scheduled-events-data:${scheduleKey}`;
+    const [repeatableRemoved, delayJobStatus] = await Promise.all([
+      this.queue.removeRepeatableByKey(scheduleId),
+      this.queue.remove(scheduleId),
+      this.redis.hdel(redisKey, scheduleId),
+      this.redis.del(scheduleRedisKey),
+    ]);
+
+    const isCanceled = repeatableRemoved || delayJobStatus == 1;
+    return isCanceled;
+  }
+
   async cancel(
     kind: Adapters.InstanceKind,
     id: Adapters.InstanceId,
@@ -242,14 +262,23 @@ export class Scheduler
   ): Promise<boolean> {
     const instanceKey = `${kind}:${id}`;
     const redisKey = `Spawnkit:scheduled-events:${instanceKey}`;
+    const rawScheduleMetadata = await this.redis.hget(redisKey, scheduleId);
+    if (!rawScheduleMetadata) {
+      return false;
+    }
+
+    const scheduleMetadata: Adapters.ScheduleEventMetadata =
+      JSON.parse(rawScheduleMetadata);
+    scheduleMetadata.canceled = true;
+
     const [repeatableRemoved, delayJobStatus] = await Promise.all([
       this.queue.removeRepeatableByKey(scheduleId),
       this.queue.remove(scheduleId),
-      this.redis.hdel(redisKey, scheduleId),
+      this.redis.hset(redisKey, scheduleId, JSON.stringify(scheduleMetadata)),
     ]);
 
-    const isRemoved = repeatableRemoved || delayJobStatus == 1;
-    return isRemoved;
+    const isCanceled = repeatableRemoved || delayJobStatus == 1;
+    return isCanceled;
   }
 
   async list(
@@ -272,9 +301,7 @@ export class Scheduler
   ): Promise<true> {
     const scheduleKey = `${kind}:${id}:scheduleId:${scheduleId}`;
     const redisKey = `Spawnkit:scheduled-events-data:${scheduleKey}`;
-    console.log("SET STORE", kind, id, scheduleId, redisKey);
     await this.redis.lpush(redisKey, JSON.stringify(data));
-    console.log("SET LENGTH", await this.redis.llen(redisKey));
     return true;
   }
 
@@ -287,9 +314,6 @@ export class Scheduler
     const scheduleKey = `${kind}:${id}:scheduleId:${scheduleId}`;
     const redisKey = `Spawnkit:scheduled-events-data:${scheduleKey}`;
 
-    console.log("GET LENGTH", await this.redis.llen(redisKey));
-    console.log("GET STORE", kind, id, scheduleId, redisKey);
-
     const fromIncluded = 0;
     const toIncluded = !last ? -1 : last; // -1 = LAST
     const members = await this.redis.lrange(redisKey, fromIncluded, toIncluded);
@@ -298,29 +322,30 @@ export class Scheduler
 
   private async register(
     scheduleId: Adapters.ScheduleId,
-    data: Adapters.ScheduleEventData,
+    config: Adapters.ScheduleEventConfig,
   ) {
-    const metaData = {
-      data,
+    const metaData: Adapters.ScheduleEventMetadata = {
+      config,
       scheduleId: scheduleId,
       created_at: Date.now(),
+      canceled: false,
     };
 
-    const instanceKey = `${data.instance.kind}:${data.instance.id}`;
+    const instanceKey = `${config.instance.kind}:${config.instance.id}`;
     const redisKey = `Spawnkit:scheduled-events:${instanceKey}`;
     await this.redis.hset(redisKey, scheduleId!, JSON.stringify(metaData));
   }
 
-  async event(data: Adapters.ScheduleEventData): Promise<string> {
+  async event(config: Adapters.ScheduleEventConfig): Promise<string> {
     const bullJobConfig =
-      "delay" in data.schedule
+      "delay" in config.schedule
         ? {
-            delay: data.schedule.delay,
+            delay: config.schedule.delay,
           }
-        : "cron" in data.schedule
+        : "cron" in config.schedule
           ? {
               repeat: {
-                pattern: data.schedule.cron,
+                pattern: config.schedule.cron,
               },
             }
           : null;
@@ -330,14 +355,14 @@ export class Scheduler
     }
 
     const jobName =
-      `event:${data.instance.kind}:${data.instance.id}:${crypto.randomUUID()}` as const;
-    const job = await this.queue.add(jobName, data, bullJobConfig);
+      `event:${config.instance.kind}:${config.instance.id}:${crypto.randomUUID()}` as const;
+    const job = await this.queue.add(jobName, config, bullJobConfig);
     const scheduleId = this.getScheduleID(job);
     if (!scheduleId) {
       throw new Error("Uh Oh!");
     }
 
-    await this.register(scheduleId, data);
+    await this.register(scheduleId, config);
     return scheduleId;
   }
 

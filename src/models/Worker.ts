@@ -4,7 +4,7 @@ import {
   InstanceId,
   ScheduleByType,
   ScheduleContext,
-  ScheduleEventData,
+  ScheduleEventConfig,
   ScheduleInstanceData,
 } from "../adapters";
 import { Client, SpawnkitConfig } from "./Client";
@@ -27,7 +27,7 @@ export class Worker<O extends SpawnkitConfig> {
       async (type, data, context) => {
         if (type === "event") {
           return await this.callInstanceMethod(
-            data as ScheduleEventData,
+            data as ScheduleEventConfig,
             context,
           );
         }

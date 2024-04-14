@@ -9,7 +9,7 @@ export type Cron = { cron: string };
 export type Delay = { delay: number };
 
 export interface ScheduleByType {
-  event: ScheduleEventData;
+  event: ScheduleEventConfig;
   instance: ScheduleInstanceData;
 }
 
@@ -19,7 +19,7 @@ type CommonScheduleConfig = {
 
 export type ScheduleConfig = CommonScheduleConfig & (Cron | Delay);
 
-export interface ScheduleEventData {
+export interface ScheduleEventConfig {
   instance: ScheduleInstanceData;
   schedule: ScheduleConfig;
   event: InstanceMethodCall;
@@ -95,8 +95,9 @@ export abstract class AdapaterMessageBroker {
 
 export interface ScheduleEventMetadata {
   created_at: number;
+  canceled: boolean;
   scheduleId: string;
-  data: ScheduleEventData;
+  config: ScheduleEventConfig;
 }
 
 export interface ScheduleContext {
@@ -118,13 +119,13 @@ export interface ScheduledCallMetaData {
 
 export abstract class AdapaterScheduler {
   abstract instance(schedule: ScheduleInstanceData): Promise<ScheduleId>;
-  abstract event(schedule: ScheduleEventData): Promise<ScheduleId>;
+  abstract event(schedule: ScheduleEventConfig): Promise<ScheduleId>;
   abstract list(
     kind: InstanceKind,
     id: InstanceId,
   ): Promise<ScheduleEventMetadata[]>;
 
-  /* Store Schedule Metadata */
+  /* Store Schedule Results */
   abstract store<Data extends ScheduledCallMetaData>(
     kind: InstanceKind,
     id: InstanceId,
@@ -132,7 +133,7 @@ export abstract class AdapaterScheduler {
     data: Data,
   ): Promise<any>;
 
-  /* Retrieve Schedule Metadata */
+  /* Retrieve Schedule Results */
   abstract get<Data extends ScheduledCallMetaData>(
     kind: InstanceKind,
     id: InstanceId,
@@ -145,6 +146,13 @@ export abstract class AdapaterScheduler {
     id: InstanceId,
     scheduleId: ScheduleId,
   ): Promise<boolean>;
+
+  abstract delete(
+    kind: InstanceKind,
+    id: InstanceId,
+    scheduleId: ScheduleId,
+  ): Promise<boolean>;
+
   abstract subscribe(
     callback: <Type extends keyof ScheduleByType>(
       type: Type,
