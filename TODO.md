@@ -1,9 +1,5 @@
 # Spawnkit lib
 
-- Add ability to get return response from scheduled calls ( delayed and cron calls );
-
-- Should auto update snapshot, when we update something in it. We should use a Proxy, and every time there is an update, we call the snapshot method per XXX interval.
-
 - Redis Adapter? Or through a worker???
   Should add TTL to some of the stuff on redis
 
