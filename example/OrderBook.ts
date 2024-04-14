@@ -1,5 +1,4 @@
 import * as Spawnkit from "@/.";
-import { SignalEvent } from "@/models/InstanceProxy";
 
 interface OrderBookData {
   orderBook: string[];
@@ -8,6 +7,7 @@ interface OrderBookData {
 
 interface OrderBookEvent {
   orders: any[];
+  alphachannel: string;
 }
 
 interface Stock {
@@ -18,16 +18,23 @@ export class OrderBook extends Spawnkit.Instance<
   OrderBookData,
   OrderBookEvent
 > {
-  on(event: SignalEvent) {
-    console.log("ON", event);
-  }
+  signal(signal: Spawnkit.SignalEvent): void {}
+
+  on<C extends keyof OrderBookEvent>(
+    cha: C,
+    message: OrderBookEvent[C],
+  ): void {}
+
+  // on<C extends keyof OrderBookEvent>(event: {
+  //   channel: C;
+  //   message: OrderBookEvent[C];
+  // }) {}
 
   async buy(stock: Stock) {
     console.log("-----BUYYYYY------");
     // this.data = this.data || ({} as any);
     // this.data!.count = this.data?.count || 0;
     // this.data!.count++;
-
     this.emit("orders", ["AAA"]);
 
     return {

@@ -36,7 +36,7 @@ export interface InstanceMethodCall<
 > {
   action: Action;
   args: Args;
-  mode: "normal" | "emit" | "scheduled";
+  mode: "normal" | "skip" | "scheduled";
   context?: any;
 }
 

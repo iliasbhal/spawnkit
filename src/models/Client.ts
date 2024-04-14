@@ -106,7 +106,7 @@ export class Client<CP extends SpawnkitConfig> {
     type InheritedMethods = Exclude<ExtractMethodNames<Instance>, undefined>;
     type AvailableMethods = Omit<ExtractMethods<Inst>, InheritedMethods>;
     type RemoteMethodes = MakeRemote<AvailableMethods>;
-    type EmitRemoteMethods = MakeEmitable<AvailableMethods>;
+    type SkipRemoteMethods = MakeSkippable<AvailableMethods>;
     type ScheduleRemoteMethods = MakeSchedulable<AvailableMethods>;
 
     const sendEventToInstance = async (
@@ -183,7 +183,7 @@ export class Client<CP extends SpawnkitConfig> {
             mode,
           });
 
-          if (mode === "emit") {
+          if (mode === "skip") {
             // DO NOTHING -> simply return the eventId na don't wait for an answer
             return eventId;
           }
@@ -245,11 +245,19 @@ export class Client<CP extends SpawnkitConfig> {
 
     const scheduleRemoteMethodHandler = createScheduledMethodHandler();
     const normalRemoteMethodHandler = createRemoteMethodHandler("normal");
-    const emitRemoteMethodHandler = createRemoteMethodHandler("emit");
+    const skipRemoteMethodHandler = createRemoteMethodHandler("skip");
 
     const instanceClientAPI = {
       id: instanceId,
       kind: kind,
+
+      async emit<Channel extends Extract<keyof InstanceChannels, string>>(
+        channel: Channel,
+        message: InstanceChannels[Channel],
+      ) {
+        await skipRemoteMethodHandler("emit")(channel, message);
+        return true;
+      },
 
       on: <Channel extends keyof InstanceChannels>(
         channel: Channel,
@@ -261,8 +269,6 @@ export class Client<CP extends SpawnkitConfig> {
           channel.toString(),
         );
 
-        console.log("SUB", channelID);
-
         return this.adapters.messages.subscribe<InstanceChannels[Channel]>(
           channelID,
           (message) => {
@@ -271,22 +277,19 @@ export class Client<CP extends SpawnkitConfig> {
         );
       },
 
+      skip: new Proxy({} as SkipRemoteMethods, {
+        get(target, prop, receiver) {
+          if (prop in target) return Reflect.get(target, prop, receiver);
+          if (typeof prop !== "string") return;
+          return skipRemoteMethodHandler(prop);
+        },
+      }),
+
       data: data,
 
       __INTERNAL__: {
         sendEventToInstance,
       },
-
-      emit: new Proxy(
-        {},
-        {
-          get(target, prop, receiver) {
-            if (prop in target) return Reflect.get(target, prop, receiver);
-            if (typeof prop !== "string") return;
-            return emitRemoteMethodHandler(prop);
-          },
-        },
-      ),
 
       schedule: scheduleRemoteMethodHandler,
       scheduled: {
@@ -307,8 +310,7 @@ export class Client<CP extends SpawnkitConfig> {
 
     // We use the Kind type here just o it to show nicely
     // in the intelissense. it will show as Remote<OrderBook> for example
-    type Spawn<Kind> = RemoteMethodes &
-      typeof instanceClientAPI & { emit: EmitRemoteMethods };
+    type Spawn<Kind> = RemoteMethodes & typeof instanceClientAPI;
 
     return new Proxy(instanceClientAPI, {
       get(target, prop, receiver) {
@@ -354,7 +356,7 @@ type MakeRemote<T> = {
     : never;
 };
 
-type MakeEmitable<T> = {
+type MakeSkippable<T> = {
   [K in keyof T]: T[K] extends (...args: any[]) => any
     ? (...args: Parameters<T[K]>) => Promise<boolean>
     : never;

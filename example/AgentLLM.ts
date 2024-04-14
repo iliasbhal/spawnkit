@@ -15,7 +15,7 @@ interface Prompt {
 }
 
 export class AgentLLM extends Spawnkit.Instance<AgentAIData, AgenAIChannels> {
-  on(event: SignalEvent) {
+  signal(event: SignalEvent) {
     if (event == "start") {
       console.log("AGENT START");
     }
@@ -24,6 +24,8 @@ export class AgentLLM extends Spawnkit.Instance<AgentAIData, AgenAIChannels> {
       console.log("AGENT STOP");
     }
   }
+
+  on(channel: any, message: any): void {}
 
   prompt(config: Prompt) {
     return new Spawnkit.Stream<string>(async (stream) => {

@@ -74,7 +74,7 @@ export class Worker<O extends SpawnkitConfig> {
     await remoteInstance.__INTERNAL__.sendEventToInstance({
       args,
       action,
-      mode: "emit",
+      mode: "skip",
       context,
     });
   }
@@ -109,7 +109,6 @@ export class Worker<O extends SpawnkitConfig> {
           this.adapters,
           abortSignal,
           data,
-          context,
         );
 
         await manager.run();

@@ -281,7 +281,7 @@ export class InstanceProxy<Inst extends Instance> {
     // await this.loadData();
 
     // Start the process + start listening for events
-    this.instance.on?.("start");
+    this.instance.signal?.("start");
     this.running = true;
     this.subscribeToInstanceEvent();
 
@@ -301,7 +301,7 @@ export class InstanceProxy<Inst extends Instance> {
     if (!this.running) return;
     this.running = false;
     this.onEventSubscription?.unsubscribe();
-    this.instance.on?.("dispose");
+    this.instance.signal?.("dispose");
 
     // When the instance receives the 'dispose' event
     // it should immedately schedule a dispose function
@@ -392,7 +392,7 @@ export class InstanceProxy<Inst extends Instance> {
         return;
       }
 
-      this.instance.on?.("abort");
+      this.instance.signal?.("abort");
       this.aborted.resolve(true);
     };
 

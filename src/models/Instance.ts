@@ -1,15 +1,21 @@
 import type { SignalEvent, InterfaceAPI } from "./InstanceProxy";
 
+type AnyRecord = { [key: string]: any };
+
 export class Instance<
-  InstanceData extends Record<string, any> = Record<string, any>,
-  InstanceChannels extends Record<string, any> = Record<string, any>,
+  InstanceData extends AnyRecord = AnyRecord,
+  InstanceChannels extends AnyRecord = AnyRecord,
 > {
   __types = {} as {
     InstanceData: InstanceData;
     InstanceChannels: InstanceChannels;
   };
 
-  on?(event: SignalEvent): any;
+  signal(signal: SignalEvent) {}
+
+  // TODO: FIX TYPING HERE
+  // For some reason, adding types here break the client types.
+  on(channel: any, message: any) {}
 
   id!: string;
   kind!: string;
@@ -20,11 +26,20 @@ export class Instance<
   }
 
   /** this will send a message to all client subscribed to this instance specified channel */
-  public async emit<Channel extends keyof InstanceChannels>(
+  public async emit<Channel extends Extract<keyof InstanceChannels, string>>(
     channel: Channel,
-    data: InstanceChannels[Channel],
+    message: InstanceChannels[Channel],
   ) {
-    return await this.api.emit(channel, data);
+    await this.api.emit(channel, message);
+
+    try {
+      this.on?.(channel, message);
+    } catch (err) {
+      // SILENCE ANY ERROR HAPPENING DURING THE EVENT HANDLER
+      console.log(err);
+    }
+
+    return;
   }
 
   public async waitFor(promise: Promise<any>) {
