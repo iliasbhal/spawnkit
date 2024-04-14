@@ -1,12 +1,15 @@
 import wait from "wait";
 import { Lock } from "./Lock";
 import {
+  InstanceId,
   ScheduleByType,
+  ScheduleContext,
   ScheduleEventData,
   ScheduleInstanceData,
 } from "../adapters";
 import { Client, SpawnkitConfig } from "./Client";
 import { InstanceProxy } from "./InstanceProxy";
+import { Data } from "./Data";
 
 export class Worker<O extends SpawnkitConfig> {
   instances: O["instances"];
@@ -21,15 +24,18 @@ export class Worker<O extends SpawnkitConfig> {
 
   start() {
     const subscription = this.adapters.scheduler.subscribe(
-      async (type, data) => {
-        // console.log("WORKER", type);
+      async (type, data, context) => {
         if (type === "event") {
-          return await this.callInstanceMethod(data as ScheduleEventData);
+          return await this.callInstanceMethod(
+            data as ScheduleEventData,
+            context,
+          );
         }
 
         if (type === "instance") {
           return await this.tryInstantiateInstance(
             data as ScheduleInstanceData,
+            context,
           );
         }
       },
@@ -43,18 +49,40 @@ export class Worker<O extends SpawnkitConfig> {
     this.stopCallback?.();
   }
 
-  private async callInstanceMethod(scheduleEvent: ScheduleByType["event"]) {
-    // console.log("scheduleEvent", scheduleEvent);
+  private getData(instanceId: InstanceId) {
+    const data = new Data<any>({
+      adapters: this.adapters,
+      instanceId: instanceId,
+    });
 
+    return data;
+  }
+
+  private async callInstanceMethod(
+    scheduleEvent: ScheduleByType["event"],
+    context: ScheduleContext,
+  ) {
     const { kind, id } = scheduleEvent.instance;
     const { action, args } = scheduleEvent.event;
 
+    console.log(
+      `Scheduled Event: kind:${kind} id:${id} action:${action} config:${JSON.stringify(scheduleEvent.schedule)}`,
+    );
+
+    console.log("SENT CONTEXT", context);
     const remoteInstance = this.client.spawn<any>(kind, id);
-    // @ts-expect-error
-    await remoteInstance.emit[action](...args);
+    await remoteInstance.__INTERNAL__.sendEventToInstance({
+      args,
+      action,
+      mode: "emit",
+      context,
+    });
   }
 
-  private async tryInstantiateInstance(config: ScheduleByType["instance"]) {
+  private async tryInstantiateInstance(
+    config: ScheduleByType["instance"],
+    context: ScheduleContext,
+  ) {
     const Instance = this.instances[config.kind];
     if (!Instance) {
       throw new Error("Machine Not implemented");
@@ -62,8 +90,9 @@ export class Worker<O extends SpawnkitConfig> {
 
     try {
       const MIN_LOCK_DURATION = 2_000;
+      const LOCK_ID = `redlock:${config.id}`;
       const lockConfig = {
-        lockId: `redlock:${config.id}`,
+        lockId: LOCK_ID,
         duration: MIN_LOCK_DURATION,
       };
 
@@ -73,12 +102,16 @@ export class Worker<O extends SpawnkitConfig> {
       const lock = new Lock(lockConfig, this.adapters.lock);
       const result = await lock.using(async (abortSignal) => {
         const instance = new Instance();
+        const data = this.getData(config.id);
         const manager = new InstanceProxy(
           instance,
           config,
           this.adapters,
           abortSignal,
+          data,
+          context,
         );
+
         await manager.run();
       });
 

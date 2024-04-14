@@ -13,7 +13,11 @@ export interface ScheduleByType {
   instance: ScheduleInstanceData;
 }
 
-export type ScheduleConfig = Cron | Delay;
+type CommonScheduleConfig = {
+  name?: string;
+};
+
+export type ScheduleConfig = CommonScheduleConfig & (Cron | Delay);
 
 export interface ScheduleEventData {
   instance: ScheduleInstanceData;
@@ -33,6 +37,7 @@ export interface InstanceMethodCall<
   action: Action;
   args: Args;
   mode: "normal" | "emit" | "scheduled";
+  context?: any;
 }
 
 export interface Adapters {
@@ -94,15 +99,57 @@ export interface ScheduleEventMetadata {
   data: ScheduleEventData;
 }
 
+export interface ScheduleContext {
+  scheduleId?: ScheduleId;
+
+  // TODO: implement fencing key.
+  // We should retrieve the fencing key from the lock
+  // And forward it the Data.set call
+  fencingKey?: string;
+}
+
+export interface ScheduledCallMetaData {
+  start_at: number;
+  ended_at: number;
+  stream: boolean;
+  result: any;
+  error: any;
+}
+
 export abstract class AdapaterScheduler {
   abstract instance(schedule: ScheduleInstanceData): Promise<ScheduleId>;
   abstract event(schedule: ScheduleEventData): Promise<ScheduleId>;
-  abstract list(): Promise<ScheduleEventMetadata[]>;
-  abstract cancel(scheduleId: ScheduleId): Promise<boolean>;
+  abstract list(
+    kind: InstanceKind,
+    id: InstanceId,
+  ): Promise<ScheduleEventMetadata[]>;
+
+  /* Store Schedule Metadata */
+  abstract store<Data extends ScheduledCallMetaData>(
+    kind: InstanceKind,
+    id: InstanceId,
+    scheduleId: ScheduleId,
+    data: Data,
+  ): Promise<any>;
+
+  /* Retrieve Schedule Metadata */
+  abstract get<Data extends ScheduledCallMetaData>(
+    kind: InstanceKind,
+    id: InstanceId,
+    scheduleId: ScheduleId,
+    last?: number,
+  ): Promise<Data[]>;
+
+  abstract cancel(
+    kind: InstanceKind,
+    id: InstanceId,
+    scheduleId: ScheduleId,
+  ): Promise<boolean>;
   abstract subscribe(
     callback: <Type extends keyof ScheduleByType>(
       type: Type,
-      scheduleData: ScheduleByType[Type],
+      data: ScheduleByType[Type],
+      context: ScheduleContext,
     ) => any,
   ): {
     unsubscribe: Function;

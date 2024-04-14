@@ -8,6 +8,9 @@ import {
   ScheduleInstanceData,
   InstanceMethodCall,
   EventId,
+  ScheduleContext,
+  ScheduleId,
+  ScheduledCallMetaData,
 } from "../adapters";
 import { Client } from "./Client";
 import { Data } from "./Data";
@@ -71,16 +74,12 @@ export class InstanceProxy<Inst extends Instance> {
     config: ScheduleInstanceData,
     adapters: Adapters,
     abortSignal: AbortSignal,
+    data: Data<Inst["__types"]["InstanceData"]>,
   ) {
     this.config = config;
     this.adapters = adapters;
     this.instance = instance;
     this.abortSignal = abortSignal;
-
-    const instanceData = new Data<Inst["__types"]["InstanceData"]>({
-      adapters,
-      instanceId: config.id,
-    });
 
     InstanceProxy.configureInstance(instance, config, {
       emit: (channel, data) => {
@@ -90,11 +89,10 @@ export class InstanceProxy<Inst extends Instance> {
         return this.keepAlive.add(promise);
       },
       data: {
-        get: (...args: Parameters<(typeof instanceData)["get"]>) =>
-          instanceData.get(...args),
-        set: (...args: Parameters<(typeof instanceData)["set"]>) => {
+        get: (...args: Parameters<(typeof data)["get"]>) => data.get(...args),
+        set: (...args: Parameters<(typeof data)["set"]>) => {
           return this.runExternalEffect(async () => {
-            return await instanceData.set(...args);
+            return await data.set(...args);
           });
         },
       },
@@ -118,7 +116,7 @@ export class InstanceProxy<Inst extends Instance> {
     requestId: EventId,
     event: InstanceMethodCall,
   ): Promise<any> {
-    const { action, args, mode = "normal" } = event;
+    const { action, args, mode = "normal", context } = event;
 
     // @ts-ignore
     const method = this.instance[action]?.bind(this.instance);
@@ -130,57 +128,153 @@ export class InstanceProxy<Inst extends Instance> {
 
     // Wrap the method in a Promise. to ensure that if the method is sync
     // We still catch the error if one happens.
+    const startedAt = Date.now();
     const [error, response] = await Promise.resolve()
       .then(() => method?.(...args))
       .then((res) => [null, res])
       .catch((err) => [err, null]);
 
-    if (mode === "emit") {
-      if (response instanceof Stream) {
-        const promise = this.keepAlive.addControlled();
-        response.on("end", () => promise.resolve(true));
-        response.start();
+    const callMetaData = {
+      start_at: startedAt,
+      ended_at: null as any,
+      stream: false,
+      result: null,
+      error: null,
+    };
+
+    const shouldStoreResult = !!context?.scheduleId;
+    const chouldEmitResponseBack = mode === "normal";
+    const handleConfig = {
+      requestId: chouldEmitResponseBack ? requestId : undefined,
+      scheduleId: shouldStoreResult ? context?.scheduleId : undefined,
+      callMetaData,
+    };
+
+    if (response instanceof Stream) {
+      return this.handleStreamResult(response, handleConfig);
+    }
+
+    return this.handleBasicResult({ error, response }, handleConfig);
+  }
+
+  handleBasicResult(
+    result: { error: Error; response: any },
+    config: {
+      requestId?: EventId;
+      scheduleId?: ScheduleId;
+      callMetaData: ScheduledCallMetaData;
+    },
+  ) {
+    const promise = this.keepAlive.addControlled();
+    config.callMetaData.ended_at = Date.now();
+
+    if (result.error) {
+      const serializedError = Client.serializeError(result.error);
+      config.callMetaData.error = serializedError;
+
+      if (config.scheduleId) {
+        this.adapters.scheduler.store(
+          this.instance.kind,
+          this.instance.id,
+          config.scheduleId,
+          config.callMetaData,
+        );
       }
-      return;
+
+      if (config.requestId) {
+        this.emitRequestResponse(config.requestId, { error: serializedError });
+      }
+
+      promise.resolve(result.error);
+    } else if (result.response) {
+      config.callMetaData.result = result.response;
+
+      if (config.requestId) {
+        this.emitRequestResponse(config.requestId, {
+          response: result.response,
+        });
+      }
+
+      if (config.scheduleId) {
+        this.adapters.scheduler.store(
+          this.instance.kind,
+          this.instance.id,
+          config.scheduleId,
+          config.callMetaData,
+        );
+      }
+
+      promise.resolve(result.response);
+    } else {
+      promise.reject(new Error("No Result"));
     }
 
-    if (mode === "scheduled") {
-      this.emitRequestResponse(requestId, { error, response });
-    }
+    return promise.await;
+  }
 
-    if (mode === "normal") {
-      if (response instanceof Stream) {
-        const promise = this.keepAlive.addControlled();
-        response.on("start", () =>
-          this.emitRequestResponse(requestId, { stream: true, start: true }),
-        );
-        response.on("data", (data) =>
-          this.emitRequestResponse(requestId, { stream: true, data: data }),
-        );
+  handleStreamResult(
+    result: Stream<any>,
+    config: {
+      requestId?: EventId;
+      scheduleId?: ScheduleId;
+      callMetaData: ScheduledCallMetaData;
+    },
+  ) {
+    const promise = this.keepAlive.addControlled();
+    config.callMetaData.stream = true;
+    config.callMetaData.result = [];
 
-        response.on("error", (err) => {
-          const serializedError = Client.serializeError(err);
-          // console.log("serializedError", serializedError);
-          this.emitRequestResponse(requestId, {
-            stream: true,
-            error: serializedError,
-          });
+    result.on("start", () => {
+      if (config.requestId)
+        this.emitRequestResponse(config.requestId, {
+          stream: true,
+          start: true,
+        });
+    });
+
+    result.on("data", (data) => {
+      config.callMetaData.result.push(data);
+      if (config.requestId)
+        this.emitRequestResponse(config.requestId, {
+          stream: true,
+          data: data,
+        });
+    });
+
+    result.on("error", (err) => {
+      const serializedError = Client.serializeError(err);
+      config.callMetaData.error = serializedError;
+
+      if (config.requestId)
+        this.emitRequestResponse(config.requestId, {
+          stream: true,
+          error: serializedError,
         });
 
-        response.on("end", () => {
-          this.emitRequestResponse(requestId, { stream: true, end: true });
-          promise.resolve(true);
-        });
-        response.start();
-      } else {
-        if (error) {
-          const serializedError = Client.serializeError(error);
-          this.emitRequestResponse(requestId, { error: serializedError });
-        } else {
-          this.emitRequestResponse(requestId, { response });
-        }
+      promise.resolve(err);
+    });
+
+    result.on("end", () => {
+      config.callMetaData.ended_at = Date.now();
+
+      if (config.scheduleId) {
+        this.adapters.scheduler.store(
+          this.instance.kind,
+          this.instance.id,
+          config.scheduleId,
+          config.callMetaData,
+        );
       }
-    }
+
+      if (config.requestId) {
+        this.emitRequestResponse(config.requestId, { stream: true, end: true });
+      }
+
+      promise.resolve(true);
+    });
+
+    result.start();
+    return promise.await;
   }
 
   public async run() {

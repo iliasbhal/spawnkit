@@ -1,6 +1,6 @@
 # Spawnkit lib
 
-- Add ability to do a custom initial load. After the spawnkit has loaded .data using the snaphot adapter. The developer can specifiy a way to load other things (example: .data has the url of a database, then the user loads an SDK that connects to that URL). Remove null typings from .data. add an initialize() function that returns the initial data. OR have to defined a .data attribute.
+- Add ability to get return response from scheduled calls ( delayed and cron calls );
 
 - Should auto update snapshot, when we update something in it. We should use a Proxy, and every time there is an update, we call the snapshot method per XXX interval.
 

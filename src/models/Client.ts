@@ -142,12 +142,12 @@ export class Client<CP extends SpawnkitConfig> {
       instanceId,
     });
 
-    const createScheduledMethodHandler = (mode: "cron" | "delay") => {
-      return (scheduleArgs: any) => {
-        const scheduleConfig = {
-          [mode]: scheduleArgs,
-        } as Delay | Cron;
+    const createScheduledMethodHandler = () => {
+      type CommonScheduleConfig = {
+        name?: string;
+      };
 
+      return (schedule: CommonScheduleConfig & (Delay | Cron)) => {
         return new Proxy({} as ScheduleRemoteMethods, {
           get(target, prop, receiver) {
             if (prop in target) return Reflect.get(target, prop, receiver);
@@ -155,7 +155,7 @@ export class Client<CP extends SpawnkitConfig> {
 
             return async (...args: any[]) => {
               const scheduleId = await scheduleEvent({
-                schedule: scheduleConfig,
+                schedule: schedule,
                 instance: {
                   id: instanceId,
                   kind: kind.toString(),
@@ -243,8 +243,7 @@ export class Client<CP extends SpawnkitConfig> {
       };
     };
 
-    const cronRemoteMethodHandler = createScheduledMethodHandler("cron");
-    const delayRemoteMethodHandler = createScheduledMethodHandler("delay");
+    const scheduleRemoteMethodHandler = createScheduledMethodHandler();
     const normalRemoteMethodHandler = createRemoteMethodHandler("normal");
     const emitRemoteMethodHandler = createRemoteMethodHandler("emit");
 
@@ -274,6 +273,10 @@ export class Client<CP extends SpawnkitConfig> {
 
       data: data,
 
+      __INTERNAL__: {
+        sendEventToInstance,
+      },
+
       emit: new Proxy(
         {},
         {
@@ -285,15 +288,16 @@ export class Client<CP extends SpawnkitConfig> {
         },
       ),
 
-      cron: cronRemoteMethodHandler,
-      delay: delayRemoteMethodHandler,
-
+      schedule: scheduleRemoteMethodHandler,
       scheduled: {
         list: async () => {
-          return this.adapters.scheduler.list();
+          return this.adapters.scheduler.list(kind, instanceId);
         },
         cancel: async (scheduleId: ScheduleId) => {
-          return this.adapters.scheduler.cancel(scheduleId);
+          return this.adapters.scheduler.cancel(kind, instanceId, scheduleId);
+        },
+        get: async (scheduleId: ScheduleId) => {
+          return this.adapters.scheduler.get(kind, instanceId, scheduleId);
         },
       },
     } as const;
@@ -301,10 +305,7 @@ export class Client<CP extends SpawnkitConfig> {
     // We use the Kind type here just o it to show nicely
     // in the intelissense. it will show as Remote<OrderBook> for example
     type Spawn<Kind> = RemoteMethodes &
-      typeof instanceClientAPI & { emit: EmitRemoteMethods } & {
-        delay(delayMS: number): ScheduleRemoteMethods;
-        cron(crontab: string): ScheduleRemoteMethods;
-      };
+      typeof instanceClientAPI & { emit: EmitRemoteMethods };
 
     return new Proxy(instanceClientAPI, {
       get(target, prop, receiver) {

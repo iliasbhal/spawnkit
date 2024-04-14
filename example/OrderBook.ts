@@ -21,6 +21,7 @@ export class OrderBook extends Spawnkit.Instance<
   on(event: SignalEvent) {
     console.log("ON", event);
   }
+
   async buy(stock: Stock) {
     console.log("-----BUYYYYY------");
     // this.data = this.data || ({} as any);

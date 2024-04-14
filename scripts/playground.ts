@@ -30,15 +30,15 @@ const worker = Spawnkit.Worker.from(spawnConfig);
 const client = Spawnkit.Client.from(spawnConfig);
 
 const main = async () => {
-  // await redis.flushall("SYNC");
+  await redis.flushall("SYNC");
   worker.start();
 
   // attributeExample()
-  await basicExample();
+  // await basicExample();
   // await streamExample();
   // await streamWithErrors();
   // await emittedEventsExample();
-  // await scheduleCallExample();
+  await scheduleCallExample();
   // await errorHandlingExample();
   // await exampleXState();
 };
@@ -153,43 +153,59 @@ const emittedEventsExample = async () => {
 };
 
 const scheduleCallExample = async () => {
-  const orderBook = client.spawn("OrderBook", "BTC/ETH");
-
-  const scheduleId = await orderBook.cron("* * * * *").buy({
-    tick: "AAPL",
-  });
-
-  const before = await orderBook.scheduled.list();
-  console.log("before", before.length);
-  await orderBook.scheduled.cancel(scheduleId);
-  const after = await orderBook.scheduled.list();
-  console.log("after", after.length);
-
-  const scheduleId2 = await orderBook.delay(3000).buy({
-    tick: "AAPL",
-  });
-
-  const before2 = await orderBook.scheduled.list();
-  console.log("before", before2.length);
-  await orderBook.scheduled.cancel(scheduleId2);
-  const after2 = await orderBook.scheduled.list();
-  console.log("after", after2.length);
-
-  await orderBook.cron("* * * * *").buy({
-    tick: "AAPL",
-  });
-
-  await orderBook.delay(3000).buy({
-    tick: "AAPL",
-  });
-
-  const list = await orderBook.scheduled.list();
-  console.log("allscheduled", list);
-
-  // orderBook.scheduled.cancel(scheduleId);
-  orderBook.on("orders", (event) => {
+  const streamExample = client.spawn("StreamExample", "BTC/ETH");
+  const orderBook2 = client.spawn("OrderBook", "BTC/USD");
+  streamExample.on("orders", (event) => {
     console.log("stream: ", event);
   });
+
+  const scheduleId = await streamExample
+    .schedule({
+      name: "Buy AAPL Regularly",
+      delay: 2000,
+      // cron: "* * * * *",
+    })
+    .startFaultyStreamDuring();
+
+  // const scheduled2 = await orderBook2.scheduled.list();
+
+  setInterval(async () => {
+    const scheduled = await streamExample.scheduled.list();
+    console.log("LIST", scheduled);
+    const data = await streamExample.scheduled.get(scheduleId);
+    console.log("DATA", data);
+  }, 30_000);
+  // console.log("scheduled2", scheduled2);
+
+  // const scheduled1 = await orderBook.scheduled.list();
+  // console.log("scheduled1", scheduled1);
+
+  // const before = await orderBook.scheduled.list();
+  // console.log("before", before.length);
+  // await orderBook.scheduled.cancel(scheduleId);
+  // const after = await orderBook.scheduled.list();
+  // console.log("after", after.length);
+
+  // const scheduleId2 = await orderBook.schedule({ delay: 3000 }).buy({
+  //   tick: "AAPL",
+  // });
+
+  // const before2 = await orderBook.scheduled.list();
+  // console.log("before", before2.length);
+  // await orderBook.scheduled.cancel(scheduleId2);
+  // const after2 = await orderBook.scheduled.list();
+  // console.log("after", after2.length);
+
+  // await orderBook.schedule({ cron: "* * * * *" }).buy({
+  //   tick: "AAPL",
+  // });
+
+  // await orderBook.schedule({ delay: 3000 }).buy({
+  //   tick: "AAPL",
+  // });
+
+  // const list = await orderBook.scheduled.list();
+  // console.log("allscheduled", list);
 
   await wait(5000);
 };

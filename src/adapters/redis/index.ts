@@ -92,7 +92,7 @@ export class Data extends RedisAdapter implements Adapters.AdapaterData {
     instanceId: Adapters.InstanceId,
     key: string,
   ): Promise<Data | null> {
-    const redisKey = this.withPrevix(instanceId + ":key+" + key);
+    const redisKey = this.withPrevix(instanceId + ":key:" + key);
     const data = await this.redis.get(redisKey);
     if (!data) return null;
     return JSON.parse(data);
@@ -103,7 +103,7 @@ export class Data extends RedisAdapter implements Adapters.AdapaterData {
     key: string,
     value: Data,
   ): Promise<true> {
-    const redisKey = this.withPrevix(instanceId + ":key+" + key);
+    const redisKey = this.withPrevix(instanceId + ":key:" + key);
     const serialized = JSON.stringify(value);
     await this.redis.set(redisKey, serialized);
     return true;
@@ -196,7 +196,7 @@ export class MessageBroker
           });
         }
 
-        await wait(100);
+        await wait(1);
       }
     });
 
@@ -211,7 +211,7 @@ export class MessageBroker
 type ScheduleQueue = BullMQ.Queue<
   Adapters.ScheduleInstanceData | Adapters.ScheduleEventData,
   any,
-  "event" | "instance"
+  `event:${string}` | "instance"
 >;
 
 type JobData = Parameters<ScheduleQueue["add"]>[1];
@@ -235,8 +235,13 @@ export class Scheduler
     });
   }
 
-  async cancel(scheduleId: string): Promise<boolean> {
-    const redisKey = "Spawnkit:scheduled-events";
+  async cancel(
+    kind: Adapters.InstanceKind,
+    id: Adapters.InstanceId,
+    scheduleId: string,
+  ): Promise<boolean> {
+    const instanceKey = `${kind}:${id}`;
+    const redisKey = `Spawnkit:scheduled-events:${instanceKey}`;
     const [repeatableRemoved, delayJobStatus] = await Promise.all([
       this.queue.removeRepeatableByKey(scheduleId),
       this.queue.remove(scheduleId),
@@ -247,56 +252,93 @@ export class Scheduler
     return isRemoved;
   }
 
-  async list(): Promise<Adapters.ScheduleEventMetadata[]> {
-    const redisKey = "Spawnkit:scheduled-events";
+  async list(
+    kind: Adapters.InstanceKind,
+    id: Adapters.InstanceId,
+  ): Promise<Adapters.ScheduleEventMetadata[]> {
+    const instanceKey = `${kind}:${id}`;
+    const redisKey = `Spawnkit:scheduled-events:${instanceKey}`;
     const rawScheduledEvents = await this.redis.hvals(redisKey);
 
     const scheduledEvents = rawScheduledEvents.map((st) => JSON.parse(st));
     return scheduledEvents as Adapters.ScheduleEventMetadata[];
   }
 
-  private async addToList(data: Adapters.ScheduleEventData, job: BullMQ.Job) {
-    const jobID = job.repeatJobKey || job.id;
+  async store<Data>(
+    kind: string,
+    id: string,
+    scheduleId: string,
+    data: Data,
+  ): Promise<true> {
+    const scheduleKey = `${kind}:${id}:scheduleId:${scheduleId}`;
+    const redisKey = `Spawnkit:scheduled-events-data:${scheduleKey}`;
+    console.log("SET STORE", kind, id, scheduleId, redisKey);
+    await this.redis.lpush(redisKey, JSON.stringify(data));
+    console.log("SET LENGTH", await this.redis.llen(redisKey));
+    return true;
+  }
+
+  async get<Data>(
+    kind: string,
+    id: string,
+    scheduleId: string,
+    last?: number,
+  ): Promise<Data[]> {
+    const scheduleKey = `${kind}:${id}:scheduleId:${scheduleId}`;
+    const redisKey = `Spawnkit:scheduled-events-data:${scheduleKey}`;
+
+    console.log("GET LENGTH", await this.redis.llen(redisKey));
+    console.log("GET STORE", kind, id, scheduleId, redisKey);
+
+    const fromIncluded = 0;
+    const toIncluded = !last ? -1 : last; // -1 = LAST
+    const members = await this.redis.lrange(redisKey, fromIncluded, toIncluded);
+    return members.map((m) => JSON.parse(m));
+  }
+
+  private async register(
+    scheduleId: Adapters.ScheduleId,
+    data: Adapters.ScheduleEventData,
+  ) {
     const metaData = {
       data,
-      scheduleId: jobID,
+      scheduleId: scheduleId,
       created_at: Date.now(),
     };
 
-    const redisKey = "Spawnkit:scheduled-events";
-    await this.redis.hset(redisKey, jobID!, JSON.stringify(metaData));
+    const instanceKey = `${data.instance.kind}:${data.instance.id}`;
+    const redisKey = `Spawnkit:scheduled-events:${instanceKey}`;
+    await this.redis.hset(redisKey, scheduleId!, JSON.stringify(metaData));
   }
 
   async event(data: Adapters.ScheduleEventData): Promise<string> {
-    if ("delay" in data.schedule) {
-      const job = await this.queue.add("event", data, {
-        delay: data.schedule.delay,
-      });
+    const bullJobConfig =
+      "delay" in data.schedule
+        ? {
+            delay: data.schedule.delay,
+          }
+        : "cron" in data.schedule
+          ? {
+              repeat: {
+                pattern: data.schedule.cron,
+              },
+            }
+          : null;
 
-      const scheduleId = job.id;
-      if (!scheduleId) throw new Error("Why no job id???");
-
-      await this.addToList(data, job);
-      return scheduleId;
+    if (!bullJobConfig) {
+      throw new Error("Schedule type not implemented");
     }
 
-    if ("cron" in data.schedule) {
-      const job = await this.queue.add("event", data, {
-        repeat: {
-          pattern: data.schedule.cron,
-        },
-      });
-
-      const scheduleId = job.repeatJobKey;
-      if (!scheduleId) {
-        throw new Error("Why no job id???");
-      }
-
-      await this.addToList(data, job);
-      return scheduleId;
+    const jobName =
+      `event:${data.instance.kind}:${data.instance.id}:${crypto.randomUUID()}` as const;
+    const job = await this.queue.add(jobName, data, bullJobConfig);
+    const scheduleId = this.getScheduleID(job);
+    if (!scheduleId) {
+      throw new Error("Uh Oh!");
     }
 
-    throw new Error("Schedule Kind not implemented");
+    await this.register(scheduleId, data);
+    return scheduleId;
   }
 
   async instance(data: Adapters.ScheduleInstanceData): Promise<string> {
@@ -319,8 +361,17 @@ export class Scheduler
     return job.id;
   }
 
+  getScheduleID(job: BullMQ.Job) {
+    const scheduleId = job.repeatJobKey || job.id;
+    return scheduleId!;
+  }
+
+  // BullMQ almost guarantee "exactly once" job execution
+  // but it can happen to go execute "at least once"
+  // This is why we need to make sure the event is not processed twice
+  // As for instance, we don't care if they are instantiate twice'
   async canProcessJob(job: BullMQ.Job<JobData, any, JobName>) {
-    const isScheduledJob = job.name === "event";
+    const isScheduledJob = job.name.startsWith("event");
     if (isScheduledJob) {
       const jobData = job.data as Adapters.ScheduleByType["event"];
       const kind = jobData.instance.kind;
@@ -329,10 +380,6 @@ export class Scheduler
       const executCount = await this.redis.incr(jobKey);
       const hasAlreadyBeenExecuted = executCount > 1;
       if (hasAlreadyBeenExecuted) {
-        // BullMQ almost guarantee "exactly once" job execution
-        // but it can happen to go execute "at least once"
-        // This is why we need to make sure the event is not processed twice
-        // As for instance, we don't care if they are instantiate twice'
         return false;
       }
     }
@@ -343,7 +390,8 @@ export class Scheduler
   subscribe(
     callback: <Type extends keyof Adapters.ScheduleByType>(
       type: Type,
-      scheduleData: Adapters.ScheduleByType[Type],
+      data: Adapters.ScheduleByType[Type],
+      context: Adapters.ScheduleContext,
     ) => any,
   ): { unsubscribe: Function } {
     const worker = new BullMQ.Worker<JobData, any, JobName>(
@@ -352,7 +400,14 @@ export class Scheduler
         const canProcess = this.canProcessJob(job);
         if (!canProcess) return;
 
-        await callback(job.name, job.data);
+        if (job.name.startsWith("event")) {
+          const scheduleId = this.getScheduleID(job);
+          await callback("event", job.data as any, { scheduleId });
+        }
+
+        if (job.name == "instance") {
+          await callback("instance", job.data as any, {});
+        }
       },
       {
         autorun: false,
