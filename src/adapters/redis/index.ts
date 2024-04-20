@@ -14,9 +14,9 @@ class RedisAdapter {
 
 export class Lock extends RedisAdapter implements Adapters.AdapterLock {
   redlock: Redlock;
-  constructor(redis: Redis) {
-    super(redis);
-    this.redlock = new Redlock([redis], {
+  constructor(client: Redis) {
+    super(client);
+    this.redlock = new Redlock([client], {
       retryCount: 0,
     });
   }
@@ -27,14 +27,19 @@ export class Lock extends RedisAdapter implements Adapters.AdapterLock {
     return `lockId:${lockId}:ownerId:${ownerId}`;
   }
 
+  withPrefix(resource: string) {
+    return `spawnkit:locks:${resource}`;
+  }
+
   async acquire(
-    lockId: string,
+    resource: string,
     ownerId: string,
     duration: number,
   ): Promise<boolean> {
     try {
-      const lock = await this.redlock.acquire([lockId], duration);
-      const ownerKey = this.createOwnerKey(lockId, ownerId);
+      const key = this.withPrefix(resource);
+      const lock = await this.redlock.acquire([key], duration);
+      const ownerKey = this.createOwnerKey(resource, ownerId);
       this.lockByOwnerKey.set(ownerKey, lock);
       return true;
     } catch (err) {
@@ -49,11 +54,11 @@ export class Lock extends RedisAdapter implements Adapters.AdapterLock {
   }
 
   async extend(
-    lockId: string,
+    resource: string,
     ownerId: string,
     duration: number,
   ): Promise<boolean> {
-    const ownerKey = this.createOwnerKey(lockId, ownerId);
+    const ownerKey = this.createOwnerKey(resource, ownerId);
     const lock = this.lockByOwnerKey.get(ownerKey);
     if (!lock) return false;
 
@@ -67,8 +72,8 @@ export class Lock extends RedisAdapter implements Adapters.AdapterLock {
     }
   }
 
-  async release(lockId: string, ownerId: string): Promise<boolean> {
-    const ownerKey = this.createOwnerKey(lockId, ownerId);
+  async release(resource: string, ownerId: string): Promise<boolean> {
+    const ownerKey = this.createOwnerKey(resource, ownerId);
     const lock = this.lockByOwnerKey.get(ownerKey);
     if (!lock) return false;
 
@@ -83,44 +88,134 @@ export class Lock extends RedisAdapter implements Adapters.AdapterLock {
   }
 }
 
+/**
+ * This class is used for internaltools
+ * Using the data in stored with it, we'll be able to build tools
+ * to debug and trace back what happens
+ * TODO: also output files ( easier to debug with );
+ */
+export class Logger extends RedisAdapter implements Adapters.AdapterLogger {
+  async log(
+    kind: Adapters.InstanceKind,
+    id: Adapters.InstanceId,
+    groupId: string,
+    signal: Adapters.InstanceSignal,
+  ) {
+    const now = Date.now();
+    const serialized = JSON.stringify({
+      ...signal,
+      timestamp: now,
+    });
+
+    await Promise.all([
+      this.redis.zadd(`spawnkit:logs:${kind}:${id}:index`, now, groupId),
+      this.redis.lpush(
+        `spawnkit:logs:${kind}:${id}:logs:${groupId}`,
+        serialized,
+      ),
+    ]);
+  }
+
+  /** list log groups for this instance */
+  async list(
+    kind: Adapters.InstanceKind,
+    id: Adapters.InstanceId,
+    range: { from: number; to: number } = {
+      from: 0,
+      to: -1 /* -1 = until the last element */,
+    },
+  ): Promise<string[]> {
+    return await this.redis.zrange(
+      `spawnkit:logs:${kind}:${id}:index`,
+      range.from,
+      range.to,
+      "REV",
+    );
+  }
+
+  /* retieve all the logs from a log group */
+  async get(
+    kind: Adapters.InstanceKind,
+    id: Adapters.InstanceId,
+    groupId: string,
+  ): Promise<Adapters.InstanceSignal[]> {
+    const rawLogs = await this.redis.lrange(
+      `spawnkit:logs:${kind}:${id}:logs:${groupId}`,
+      0,
+      -1,
+    );
+    const logs = rawLogs.map((raw) => JSON.parse(raw));
+    return logs;
+  }
+
+  async delete(
+    kind: string,
+    id: string,
+    range: { from: number; to: number },
+  ): Promise<any> {}
+}
+
 export class Data extends RedisAdapter implements Adapters.AdapaterData {
   private withPrevix(string: Adapters.InstanceId) {
-    return `data:${string}`;
+    return `spawnkit:data:${string}`;
   }
 
   async get<Data>(
-    instanceId: Adapters.InstanceId,
+    kind: Adapters.InstanceKind,
+    id: Adapters.InstanceId,
     key: string,
   ): Promise<Data | null> {
-    const redisKey = this.withPrevix(instanceId + ":key:" + key);
-    const data = await this.redis.get(redisKey);
+    const data = await this.redis.get(`spawnkit:data:${kind}:${id}:${key}`);
     if (!data) return null;
     return JSON.parse(data);
   }
 
   async set<Data>(
-    instanceId: Adapters.InstanceId,
+    kind: Adapters.InstanceKind,
+    id: Adapters.InstanceId,
     key: string,
     value: Data,
   ): Promise<true> {
-    const redisKey = this.withPrevix(instanceId + ":key:" + key);
     const serialized = JSON.stringify(value);
-    await this.redis.set(redisKey, serialized);
+    await this.redis.set(`spawnkit:data:${kind}:${id}:${key}`, serialized);
     return true;
   }
 }
+
+type MaintenanceTask = {
+  name: "zttl";
+  config: {
+    below: number;
+    key: string;
+  };
+};
 
 export class MessageBroker
   extends RedisAdapter
   implements Adapters.AdapaterMessageBroker
 {
+  queue: ScheduleQueue;
+
+  constructor(redis: Redis) {
+    super(redis);
+
+    this.queue = new BullMQ.Queue(Scheduler.QUEUE_NAME, {
+      connection: redis,
+      prefix: "spawnkit",
+      defaultJobOptions: {
+        removeOnComplete: true,
+        removeOnFail: true,
+      },
+    });
+  }
   private withPrefix(channelName: string) {
-    return `messages:${channelName}`;
+    return `spawnkit:messages:${channelName}`;
   }
 
   async publish<EventData>(
     channel: string,
     event: EventData,
+    options?: { mode: "pubsub" },
   ): Promise<Adapters.EventId> {
     const hashID = this.withPrefix(channel);
     const eventId = crypto.randomUUID();
@@ -129,7 +224,30 @@ export class MessageBroker
       data: event,
     });
 
-    await this.redis.zadd(hashID, Date.now(), zmember);
+    const now = Date.now();
+    await this.redis.zadd(hashID, now, zmember);
+
+    if (options?.mode === "pubsub") {
+      // Since We don't need to prune the set for evey event
+      // We just need to prune it from time to time so that it doesn't grow much
+      // only schedule a task on in ten events
+      const oneEvery = 1 / 20;
+      const isSampled = Math.random() < oneEvery;
+      if (isSampled) {
+        Scheduler.addMaintenanceTask({
+          redis: this.redis,
+          runInNext: "EVERY_MIN",
+          task: {
+            name: "zttl",
+            config: {
+              key: hashID,
+              below: now,
+            },
+          },
+        });
+      }
+    }
+
     return eventId;
   }
 
@@ -167,6 +285,9 @@ export class MessageBroker
   subscribe<E>(
     channel: string,
     callback: (event: E) => any,
+    options?: {
+      mode: "pubsub";
+    },
   ): { unsubscribe: Function } {
     const abortCtl = new AbortController();
     const abortSignal = abortCtl.signal;
@@ -174,7 +295,8 @@ export class MessageBroker
     Promise.resolve().then(async () => {
       const previousEventsIds = new Set();
       const range = {
-        from: 0,
+        // If pubsub, we don't care about past events
+        from: options?.mode === "pubsub" ? Date.now() : 0,
         to: Infinity,
       };
 
@@ -208,10 +330,18 @@ export class MessageBroker
   }
 }
 
+interface MaintenanceCronConfig {
+  cron: string;
+  queue: `maintenance:${string}`;
+  tasks: string;
+}
+
 type ScheduleQueue = BullMQ.Queue<
-  Adapters.ScheduleInstanceData | Adapters.ScheduleEventConfig,
+  | Adapters.ScheduleInstanceData
+  | Adapters.ScheduleEventConfig
+  | MaintenanceCronConfig,
   any,
-  `event:${string}` | "instance"
+  `event:${string}` | "instance" | `maintenance:${string}`
 >;
 
 type JobData = Parameters<ScheduleQueue["add"]>[1];
@@ -221,13 +351,15 @@ export class Scheduler
   extends RedisAdapter
   implements Adapters.AdapaterScheduler
 {
-  static QUEUE_NAME = "Spawnkit";
+  static QUEUE_NAME = "queues";
   private queue: ScheduleQueue;
 
   constructor(redis: Redis) {
     super(redis);
+
     this.queue = new BullMQ.Queue(Scheduler.QUEUE_NAME, {
       connection: redis,
+      prefix: "spawnkit",
       defaultJobOptions: {
         removeOnComplete: true,
         removeOnFail: true,
@@ -240,10 +372,8 @@ export class Scheduler
     id: Adapters.InstanceId,
     scheduleId: string,
   ) {
-    const instanceKey = `${kind}:${id}`;
-    const scheduleKey = `${kind}:${id}:scheduleId:${scheduleId}`;
-    const redisKey = `Spawnkit:scheduled-events:${instanceKey}`;
-    const scheduleRedisKey = `Spawnkit:scheduled-events-data:${scheduleKey}`;
+    const redisKey = `spawnkit:scheduled:${kind}:${id}:index`;
+    const scheduleRedisKey = `spawnkit:scheduled:${kind}:${id}:status:${scheduleId}`;
     const [repeatableRemoved, delayJobStatus] = await Promise.all([
       this.queue.removeRepeatableByKey(scheduleId),
       this.queue.remove(scheduleId),
@@ -260,8 +390,7 @@ export class Scheduler
     id: Adapters.InstanceId,
     scheduleId: string,
   ): Promise<boolean> {
-    const instanceKey = `${kind}:${id}`;
-    const redisKey = `Spawnkit:scheduled-events:${instanceKey}`;
+    const redisKey = `spawnkit:scheduled:${kind}:${id}:index`;
     const rawScheduleMetadata = await this.redis.hget(redisKey, scheduleId);
     if (!rawScheduleMetadata) {
       return false;
@@ -285,8 +414,7 @@ export class Scheduler
     kind: Adapters.InstanceKind,
     id: Adapters.InstanceId,
   ): Promise<Adapters.ScheduleEventMetadata[]> {
-    const instanceKey = `${kind}:${id}`;
-    const redisKey = `Spawnkit:scheduled-events:${instanceKey}`;
+    const redisKey = `spawnkit:scheduled:${kind}:${id}:index`;
     const rawScheduledEvents = await this.redis.hvals(redisKey);
 
     const scheduledEvents = rawScheduledEvents.map((st) => JSON.parse(st));
@@ -299,8 +427,7 @@ export class Scheduler
     scheduleId: string,
     data: Data,
   ): Promise<true> {
-    const scheduleKey = `${kind}:${id}:scheduleId:${scheduleId}`;
-    const redisKey = `Spawnkit:scheduled-events-data:${scheduleKey}`;
+    const redisKey = `spawnkit:scheduled:${kind}:${id}:status:${scheduleId}`;
     await this.redis.lpush(redisKey, JSON.stringify(data));
     return true;
   }
@@ -311,8 +438,7 @@ export class Scheduler
     scheduleId: string,
     last?: number,
   ): Promise<Data[]> {
-    const scheduleKey = `${kind}:${id}:scheduleId:${scheduleId}`;
-    const redisKey = `Spawnkit:scheduled-events-data:${scheduleKey}`;
+    const redisKey = `spawnkit:scheduled:${kind}:${id}:status:${scheduleId}`;
 
     const fromIncluded = 0;
     const toIncluded = !last ? -1 : last; // -1 = LAST
@@ -330,9 +456,8 @@ export class Scheduler
       created_at: Date.now(),
       canceled: false,
     };
-
-    const instanceKey = `${config.instance.kind}:${config.instance.id}`;
-    const redisKey = `Spawnkit:scheduled-events:${instanceKey}`;
+    const { kind, id } = config.instance;
+    const redisKey = `spawnkit:scheduled:${kind}:${id}:index`;
     await this.redis.hset(redisKey, scheduleId!, JSON.stringify(metaData));
   }
 
@@ -401,7 +526,7 @@ export class Scheduler
       const jobData = job.data as Adapters.ScheduleByType["event"];
       const kind = jobData.instance.kind;
       const instanceId = jobData.instance.id;
-      const jobKey = `${kind}:${instanceId}:${job.id}`;
+      const jobKey = `spawnkit:locks:${kind}:${instanceId}:jobs:${job.id}`;
       const executCount = await this.redis.incr(jobKey);
       const hasAlreadyBeenExecuted = executCount > 1;
       if (hasAlreadyBeenExecuted) {
@@ -412,6 +537,51 @@ export class Scheduler
     return true;
   }
 
+  static SCHEDULED_TASKS_CRON = {
+    EVERY_MIN: {
+      cron: `* * * * *`,
+      queue: `maintenance:every-minute`,
+      tasks: `spawnkit:tasks:maintenance:every-minute`,
+    },
+  } satisfies Record<string, MaintenanceCronConfig>;
+
+  async ensureMainenanceTasksSetup() {
+    Object.values(Scheduler.SCHEDULED_TASKS_CRON).forEach((config) => {
+      this.queue.add(config.queue, config, {
+        repeat: {
+          immediately: false,
+          pattern: config.cron,
+        },
+      });
+    });
+  }
+
+  static async addMaintenanceTask(config: {
+    redis: Redis;
+    runInNext: keyof typeof Scheduler.SCHEDULED_TASKS_CRON;
+    task: MaintenanceTask;
+  }) {
+    const cron = Scheduler.SCHEDULED_TASKS_CRON[config.runInNext];
+    await config.redis.rpush(cron.tasks, JSON.stringify(config.task));
+  }
+
+  async handleMaintenance(cronConfig: MaintenanceCronConfig) {
+    while (true) {
+      const rawTask = await this.redis.lpop(cronConfig.tasks);
+      if (!rawTask) break;
+
+      console.log("RAW TASK", rawTask);
+      const task = JSON.parse(rawTask) as MaintenanceTask;
+      if (task.name === "zttl") {
+        await this.redis.zremrangebyscore(
+          task.config.key,
+          0,
+          task.config.below,
+        );
+      }
+    }
+  }
+
   subscribe(
     callback: <Type extends keyof Adapters.ScheduleByType>(
       type: Type,
@@ -419,6 +589,8 @@ export class Scheduler
       context: Adapters.ScheduleContext,
     ) => any,
   ): { unsubscribe: Function } {
+    this.ensureMainenanceTasksSetup();
+
     const worker = new BullMQ.Worker<JobData, any, JobName>(
       Scheduler.QUEUE_NAME,
       async (job) => {
@@ -433,11 +605,16 @@ export class Scheduler
         if (job.name == "instance") {
           await callback("instance", job.data as any, {});
         }
+
+        if (job.name.startsWith("maintenance")) {
+          await this.handleMaintenance(job.data as MaintenanceCronConfig);
+        }
       },
       {
         autorun: false,
         // concurrency: this.config.concurrency,
         connection: this.redis,
+        prefix: "spawnkit",
       },
     );
 

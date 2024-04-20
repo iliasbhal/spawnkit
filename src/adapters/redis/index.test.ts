@@ -25,9 +25,10 @@ function createGetAdapters() {
 
     const adapters: Adapters = {
       lock: new RedisAdapters.Lock(redisClient),
-      snapshot: new RedisAdapters.Snapshot(redisClient),
+      data: new RedisAdapters.Data(redisClient),
       messages: new RedisAdapters.MessageBroker(redisClient),
       scheduler: new RedisAdapters.Scheduler(redisClient),
+      logger: new RedisAdapters.Logger(redisClient),
     };
 
     return adapters;

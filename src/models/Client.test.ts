@@ -35,6 +35,7 @@ describe("Client", () => {
 
   describe("PubSub", () => {
     it.todo("can emit and listen to instance channels");
+    it.todo("when subscrbing to channel, it should not replay past events");
   });
 
   describe("Internal", () => {

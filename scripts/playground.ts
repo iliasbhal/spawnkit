@@ -16,6 +16,7 @@ const spawnConfig = {
     data: new RedisAdapter.Data(redis),
     messages: new RedisAdapter.MessageBroker(redis),
     scheduler: new RedisAdapter.Scheduler(redis),
+    logger: new RedisAdapter.Logger(redis),
   },
   instances: {
     StreamExample,
@@ -33,14 +34,16 @@ const main = async () => {
   await redis.flushall("SYNC");
   worker.start();
 
-  // attributeExample()
-  // await basicExample();
-  // await streamExample();
-  // await streamWithErrors();
-  // await emittedEventsExample();
-  await scheduleCallExample();
-  // await errorHandlingExample();
-  // await exampleXState();
+  // attributeExample();
+  await Promise.all([
+    // basicExample(),
+    // streamExample(),
+    // streamWithErrors(),
+    // scheduleCallExample(),
+    // emittedEventsExample(),
+    // errorHandlingExample(),
+    exampleXState(),
+  ]);
 };
 
 const attributeExample = () => {
@@ -126,39 +129,44 @@ const emittedEventsExample = async () => {
   const orderBook = client.spawn("OrderBook", "BTC/USD");
   const orderBook2 = client.spawn("OrderBook", "ETH/USD");
 
-  orderBook2.on("orders", (event) => {
-    console.log("CHANGE RECEIVED on 2", event);
-  });
-
+  // Example 1: can emit from client and handle from instance
+  // and from client as well
+  orderBook.emit("alphachannel", "asddas");
+  orderBook.emit("orders", ["asddas"]);
   orderBook.on("orders", (event) => {
-    console.log("CHANGE RECEIVED on 1", event);
+    console.log("ON CLIENT 1", event);
   });
 
-  const intervalId = setInterval(async () => {
-    const isJust = Math.random() > 0.5;
-    if (isJust) {
-      orderBook.emit.buy({ tick: "APPL" });
-      return;
-    }
+  orderBook2.on("orders", (event) => {
+    console.log("ON CLIENT 2", event);
+  });
 
-    const prev = Date.now();
-    const response = await orderBook.buy({ tick: "APPL" });
-    const then = Date.now();
+  await orderBook.buy({ tick: "BTC/USD" });
+  await orderBook.skip.buy({ tick: "BTC/USD (via skip)" });
 
-    console.log("response", response, then - prev);
-  }, 25);
+  await orderBook2.buy({ tick: "ETH/USD" });
+  await orderBook2.skip.buy({ tick: "ETH/USD (via skip)" });
+
+  // const intervalId = setInterval(async () => {
+  //   const isSkip = Math.random() > 0.5;
+  //   if (isSkip) {
+  //     orderBook.skip.buy({ tick: "APPL" });
+  //     return;
+  //   }
+
+  //   const prev = Date.now();
+  //   const response = await orderBook.buy({ tick: "APPL" });
+  //   const then = Date.now();
+
+  //   console.log("response", response, then - prev);
+  // }, 25);
 
   await wait(10_000);
-  clearInterval(intervalId);
+  // clearInterval(intervalId);
 };
 
 const scheduleCallExample = async () => {
   const streamExample = client.spawn("StreamExample", "BTC/ETH");
-  const orderBook2 = client.spawn("OrderBook", "BTC/USD");
-  streamExample.on("orders", (event) => {
-    console.log("stream: ", event);
-  });
-
   const scheduleId = await streamExample
     .schedule({
       name: "Buy AAPL Regularly",
@@ -167,24 +175,43 @@ const scheduleCallExample = async () => {
     })
     .startFaultyStreamDuring();
 
-  // const scheduled2 = await orderBook2.scheduled.list();
+  // setInterval(async () => {
+  //   const scheduled = await streamExample.scheduled.list();
+  //   console.log("LIST", scheduled);
+  //   const data = await streamExample.scheduled.get(scheduleId);
+  //   console.log("DATA", data);
+  // }, 10_000);
 
-  setInterval(async () => {
-    const scheduled = await streamExample.scheduled.list();
-    console.log("LIST", scheduled);
-    const data = await streamExample.scheduled.get(scheduleId);
-    console.log("DATA", data);
-  }, 30_000);
+  // const orderBook = client.spawn("OrderBook", "BTC/ETH");
+
+  // orderBook.emit("orders", ["asddsa"]);
+
+  // const orderBook2 = client.spawn("OrderBook", "BTC/USD");
+  // orderBook.on("orders", (event) => {
+  //   console.log("stream: ", event);
+  // });
+
+  // const scheduleId = await orderBook
+  //   .schedule({
+  //     name: "Buy AAPL Regularly",
+  //     delay: 2000,
+  //     // cron: "* * * * *",
+  //   })
+  //   .buy({
+  //     tick: "AAPL",
+  //   });
+
+  // const scheduled2 = await orderBook2.scheduled.list();
   // console.log("scheduled2", scheduled2);
 
-  // const scheduled1 = await orderBook.scheduled.list();
-  // console.log("scheduled1", scheduled1);
-
   // const before = await orderBook.scheduled.list();
-  // console.log("before", before.length);
+  // console.log("before", before);
   // await orderBook.scheduled.cancel(scheduleId);
   // const after = await orderBook.scheduled.list();
-  // console.log("after", after.length);
+  // console.log("after", after);
+  // await orderBook.scheduled.delete(scheduleId);
+  // const after2 = await orderBook.scheduled.list();
+  // console.log("after2", after2);
 
   // const scheduleId2 = await orderBook.schedule({ delay: 3000 }).buy({
   //   tick: "AAPL",
@@ -227,9 +254,13 @@ const errorHandlingExample = async () => {
 
 const exampleXState = async () => {
   const toggle = client.spawn("ToggleMachine", "AAAA");
-  // toggle.data.on("snapshot", (next) => {
-  //   console.log("SUBSCRIBE", "KEY", "snapshot", next);
-  // });
+  toggle.data.on("snapshot", (next) => {
+    console.log("SUBSCRIBE", "KEY", "snapshot", next);
+  });
+
+  toggle.on("snapshot", () => {
+    console.log("HEHEHEHEHEHHEHEHE");
+  });
   // await toggle.init([1, 2, 3]);
   // await toggle.init([1, 2, 3]);
   // const before = await toggle.data.get("snapshot");
@@ -244,7 +275,7 @@ const exampleXState = async () => {
   for (let i = 0; i < 1000; i++) {
     await wait(0);
     console.log(i);
-    await toggle.send({ type: "TOGGLE" });
+    toggle.skip.send({ type: "TOGGLE" });
   }
 
   // const response = await toggle.send({ type: "TOGGLE" });

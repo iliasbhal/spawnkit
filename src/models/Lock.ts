@@ -1,35 +1,45 @@
 import wait from "wait";
-import { AdapterLock } from "../adapters";
+import {
+  Adapters,
+  InstanceId,
+  InstanceKind,
+  InstanceSignal,
+} from "../adapters";
 import { ControlledPromise } from "@/utils/ControlledPromise";
+import { Logger } from "./Logger";
 
 export class LockError extends Error {}
 
 export class AcquireLockError extends LockError {
-  constructor(lockId: string, ownerId: string) {
-    super(`Couldn\'t acquire lock (${lockId} | ${ownerId})`);
+  constructor(resource: string, lockId: string) {
+    super(`Couldn\'t acquire lock (${resource} | ${lockId})`);
   }
 }
 
 export class LockReleaseError extends LockError {
-  constructor(lockId: string, ownerId: string) {
-    super(`Couldn\'t release lock (${lockId} | ${ownerId})`);
+  constructor(resource: string, lockId: string) {
+    super(`Couldn\'t release lock (${resource} | ${lockId})`);
   }
 }
 
 export class LockExtendError extends LockError {
-  constructor(lockId: string, ownerId: string) {
-    super(`Couldn\'t extend lock (${lockId} | ${ownerId})`);
+  constructor(resource: string, lockId: string) {
+    super(`Couldn\'t extend lock (${resource} | ${lockId})`);
   }
 }
 
-interface InstanceLockConfigInput {
-  lockId: string;
+interface LockConfig {
+  resource: string;
   duration: number;
   extendBeforeThreshold?: number;
+  instance: {
+    kind: InstanceKind;
+    id: InstanceId;
+  };
 }
 
 interface InstanceLockConfig {
-  lockId: string;
+  resource: string;
   duration: number;
   extendBeforeThreshold: number;
 }
@@ -40,11 +50,12 @@ export class Lock {
   static ReleaseError = LockReleaseError;
 
   config: InstanceLockConfig;
-  lock: AdapterLock;
-  ownerId: string;
+  adapters: Adapters;
+  logger: Logger;
+  lockId: string;
   expireAt: number = 0;
 
-  getConfig(input: InstanceLockConfigInput): InstanceLockConfig {
+  getConfig(input: LockConfig): InstanceLockConfig {
     const config = input;
 
     if (Math.floor(config.duration) !== config.duration) {
@@ -65,42 +76,76 @@ export class Lock {
     });
   }
 
-  constructor(config: InstanceLockConfigInput, adapterLock: AdapterLock) {
+  constructor(
+    config: LockConfig & { adapters: Adapters; lockId: string; logger: Logger },
+  ) {
     this.config = this.getConfig(config);
-    this.ownerId = crypto.randomUUID();
-    this.lock = adapterLock;
+    this.lockId = config.lockId;
+    this.adapters = config.adapters;
+    this.logger = config.logger;
   }
 
   async acquire() {
-    const { lockId, duration } = this.config;
+    const { resource, duration } = this.config;
 
     const expireAt = Date.now() + duration;
-    const acquired = await this.lock.acquire(lockId, this.ownerId, duration);
-    if (!acquired) throw new AcquireLockError(lockId, this.ownerId);
+
+    this.logger.log({
+      type: "lock:acquire",
+      duration: duration,
+    });
+
+    const acquired = await this.adapters.lock.acquire(
+      resource,
+      this.lockId,
+      duration,
+    );
+
+    if (!acquired) throw new AcquireLockError(resource, this.lockId);
 
     this.expireAt = expireAt;
     return acquired;
   }
 
   async extend() {
-    const { lockId, duration } = this.config;
+    const { resource, duration } = this.config;
     const expireAt = Date.now() + duration;
-    const extended = await this.lock.extend(lockId, this.ownerId, duration);
-    if (!extended) throw new LockExtendError(lockId, this.ownerId);
+
+    this.logger.log({
+      type: "lock:extend",
+      duration: duration,
+    });
+
+    const extended = await this.adapters.lock.extend(
+      resource,
+      this.lockId,
+      duration,
+    );
+    if (!extended) throw new LockExtendError(resource, this.lockId);
 
     this.expireAt = expireAt;
   }
 
   async release() {
-    const { lockId } = this.config;
-    const released = await this.lock.release(lockId, this.ownerId);
-    if (!released) throw new LockReleaseError(lockId, this.ownerId);
+    const { resource } = this.config;
+
+    this.logger.log({
+      type: "lock:release",
+    });
+
+    const released = await this.adapters.lock.release(resource, this.lockId);
+    if (!released) throw new LockReleaseError(resource, this.lockId);
 
     this.expireAt = 0;
   }
 
   autoExtendLockInBackground(stopExtendingSignal: AbortSignal) {
     const extendAbortCtl = new AbortController();
+    extendAbortCtl.signal.addEventListener("abort", () => {
+      this.logger.log({
+        type: "lock:abort",
+      });
+    });
 
     Promise.resolve()
       .then(async () => {

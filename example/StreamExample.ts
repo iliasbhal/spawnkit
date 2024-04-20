@@ -2,8 +2,6 @@ import * as Spawnkit from "@/.";
 import wait from "wait";
 
 export class StreamExample extends Spawnkit.Instance {
-  // signal(signal: Spawnkit.SignalEvent): void {}
-
   startStream(someData: { count: number }) {
     return new Spawnkit.Stream<string>(async (stream) => {
       for (let i = 0; i < someData.count; i++) {

@@ -1,7 +1,9 @@
+import { Lock } from "@/models/Lock";
+
 export type InstanceId = string;
 export type InstanceKind = string;
 export type EventId = string;
-export type LockId = string;
+export type RessourceId = string;
 export type LockOwnerId = string;
 
 export type ScheduleId = string;
@@ -40,11 +42,85 @@ export interface InstanceMethodCall<
   context?: any;
 }
 
+export type InstanceSignal =
+  | {
+      type: "log";
+      message: string;
+    }
+  | {
+      type: "lock:acquire";
+      duration: number;
+    }
+  | {
+      type: "lock:abort";
+    }
+  | {
+      type: "lock:extend";
+      duration: number;
+    }
+  | {
+      type: "lock:release";
+    }
+  | {
+      type: "data:get";
+      key: string;
+      value: any;
+    }
+  | {
+      type: "data:set";
+      key: string;
+    }
+  | {
+      type: "proxy:start";
+    }
+  | {
+      type: "proxy:dispose";
+    }
+  | {
+      type: "proxy:call:start";
+      id: string;
+      method: string;
+      args: any[];
+    }
+  | {
+      type: "proxy:call:end";
+      id: string;
+      result: any;
+    };
+
 export interface Adapters {
   lock: AdapterLock;
   data: AdapaterData;
   messages: AdapaterMessageBroker;
   scheduler: AdapaterScheduler;
+  logger?: AdapterLogger;
+}
+
+export abstract class AdapterLogger {
+  abstract log(
+    kind: InstanceKind,
+    id: InstanceId,
+    groupId: string,
+    signal: InstanceSignal,
+  ): any;
+
+  abstract list(
+    kind: InstanceKind,
+    id: InstanceId,
+    range: { from: number; to: number },
+  ): Promise<string[]>;
+
+  abstract get(
+    kind: InstanceKind,
+    id: InstanceId,
+    groupId: string,
+  ): Promise<InstanceSignal[]>;
+
+  abstract delete(
+    kind: InstanceKind,
+    id: InstanceId,
+    range: { from: number; to: number },
+  ): Promise<any>;
 }
 
 export abstract class AdapterLock {
@@ -52,7 +128,7 @@ export abstract class AdapterLock {
    *
    */
   abstract acquire(
-    lockId: LockId,
+    lockId: RessourceId,
     /* The owner id is a string that cannot be used by other processes claiming the lock
      *  It should be a unique value across the entire cluster.
      */
@@ -60,17 +136,22 @@ export abstract class AdapterLock {
     duration: number,
   ): Promise<boolean>;
   abstract extend(
-    lockId: LockId,
+    lockId: RessourceId,
     ownerId: LockOwnerId,
     duration: number,
   ): Promise<boolean>;
-  abstract release(lockId: LockId, ownerId: LockOwnerId): Promise<boolean>;
+  abstract release(lockId: RessourceId, ownerId: LockOwnerId): Promise<boolean>;
 }
 
 export abstract class AdapaterData {
-  abstract get<Data>(instanceId: InstanceId, key: string): Promise<Data | null>;
+  abstract get<Data>(
+    kind: InstanceKind,
+    id: InstanceId,
+    key: string,
+  ): Promise<Data | null>;
   abstract set<Data>(
-    instanceId: InstanceId,
+    kind: InstanceKind,
+    id: InstanceId,
     key: string,
     value: Data,
   ): Promise<boolean>;
@@ -80,6 +161,9 @@ export abstract class AdapaterMessageBroker {
   abstract publish<EventData>(
     channel: string,
     event: EventData,
+    options?: {
+      mode: "pubsub";
+    },
   ): Promise<EventId>;
 
   abstract ack<EventData>(
@@ -90,6 +174,9 @@ export abstract class AdapaterMessageBroker {
   abstract subscribe<EventData>(
     channel: string,
     onEvent: (event: { id: EventId; data: EventData }) => void,
+    options?: {
+      mode: "pubsub";
+    },
   ): { unsubscribe: Function };
 }
 
@@ -120,6 +207,7 @@ export interface ScheduledCallMetaData {
 export abstract class AdapaterScheduler {
   abstract instance(schedule: ScheduleInstanceData): Promise<ScheduleId>;
   abstract event(schedule: ScheduleEventConfig): Promise<ScheduleId>;
+
   abstract list(
     kind: InstanceKind,
     id: InstanceId,

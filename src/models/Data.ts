@@ -1,22 +1,29 @@
-import { Adapters, InstanceId } from "@/adapters";
+import { Adapters } from "@/adapters";
 import { AsyncDebounceHandler } from "@/utils/AsyncDebounceHandler";
+import { Logger } from "./Logger";
+import { Client } from "./Client";
 
 export class Data<DataShape extends Record<string, any>> {
-  adapters: Pick<Adapters, "data" | "messages">;
-  instanceId: InstanceId;
+  logger: Logger;
+  adapters: Adapters;
+  instance: {
+    kind: string;
+    id: string;
+  };
 
   cache = new Cache();
 
   constructor(config: {
-    adapters: Pick<Adapters, "data" | "messages">;
-    instanceId: InstanceId;
+    adapters: Adapters;
+    logger: Logger;
+    instance: {
+      kind: string;
+      id: string;
+    };
   }) {
+    this.logger = config.logger;
     this.adapters = config.adapters;
-    this.instanceId = config.instanceId;
-  }
-
-  static getChannelForInstanceKeyUpdates(instanceId: string, key: string) {
-    return `${instanceId}:key:${key}:data-update`;
+    this.instance = config.instance;
   }
 
   async get<K extends keyof DataShape>(key: K): Promise<DataShape[K] | null> {
@@ -24,7 +31,17 @@ export class Data<DataShape extends Record<string, any>> {
       return this.cache.get(key);
     }
 
-    const data = await this.adapters.data.get(this.instanceId, key.toString());
+    this.logger.log({
+      type: "data:get",
+      key: key.toString(),
+    });
+
+    const data = await this.adapters.data.get<DataShape[K] | null>(
+      this.instance.kind,
+      this.instance.id,
+      key.toString(),
+    );
+
     this.cache.set(key, data);
     return data;
   }
@@ -39,13 +56,28 @@ export class Data<DataShape extends Record<string, any>> {
 
     const debouncer = this.debounceByKey.get(key)!;
     await debouncer.onlyLastOnePerTick(async () => {
-      await this.adapters.data.set(this.instanceId, key.toString(), value);
+      await this.adapters.data.set(
+        this.instance.kind,
+        this.instance.id,
+        key.toString(),
+        value,
+      );
 
-      const channel = Data.getChannelForInstanceKeyUpdates(
-        this.instanceId,
+      const channel = Client.getChannelForDataUpdate(
+        this.instance.kind,
+        this.instance.id,
         key.toString(),
       );
-      await this.adapters.messages.publish(channel, value);
+
+      this.logger.log({
+        type: "data:set",
+        key: key.toString(),
+        value: value,
+      });
+
+      await this.adapters.messages.publish(channel, value, {
+        mode: "pubsub",
+      });
       // cleanup to ensure we don't end up with a big object
       // in the case where the instance is using a lot of keys
       this.debounceByKey.delete(key);
@@ -55,25 +87,37 @@ export class Data<DataShape extends Record<string, any>> {
 
 export class RemoteData<DataShape extends Record<string, any>> {
   adapters: Pick<Adapters, "data" | "messages">;
-  instanceId: InstanceId;
+  instance: {
+    kind: string;
+    id: string;
+  };
 
   constructor(config: {
     adapters: Pick<Adapters, "data" | "messages">;
-    instanceId: InstanceId;
+    instance: {
+      kind: string;
+      id: string;
+    };
   }) {
     this.adapters = config.adapters;
-    this.instanceId = config.instanceId;
+    this.instance = config.instance;
   }
 
   async get<K extends keyof DataShape>(key: K): Promise<DataShape[K] | null> {
-    return await this.adapters.data.get(this.instanceId, key.toString());
+    return await this.adapters.data.get(
+      this.instance.kind,
+      this.instance.id,
+      key.toString(),
+    );
   }
 
   on<K extends keyof DataShape>(key: K, callback: (next: DataShape[K]) => any) {
-    const channel = Data.getChannelForInstanceKeyUpdates(
-      this.instanceId,
+    const channel = Client.getChannelForDataUpdate(
+      this.instance.kind,
+      this.instance.id,
       key.toString(),
     );
+
     return this.adapters.messages.subscribe<DataShape[K]>(channel, (event) => {
       callback(event.data);
     });

@@ -8,14 +8,14 @@ import {
   ScheduleInstanceData,
   InstanceMethodCall,
   EventId,
-  ScheduleContext,
   ScheduleId,
   ScheduledCallMetaData,
+  InstanceSignal,
 } from "../adapters";
 import { Client } from "./Client";
 import { Data } from "./Data";
-
-export type SignalEvent = "abort" | "start" | "dispose";
+import { Lock } from "./Lock";
+import { Logger } from "./Logger";
 
 export interface InstanceProps {
   kind: string;
@@ -41,7 +41,7 @@ export interface InstanceEventChannels {
 }
 
 type Emit<Channels extends Record<string, any>> = <
-  Channel extends keyof Channels,
+  Channel extends Extract<keyof Channels, string>,
 >(
   channel: Channel,
   data: Channels[Channel],
@@ -55,11 +55,15 @@ export interface InterfaceAPI<
     get: Data<InstanceData>["get"];
     set: Data<InstanceData>["set"];
   };
+  logger: {
+    log: (message: string) => void;
+  };
   emit: Emit<InstanceChannels>;
   waitFor: (promise: Promise<any>) => any;
 }
 
 export class InstanceProxy<Inst extends Instance> {
+  public logger: Logger;
   public instance: Inst;
   public running: boolean = false;
   public keepAlive = new PromiseList();
@@ -70,12 +74,14 @@ export class InstanceProxy<Inst extends Instance> {
   public abortSignal: AbortSignal;
 
   constructor(
+    logger: Logger,
     instance: Inst,
     config: ScheduleInstanceData,
     adapters: Adapters,
     abortSignal: AbortSignal,
     data: Data<Inst["__types"]["InstanceData"]>,
   ) {
+    this.logger = logger;
     this.config = config;
     this.adapters = adapters;
     this.instance = instance;
@@ -87,6 +93,14 @@ export class InstanceProxy<Inst extends Instance> {
       },
       waitFor: (promise: Promise<any>) => {
         return this.keepAlive.add(promise);
+      },
+      logger: {
+        log: (message: string) => {
+          return this.logger.log({
+            type: "log",
+            message,
+          });
+        },
       },
       data: {
         get: (...args: Parameters<(typeof data)["get"]>) => data.get(...args),
@@ -129,6 +143,15 @@ export class InstanceProxy<Inst extends Instance> {
     // Wrap the method in a Promise. to ensure that if the method is sync
     // We still catch the error if one happens.
     const startedAt = Date.now();
+    const callID = crypto.randomUUID();
+    this.trace({
+      type: "proxy:call:start",
+      id: callID,
+      context,
+      method: action,
+      args,
+    });
+
     const [error, response] = await Promise.resolve()
       .then(() => method?.(...args))
       .then((res) => [null, res])
@@ -150,11 +173,18 @@ export class InstanceProxy<Inst extends Instance> {
       callMetaData,
     };
 
-    if (response instanceof Stream) {
-      return this.handleStreamResult(response, handleConfig);
-    }
+    const isStream = response instanceof Stream;
+    const result = await Promise.resolve().then(() =>
+      isStream
+        ? this.handleStreamResult(response, handleConfig)
+        : this.handleBasicResult({ error, response }, handleConfig),
+    );
 
-    return this.handleBasicResult({ error, response }, handleConfig);
+    this.trace({
+      type: "proxy:call:end",
+      id: callID,
+      result,
+    });
   }
 
   handleBasicResult(
@@ -185,8 +215,8 @@ export class InstanceProxy<Inst extends Instance> {
         this.emitRequestResponse(config.requestId, { error: serializedError });
       }
 
-      promise.resolve(result.error);
-    } else if (result.response) {
+      promise.resolve(result);
+    } else {
       config.callMetaData.result = result.response;
 
       if (config.requestId) {
@@ -204,9 +234,7 @@ export class InstanceProxy<Inst extends Instance> {
         );
       }
 
-      promise.resolve(result.response);
-    } else {
-      promise.reject(new Error("No Result"));
+      promise.resolve(result);
     }
 
     return promise.await;
@@ -277,12 +305,18 @@ export class InstanceProxy<Inst extends Instance> {
     return promise.await;
   }
 
-  public async run() {
-    // await this.loadData();
+  trace(...args: Parameters<typeof this.logger.log>) {
+    Promise.allSettled([
+      Promise.resolve().then(() => this.instance.signal?.(...args)),
+      Promise.resolve().then(() => this.logger.log(...args)),
+    ]);
+  }
 
-    // Start the process + start listening for events
-    this.instance.signal?.("start");
+  /** Starts listening to events */
+  public async start() {
     this.running = true;
+    this.trace({ type: "proxy:start" });
+
     this.subscribeToInstanceEvent();
 
     const syncAbort = this.syncAbortSignal(this.abortSignal);
@@ -301,7 +335,7 @@ export class InstanceProxy<Inst extends Instance> {
     if (!this.running) return;
     this.running = false;
     this.onEventSubscription?.unsubscribe();
-    this.instance.signal?.("dispose");
+    this.trace({ type: "proxy:dispose" });
 
     // When the instance receives the 'dispose' event
     // it should immedately schedule a dispose function
@@ -350,7 +384,7 @@ export class InstanceProxy<Inst extends Instance> {
 
           const processed = Promise.resolve()
             .then(() => this.callMethodDefinedInEvent(event.id, event.data))
-            .then(() => this.adapters.messages.ack(this.instance.id, event));
+            .finally(() => this.adapters.messages.ack(this.instance.id, event));
 
           this.keepAlive.add(processed);
         },
@@ -375,7 +409,7 @@ export class InstanceProxy<Inst extends Instance> {
   }
 
   public async emitInstanceEvent(channel: string, data: any) {
-    const instanceChannel = Client.getChannelForInstance(
+    const instanceChannel = Client.getChannelForEventBus(
       this.config.kind,
       this.config.id,
       channel.toString(),
@@ -392,7 +426,6 @@ export class InstanceProxy<Inst extends Instance> {
         return;
       }
 
-      this.instance.signal?.("abort");
       this.aborted.resolve(true);
     };
 

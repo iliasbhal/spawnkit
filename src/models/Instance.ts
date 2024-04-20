@@ -1,4 +1,5 @@
-import type { SignalEvent, InterfaceAPI } from "./InstanceProxy";
+import { InstanceSignal } from "@/adapters";
+import type { InterfaceAPI } from "./InstanceProxy";
 
 type AnyRecord = { [key: string]: any };
 
@@ -11,7 +12,7 @@ export class Instance<
     InstanceChannels: InstanceChannels;
   };
 
-  signal(signal: SignalEvent) {}
+  signal(signal: InstanceSignal) {}
 
   // TODO: FIX TYPING HERE
   // For some reason, adding types here break the client types.
@@ -20,6 +21,10 @@ export class Instance<
   id!: string;
   kind!: string;
   api!: InterfaceAPI<InstanceData, InstanceChannels>;
+
+  get logger() {
+    return this.api.logger;
+  }
 
   get data() {
     return this.api.data;

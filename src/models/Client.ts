@@ -44,15 +44,23 @@ export class Client<CP extends SpawnkitConfig> {
     id: InstanceId,
     eventId: EventId,
   ) {
-    return Client.getChannelForInstance(kind, id, `event:${eventId}`);
+    return `${kind}:${id}:event:${eventId}` as const;
   }
 
-  static getChannelForInstance<Channel extends string>(
+  static getChannelForDataUpdate(
+    kind: InstanceKind,
+    id: InstanceId,
+    eventId: EventId,
+  ) {
+    return `${kind}:${id}:data:${eventId}` as const;
+  }
+
+  static getChannelForEventBus<Channel extends string>(
     kind: InstanceKind,
     id: InstanceId,
     channel: Channel,
   ) {
-    return `kind:${kind}:id:${id}:${channel}` as const;
+    return `${kind}:${id}:stream:${channel}` as const;
   }
 
   static deserializeError(serializedError: { message: string; name: string }) {
@@ -81,18 +89,18 @@ export class Client<CP extends SpawnkitConfig> {
     );
   }
 
-  timesampByInstnace = new Map<InstanceId, number>();
+  timestampByInstance = new Map<InstanceId, number>();
   private shouldScheduleInstance(instanceId: InstanceId) {
-    const lastSentEventTimesamp = this.timesampByInstnace.get(instanceId);
+    const now = Date.now();
+    const lastSentEventTimesamp = this.timestampByInstance.get(instanceId);
+    this.timestampByInstance.set(instanceId, now);
+
     if (!lastSentEventTimesamp) {
-      this.timesampByInstnace.set(instanceId, Date.now());
       return true;
     }
 
-    const now = Date.now();
     const timeSinceLastEventSent = now - lastSentEventTimesamp;
     const shouldScheduleInstance = timeSinceLastEventSent > 1000;
-    this.timesampByInstnace.set(instanceId, now);
     return shouldScheduleInstance;
   }
 
@@ -139,7 +147,10 @@ export class Client<CP extends SpawnkitConfig> {
 
     const data = new RemoteData<InstanceData>({
       adapters: this.adapters,
-      instanceId,
+      instance: {
+        id: instanceId,
+        kind: kind,
+      },
     });
 
     const createScheduledMethodHandler = () => {
@@ -259,11 +270,11 @@ export class Client<CP extends SpawnkitConfig> {
         return true;
       },
 
-      on: <Channel extends keyof InstanceChannels>(
+      on: <Channel extends Extract<keyof InstanceChannels, string>>(
         channel: Channel,
         callback: (data: InstanceChannels[Channel]) => any,
       ) => {
-        const channelID = Client.getChannelForInstance(
+        const channelID = Client.getChannelForEventBus(
           kind.toString(),
           instanceId,
           channel.toString(),
@@ -273,6 +284,9 @@ export class Client<CP extends SpawnkitConfig> {
           channelID,
           (message) => {
             callback(message.data);
+          },
+          {
+            mode: "pubsub",
           },
         );
       },
