@@ -32,7 +32,7 @@ export class Stream<StreamValue> {
     this.eventsHandlers.get(event)!.add(callback);
   }
 
-  storred: any[] = [];
+  stored: any[] = [];
   protected store(event: any, data?: any) {
     if (this.started) {
       this.unstore();
@@ -40,19 +40,20 @@ export class Stream<StreamValue> {
       return;
     }
 
-    this.storred.push({ event, data });
+    this.stored.push({ event, data });
   }
 
   unstore() {
-    if (this.storred.length) {
-      this.storred.splice(0).forEach(({ event, data }) => {
+    if (this.stored.length) {
+      this.stored.splice(0).forEach(({ event, data }) => {
         this.notify(event, data);
       });
     }
   }
 
   async map(callback: (data: StreamValue) => any) {
-    if (this.closed) return;
+    console.log("this closed", this.closed);
+    if (this.closed) return Promise.resolve();
 
     return await new Promise((resolve, reject) => {
       this.on("end", () => resolve(true));
@@ -120,6 +121,12 @@ export class Stream<StreamValue> {
 
   clear() {
     this.eventsHandlers.clear();
+  }
+
+  async ensureStarted() {
+    // if (this.started === false) {
+    //   await this.start();
+    // }
   }
 
   started = false;

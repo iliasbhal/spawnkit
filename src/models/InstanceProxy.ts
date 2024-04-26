@@ -248,11 +248,13 @@ export class InstanceProxy<Inst extends Instance> {
     const promise = this.keepAlive.addControlled();
     config.callMetaData.stream = true;
     config.callMetaData.result = [];
+    let steamIdx = 0;
 
     result.on("start", () => {
       if (config.requestId)
         this.emitStream(config.requestId, {
           stream: true,
+          index: steamIdx++,
           start: true,
         });
     });
@@ -262,6 +264,7 @@ export class InstanceProxy<Inst extends Instance> {
       if (config.requestId)
         this.emitStream(config.requestId, {
           stream: true,
+          index: steamIdx++,
           data: data,
         });
     });
@@ -273,6 +276,7 @@ export class InstanceProxy<Inst extends Instance> {
       if (config.requestId)
         this.emitStream(config.requestId, {
           stream: true,
+          index: steamIdx++,
           error: serializedError as Error,
         });
 
@@ -294,6 +298,7 @@ export class InstanceProxy<Inst extends Instance> {
       if (config.requestId) {
         this.emitStream(config.requestId, {
           stream: true,
+          index: steamIdx++,
           end: true,
         });
       }
