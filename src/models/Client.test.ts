@@ -23,6 +23,7 @@ describe("Client", () => {
   describe("Stream", () => {
     it.todo("forwards returned stream to client (.map)");
     it.todo("forwards returned stream to client (async iterator)");
+    it.todo("should replay messages in the same order they have been emitted");
   });
 
   describe("Schedule", () => {

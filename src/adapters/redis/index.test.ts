@@ -27,7 +27,8 @@ function createGetAdapters() {
       lock: new RedisAdapters.Lock(redisClient),
       data: new RedisAdapters.Data(redisClient),
       messages: new RedisAdapters.MessageBroker(redisClient),
-      scheduler: new RedisAdapters.Scheduler(redisClient),
+      instances: new RedisAdapters.InstanceScheduler(redisClient),
+      events: new RedisAdapters.EventScheduler(redisClient),
       logger: new RedisAdapters.Logger(redisClient),
     };
 

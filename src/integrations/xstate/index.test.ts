@@ -1,8 +1,8 @@
 import wait from "wait";
-import { Machine } from "../instances";
+import { Machine } from "@/integrations/xstate";
 import { toggle, toggleWithSync, createInvokeMachine } from "./fixtures";
 import { InstanceSnapshot, InstanceEvent } from "../repositories";
-import * as Spawnkit from "..";
+import * as Spawnkit from "@/.";
 
 describe("Instance", () => {
   const stubs = {

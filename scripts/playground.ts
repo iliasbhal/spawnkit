@@ -15,7 +15,8 @@ const spawnConfig = {
     lock: new RedisAdapter.Lock(redis),
     data: new RedisAdapter.Data(redis),
     messages: new RedisAdapter.MessageBroker(redis),
-    scheduler: new RedisAdapter.Scheduler(redis),
+    events: new RedisAdapter.EventScheduler(redis),
+    instances: new RedisAdapter.InstanceScheduler(redis),
     logger: new RedisAdapter.Logger(redis),
   },
   instances: {
@@ -65,8 +66,8 @@ const basicExample = async () => {
   console.log(response);
 
   // Example 2: call the methods but don't wait for the response
-  // await orderBook.emit.buy({ tick: "APPL" });
-  // console.log("SENT");
+  await orderBook.skip.buy({ tick: "APPL" });
+  console.log("SENT");
 };
 
 const streamExample = async () => {
@@ -89,39 +90,44 @@ const streamExample = async () => {
   // We can also just emit and not read the stream
   // This will ensure the backend doesn't send message across the network
   // if the client doesn't intend to read them.
-  // await exampleInst.emit.startStream({
-  //   count: 4,
-  // });
+  await exampleInst.skip.startStream({
+    count: 4,
+  });
 };
 
 const streamWithErrors = async () => {
   const exampleInst = client.spawn("StreamExample", "Hector");
   console.log(exampleInst.kind, exampleInst.id);
 
-  // const erroredStream = await exampleInst.startFaultyStreamStart();
-  // try {
-  //   await erroredStream.map((data) => {
-  //     console.log("RECEIVED ->", data);
-  //   });
+  const erroredStream = await exampleInst.startFaultyStreamStart();
 
-  //   // for await (const data of erroredStream) {
-  //   //   console.log("STREAM ->", data);
-  //   // }
+  console.log("1st stream");
+  // try {
+  //   // await erroredStream.map((data) => {
+  //   //   console.log("RECEIVED ->", data);
+  //   // });
+
+  //   for await (const data of erroredStream) {
+  //     console.log("STREAM ->", data);
+  //   }
   // } catch (err) {
   //   console.log("AN ERROR HANNPED", err);
   // }
 
+  // console.log("AFTER MAP");
+
+  console.log("2nd stream");
   const erroredStream2 = await exampleInst.startFaultyStreamDuring();
   try {
-    await erroredStream2.map((data) => {
-      console.log("RECEIVED ->", data);
-    });
+    // await erroredStream2.map((data) => {
+    //   console.log("RECEIVED 2 ->", data);
+    // });
 
-    // for await (const data of erroredStream2) {
-    //   console.log("STREAM ->", data);
-    // }
+    for await (const data of erroredStream2) {
+      console.log("STREAM ->", data);
+    }
   } catch (err) {
-    console.log("AN ERROR HANNPED", err);
+    console.log("AN ERROR HANNPED 2", err);
   }
 };
 
@@ -166,14 +172,14 @@ const emittedEventsExample = async () => {
 };
 
 const scheduleCallExample = async () => {
-  const streamExample = client.spawn("StreamExample", "BTC/ETH");
-  const scheduleId = await streamExample
-    .schedule({
-      name: "Buy AAPL Regularly",
-      delay: 2000,
-      // cron: "* * * * *",
-    })
-    .startFaultyStreamDuring();
+  // const streamExample = client.spawn("StreamExample", "BTC/ETH");
+  // const scheduleId = await streamExample
+  //   .schedule({
+  //     name: "Buy AAPL Regularly",
+  //     delay: 2000,
+  //     // cron: "* * * * *",
+  //   })
+  //   .startFaultyStreamDuring();
 
   // setInterval(async () => {
   //   const scheduled = await streamExample.scheduled.list();
@@ -187,11 +193,11 @@ const scheduleCallExample = async () => {
   // orderBook.emit("orders", ["asddsa"]);
 
   // const orderBook2 = client.spawn("OrderBook", "BTC/USD");
-  // orderBook.on("orders", (event) => {
+  // orderBook2.on("orders", (event) => {
   //   console.log("stream: ", event);
   // });
 
-  // const scheduleId = await orderBook
+  // const scheduleId = await orderBook2
   //   .schedule({
   //     name: "Buy AAPL Regularly",
   //     delay: 2000,
@@ -247,8 +253,8 @@ const errorHandlingExample = async () => {
       "caught error",
       err instanceof Spawnkit.RemoteError,
       err.name === "SomeSpetialError",
-      err,
     );
+    console.log(err);
   }
 };
 

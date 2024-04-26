@@ -23,24 +23,20 @@ export class Worker<O extends SpawnkitConfig> {
   }
 
   start() {
-    const subscription = this.adapters.scheduler.subscribe(
-      async (type, data, context) => {
-        if (type === "event") {
-          return await this.callInstanceMethod(
-            data as ScheduleEventConfig,
-            context,
-          );
-        }
+    const eventSub = this.adapters.events.subscribe(async (data, context) => {
+      return await this.callInstanceMethod(data, context);
+    });
 
-        if (type === "instance") {
-          return await this.tryInstantiateInstance(
-            data as ScheduleInstanceData,
-          );
-        }
+    const instancesSub = this.adapters.instances.subscribe(
+      async (data, context) => {
+        return await this.tryInstantiateInstance(data);
       },
     );
 
-    this.stopCallback = subscription.unsubscribe;
+    this.stopCallback = () => {
+      eventSub.unsubscribe();
+      instancesSub.unsubscribe();
+    };
   }
 
   private stopCallback?: Function;
@@ -134,7 +130,7 @@ export class Worker<O extends SpawnkitConfig> {
             instanceConfig.id,
           );
           if (hasUnprocessedEvents) {
-            this.adapters.scheduler.instance(instanceConfig);
+            this.adapters.instances.schedule(instanceConfig);
           }
         }
       });

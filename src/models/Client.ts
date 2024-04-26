@@ -3,10 +3,9 @@ import type {
   InstanceEventChannels,
   InstanceEventStreamMessage,
 } from "./InstanceProxy";
-import { Stream } from "@/utils/Stream";
+import { Stream } from "@/models/Stream";
 import {
   Adapters,
-  ScheduleEventConfig,
   ScheduleId,
   Cron,
   Delay,
@@ -132,17 +131,13 @@ export class Client<CP extends SpawnkitConfig> {
         // This is mainly to avoid adding unnessary pressure the the backend.
         // Scheduling too often is guarenteed to fail often as theu won't be able to acquire the locks
         shouldScheduleInstance &&
-          this.adapters.scheduler.instance({
+          this.adapters.instances.schedule({
             kind: kind.toString(),
             id: instanceId,
           }),
       ]);
 
       return eventId;
-    };
-
-    const scheduleEvent = async (schedule: ScheduleEventConfig) => {
-      return await this.adapters.scheduler.event(schedule);
     };
 
     const data = new RemoteData<InstanceData>({
@@ -160,12 +155,12 @@ export class Client<CP extends SpawnkitConfig> {
 
       return (schedule: CommonScheduleConfig & (Delay | Cron)) => {
         return new Proxy({} as ScheduleRemoteMethods, {
-          get(target, prop, receiver) {
+          get: (target, prop, receiver) => {
             if (prop in target) return Reflect.get(target, prop, receiver);
             if (typeof prop !== "string") return;
 
             return async (...args: any[]) => {
-              const scheduleId = await scheduleEvent({
+              const scheduleId = await this.adapters.events.schedule({
                 schedule: schedule,
                 instance: {
                   id: instanceId,
@@ -208,13 +203,14 @@ export class Client<CP extends SpawnkitConfig> {
               );
 
               const internalStream = new ClientStream();
+
+              internalStream.on("end", () => subscription.unsubscribe());
               const handleStreamMessage = (
                 subscription: { unsubscribe: Function },
                 message: InstanceEventStreamMessage,
               ) => {
-                if ("start" in message) resolve(internalStream);
+                resolve(internalStream);
                 internalStream.forward(message);
-                if ("end" in message) subscription.unsubscribe();
               };
 
               const handleDefaultMessage = (
@@ -238,6 +234,8 @@ export class Client<CP extends SpawnkitConfig> {
               > = this.adapters.messages.subscribe<InternalMessageData>(
                 channelID,
                 (message) => {
+                  // console.log("SUB", channelID, message);
+
                   if ("stream" in message.data)
                     return handleStreamMessage(subscription, message.data);
                   if ("response" in message.data)
@@ -308,16 +306,16 @@ export class Client<CP extends SpawnkitConfig> {
       schedule: scheduleRemoteMethodHandler,
       scheduled: {
         list: async () => {
-          return this.adapters.scheduler.list(kind, instanceId);
+          return this.adapters.events.list(kind, instanceId);
         },
         cancel: async (scheduleId: ScheduleId) => {
-          return this.adapters.scheduler.cancel(kind, instanceId, scheduleId);
+          return this.adapters.events.cancel(kind, instanceId, scheduleId);
         },
         delete: async (scheduleId: ScheduleId) => {
-          return this.adapters.scheduler.delete(kind, instanceId, scheduleId);
+          return this.adapters.events.delete(kind, instanceId, scheduleId);
         },
         get: async (scheduleId: ScheduleId) => {
-          return this.adapters.scheduler.get(kind, instanceId, scheduleId);
+          return this.adapters.events.get(kind, instanceId, scheduleId);
         },
       },
     } as const;
@@ -341,7 +339,29 @@ class ClientStream extends Stream<any> {
     super(() => {});
   }
 
-  forward(message: InternalMessageData) {
+  lastIndex = -1;
+  receivedMessageBuffer: InstanceEventStreamMessage[] = [];
+  async forward(message: InstanceEventStreamMessage) {
+    // await this.ensureStarted();
+    this.receivedMessageBuffer.push(message);
+    this.receivedMessageBuffer.sort((left, right) => left.index - right.index);
+    // console.log("this.receivedMessageBuffer", this.receivedMessageBuffer);
+
+    while (this.receivedMessageBuffer[0]) {
+      const bufferedMsg = this.receivedMessageBuffer.shift()!;
+      const isMessageInOrder = bufferedMsg.index == this.lastIndex + 1;
+      if (!isMessageInOrder) {
+        this.receivedMessageBuffer.unshift(bufferedMsg);
+        break;
+      }
+
+      this.lastIndex = bufferedMsg.index;
+      this.injest(bufferedMsg);
+    }
+  }
+
+  injest(message: InstanceEventStreamMessage) {
+    console.log("INJEST", message);
     if ("start" in message) this.store("start");
     if ("data" in message) this.store("data", message.data);
 

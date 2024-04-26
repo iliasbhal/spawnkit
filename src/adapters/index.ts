@@ -10,6 +10,15 @@ export type ScheduleId = string;
 export type Cron = { cron: string };
 export type Delay = { delay: number };
 
+export interface Adapters {
+  lock: AdapterLock;
+  data: AdapaterData;
+  messages: AdapaterMessageBroker;
+  events: AdapterEventScheduler;
+  instances: AdapaterInstanceScheduler;
+  logger?: AdapterLogger;
+}
+
 export interface ScheduleByType {
   event: ScheduleEventConfig;
   instance: ScheduleInstanceData;
@@ -64,11 +73,11 @@ export type InstanceSignal =
   | {
       type: "data:get";
       key: string;
-      value: any;
     }
   | {
       type: "data:set";
       key: string;
+      value: any;
     }
   | {
       type: "proxy:start";
@@ -87,14 +96,6 @@ export type InstanceSignal =
       id: string;
       result: any;
     };
-
-export interface Adapters {
-  lock: AdapterLock;
-  data: AdapaterData;
-  messages: AdapaterMessageBroker;
-  scheduler: AdapaterScheduler;
-  logger?: AdapterLogger;
-}
 
 export abstract class AdapterLogger {
   abstract log(
@@ -204,9 +205,8 @@ export interface ScheduledCallMetaData {
   error: any;
 }
 
-export abstract class AdapaterScheduler {
-  abstract instance(schedule: ScheduleInstanceData): Promise<ScheduleId>;
-  abstract event(schedule: ScheduleEventConfig): Promise<ScheduleId>;
+export abstract class AdapterEventScheduler {
+  abstract schedule(schedule: ScheduleEventConfig): Promise<ScheduleId>;
 
   abstract list(
     kind: InstanceKind,
@@ -242,11 +242,17 @@ export abstract class AdapaterScheduler {
   ): Promise<boolean>;
 
   abstract subscribe(
-    callback: <Type extends keyof ScheduleByType>(
-      type: Type,
-      data: ScheduleByType[Type],
-      context: ScheduleContext,
-    ) => any,
+    callback: (data: ScheduleEventConfig, context: ScheduleContext) => any,
+  ): {
+    unsubscribe: Function;
+  };
+}
+
+export abstract class AdapaterInstanceScheduler {
+  abstract schedule(schedule: ScheduleInstanceData): Promise<ScheduleId>;
+
+  abstract subscribe(
+    callback: (data: ScheduleInstanceData, context: ScheduleContext) => any,
   ): {
     unsubscribe: Function;
   };

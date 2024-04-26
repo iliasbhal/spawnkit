@@ -1,10 +1,8 @@
 # Spawnkit lib
 
-- Redis Adapter? Or through a worker???
-  Should add TTL to some of the stuff on redis
+- Investigate why xstate toggle doesn't produce snapshot event in the TRUE / FALSE / TRUE / FALSe sequence. it sometimes output TRUE TRUE FALSE FALSE for example. We should ensure that data events are in order.
 
-- should create a queue for each type of instance
-  to allow for easier migration and customization.
+- Should be able to see logs from a UI.
 
 # Spawnkit cloud
 

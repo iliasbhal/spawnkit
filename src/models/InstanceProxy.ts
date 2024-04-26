@@ -1,7 +1,7 @@
 import { PromiseList } from "@/utils/PromiseList";
 import { ControlledPromise } from "@/utils/ControlledPromise";
 import { ControlledTimeout } from "@/utils/ControlledTimeout";
-import { Stream } from "@/utils/Stream";
+import { Stream } from "@/models/Stream";
 import { Instance } from "./Instance";
 import {
   Adapters,
@@ -10,11 +10,9 @@ import {
   EventId,
   ScheduleId,
   ScheduledCallMetaData,
-  InstanceSignal,
 } from "../adapters";
 import { Client } from "./Client";
 import { Data } from "./Data";
-import { Lock } from "./Lock";
 import { Logger } from "./Logger";
 
 export interface InstanceProps {
@@ -29,10 +27,10 @@ export interface InstanceDataChannels {
 export type InstanceEventRequestMessage = { error: any } | { response: any };
 
 export type InstanceEventStreamMessage =
-  | { stream: true; start: true }
-  | { stream: true; data: any }
-  | { stream: true; end: true }
-  | { stream: true; error: Error };
+  | { stream: true; index: number; start: true }
+  | { stream: true; index: number; data: any }
+  | { stream: true; index: number; end: true }
+  | { stream: true; index: number; error: Error };
 
 export interface InstanceEventChannels {
   [key: `kind:${string}:id:${string}:event:${string}`]:
@@ -147,7 +145,6 @@ export class InstanceProxy<Inst extends Instance> {
     this.trace({
       type: "proxy:call:start",
       id: callID,
-      context,
       method: action,
       args,
     });
@@ -203,7 +200,7 @@ export class InstanceProxy<Inst extends Instance> {
       config.callMetaData.error = serializedError;
 
       if (config.scheduleId) {
-        this.adapters.scheduler.store(
+        this.adapters.events.store(
           this.instance.kind,
           this.instance.id,
           config.scheduleId,
@@ -226,7 +223,7 @@ export class InstanceProxy<Inst extends Instance> {
       }
 
       if (config.scheduleId) {
-        this.adapters.scheduler.store(
+        this.adapters.events.store(
           this.instance.kind,
           this.instance.id,
           config.scheduleId,
@@ -254,7 +251,7 @@ export class InstanceProxy<Inst extends Instance> {
 
     result.on("start", () => {
       if (config.requestId)
-        this.emitRequestResponse(config.requestId, {
+        this.emitStream(config.requestId, {
           stream: true,
           start: true,
         });
@@ -263,7 +260,7 @@ export class InstanceProxy<Inst extends Instance> {
     result.on("data", (data) => {
       config.callMetaData.result.push(data);
       if (config.requestId)
-        this.emitRequestResponse(config.requestId, {
+        this.emitStream(config.requestId, {
           stream: true,
           data: data,
         });
@@ -274,9 +271,9 @@ export class InstanceProxy<Inst extends Instance> {
       config.callMetaData.error = serializedError;
 
       if (config.requestId)
-        this.emitRequestResponse(config.requestId, {
+        this.emitStream(config.requestId, {
           stream: true,
-          error: serializedError,
+          error: serializedError as Error,
         });
 
       promise.resolve(err);
@@ -286,7 +283,7 @@ export class InstanceProxy<Inst extends Instance> {
       config.callMetaData.ended_at = Date.now();
 
       if (config.scheduleId) {
-        this.adapters.scheduler.store(
+        this.adapters.events.store(
           this.instance.kind,
           this.instance.id,
           config.scheduleId,
@@ -295,7 +292,10 @@ export class InstanceProxy<Inst extends Instance> {
       }
 
       if (config.requestId) {
-        this.emitRequestResponse(config.requestId, { stream: true, end: true });
+        this.emitStream(config.requestId, {
+          stream: true,
+          end: true,
+        });
       }
 
       promise.resolve(true);
@@ -303,6 +303,10 @@ export class InstanceProxy<Inst extends Instance> {
 
     result.start();
     return promise.await;
+  }
+
+  emitStream(requestId: string, data: InstanceEventStreamMessage) {
+    return this.emitRequestResponse(requestId, data);
   }
 
   trace(...args: Parameters<typeof this.logger.log>) {
@@ -404,6 +408,7 @@ export class InstanceProxy<Inst extends Instance> {
     );
 
     return this.runExternalEffect(async () => {
+      console.log("EMIT REQUEST RESPONSE", data);
       return await this.adapters.messages.publish(channelID, data);
     });
   }
