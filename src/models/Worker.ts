@@ -1,12 +1,7 @@
 import wait from "wait";
 import { Lock } from "./Lock";
-import {
-  ScheduleByType,
-  ScheduleContext,
-  ScheduleEventConfig,
-  ScheduleInstanceData,
-} from "../adapters";
-import { Client, SpawnkitConfig } from "./Client";
+import { ScheduleByType, ScheduleContext } from "../adapters";
+import type { Client, SpawnkitConfig } from "./Client";
 import { InstanceProxy } from "./InstanceProxy";
 import { Data } from "./Data";
 import { Logger } from "./Logger";
@@ -16,10 +11,10 @@ export class Worker<O extends SpawnkitConfig> {
   adapters: O["adapters"];
   client: Client<O>;
 
-  constructor(config: O) {
+  constructor(config: O, client: Client<any>) {
     this.instances = config.instances;
     this.adapters = config.adapters;
-    this.client = new Client(config);
+    this.client = client;
   }
 
   start() {
@@ -150,7 +145,7 @@ export class Worker<O extends SpawnkitConfig> {
     }
   }
 
-  static from<O extends SpawnkitConfig>(opts: O) {
+  static from<O extends SpawnkitConfig>(opts: O, client: Client<any>) {
     Worker.verify(opts.instances);
 
     if (process.env.NODE_ENV !== "test") {
@@ -159,7 +154,7 @@ export class Worker<O extends SpawnkitConfig> {
       });
     }
 
-    return new Worker<O>(opts);
+    return new Worker<O>(opts, client);
   }
 
   static verify(instances: SpawnkitConfig["instances"]) {

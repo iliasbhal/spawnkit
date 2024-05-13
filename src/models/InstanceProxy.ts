@@ -5,7 +5,7 @@ import { Stream } from "@/models/Stream";
 import { Instance } from "./Instance";
 import {
   Adapters,
-  ScheduleInstanceData,
+  InstanceIdentifier,
   InstanceMethodCall,
   EventId,
   ScheduleId,
@@ -67,14 +67,14 @@ export class InstanceProxy<Inst extends Instance> {
   public keepAlive = new PromiseList();
   public aborted = new ControlledPromise("Aborted");
 
-  public config: ScheduleInstanceData;
+  public config: InstanceIdentifier;
   public adapters: Adapters;
   public abortSignal: AbortSignal;
 
   constructor(
     logger: Logger,
     instance: Inst,
-    config: ScheduleInstanceData,
+    config: InstanceIdentifier,
     adapters: Adapters,
     abortSignal: AbortSignal,
     data: Data<Inst["__types"]["InstanceData"]>,
@@ -87,7 +87,7 @@ export class InstanceProxy<Inst extends Instance> {
 
     InstanceProxy.configureInstance(instance, config, {
       emit: (channel, data) => {
-        return this.emitInstanceEvent(channel, data);
+        return this.emit(channel, data);
       },
       waitFor: (promise: Promise<any>) => {
         return this.keepAlive.add(promise);
@@ -125,7 +125,7 @@ export class InstanceProxy<Inst extends Instance> {
   }
 
   public async callMethodDefinedInEvent(
-    requestId: EventId,
+    messageId: EventId,
     event: InstanceMethodCall,
   ): Promise<any> {
     const { action, args, mode = "normal", context } = event;
@@ -164,8 +164,8 @@ export class InstanceProxy<Inst extends Instance> {
 
     const shouldStoreResult = !!context?.scheduleId;
     const chouldEmitResponseBack = mode === "normal";
-    const handleConfig = {
-      requestId: chouldEmitResponseBack ? requestId : undefined,
+    const reponseContext = {
+      messageId: chouldEmitResponseBack ? messageId : undefined,
       scheduleId: shouldStoreResult ? context?.scheduleId : undefined,
       callMetaData,
     };
@@ -173,8 +173,8 @@ export class InstanceProxy<Inst extends Instance> {
     const isStream = response instanceof Stream;
     const result = await Promise.resolve().then(() =>
       isStream
-        ? this.handleStreamResult(response, handleConfig)
-        : this.handleBasicResult({ error, response }, handleConfig),
+        ? this.handleStreamResult(response, reponseContext)
+        : this.handleBasicResult({ error, response }, reponseContext),
     );
 
     this.trace({
@@ -187,7 +187,7 @@ export class InstanceProxy<Inst extends Instance> {
   handleBasicResult(
     result: { error: Error; response: any },
     config: {
-      requestId?: EventId;
+      messageId?: EventId;
       scheduleId?: ScheduleId;
       callMetaData: ScheduledCallMetaData;
     },
@@ -199,25 +199,27 @@ export class InstanceProxy<Inst extends Instance> {
       const serializedError = Client.serializeError(result.error);
       config.callMetaData.error = serializedError;
 
-      if (config.scheduleId) {
+      if (config.messageId) {
         this.adapters.events.store(
           this.instance.kind,
           this.instance.id,
-          config.scheduleId,
+          config.messageId,
           config.callMetaData,
         );
       }
 
-      if (config.requestId) {
-        this.emitRequestResponse(config.requestId, { error: serializedError });
+      if (config.messageId) {
+        this.respond(config.messageId, {
+          error: serializedError,
+        });
       }
 
       promise.resolve(result);
     } else {
       config.callMetaData.result = result.response;
 
-      if (config.requestId) {
-        this.emitRequestResponse(config.requestId, {
+      if (config.messageId) {
+        this.respond(config.messageId, {
           response: result.response,
         });
       }
@@ -252,7 +254,7 @@ export class InstanceProxy<Inst extends Instance> {
 
     result.on("start", () => {
       if (config.requestId)
-        this.emitStream(config.requestId, {
+        this.respond(config.requestId, {
           stream: true,
           index: steamIdx++,
           start: true,
@@ -262,7 +264,7 @@ export class InstanceProxy<Inst extends Instance> {
     result.on("data", (data) => {
       config.callMetaData.result.push(data);
       if (config.requestId)
-        this.emitStream(config.requestId, {
+        this.respond(config.requestId, {
           stream: true,
           index: steamIdx++,
           data: data,
@@ -274,7 +276,7 @@ export class InstanceProxy<Inst extends Instance> {
       config.callMetaData.error = serializedError;
 
       if (config.requestId)
-        this.emitStream(config.requestId, {
+        this.respond(config.requestId, {
           stream: true,
           index: steamIdx++,
           error: serializedError as Error,
@@ -296,7 +298,7 @@ export class InstanceProxy<Inst extends Instance> {
       }
 
       if (config.requestId) {
-        this.emitStream(config.requestId, {
+        this.respond(config.requestId, {
           stream: true,
           index: steamIdx++,
           end: true,
@@ -308,10 +310,6 @@ export class InstanceProxy<Inst extends Instance> {
 
     result.start();
     return promise.await;
-  }
-
-  emitStream(requestId: string, data: InstanceEventStreamMessage) {
-    return this.emitRequestResponse(requestId, data);
   }
 
   trace(...args: Parameters<typeof this.logger.log>) {
@@ -386,14 +384,17 @@ export class InstanceProxy<Inst extends Instance> {
 
     this.onEventSubscription =
       this.adapters.messages.subscribe<InstanceMethodCall>(
-        this.instance.id,
+        this.instance,
+        "rpc",
         async (event) => {
           this.keepAlive.addWait(300, "Event Received");
           timer.restart(NO_EVENT_TIMEOUT);
 
           const processed = Promise.resolve()
             .then(() => this.callMethodDefinedInEvent(event.id, event.data))
-            .finally(() => this.adapters.messages.ack(this.instance.id, event));
+            .finally(() =>
+              this.adapters.messages.ack(this.instance, "rpc", event.id),
+            );
 
           this.keepAlive.add(processed);
         },
@@ -405,28 +406,26 @@ export class InstanceProxy<Inst extends Instance> {
   /** this function is used to emit message to one client,
    * also for type safety, so that so that it doesn't show on client.on channel name autocomplete
    **/
-  public async emitRequestResponse(requestId: string, data: any) {
-    const channelID = Client.getChannelForEventResponse(
-      this.instance.kind,
-      this.instance.id,
-      requestId,
-    );
+  public async respond(messageId: string, data: any) {
+    const channelID = Client.getChannelForEventResponse(messageId);
 
     return this.runExternalEffect(async () => {
-      console.log("EMIT REQUEST RESPONSE", data);
-      return await this.adapters.messages.publish(channelID, data);
+      // console.log("EMIT REQUEST RESPONSE", data);
+      return await this.adapters.messages.publish(
+        this.instance,
+        channelID,
+        data,
+      );
     });
   }
 
-  public async emitInstanceEvent(channel: string, data: any) {
-    const instanceChannel = Client.getChannelForEventBus(
-      this.config.kind,
-      this.config.id,
-      channel.toString(),
-    );
-
+  public async emit(channel: string, data: any) {
     return this.runExternalEffect(async () => {
-      return await this.adapters.messages.publish(instanceChannel, data);
+      return await this.adapters.messages.publish(
+        this.instance,
+        Client.getChannelForEventBus("instance", channel.toString()),
+        data,
+      );
     });
   }
 

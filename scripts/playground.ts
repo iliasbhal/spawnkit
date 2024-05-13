@@ -28,22 +28,21 @@ const spawnConfig = {
   },
 } satisfies Spawnkit.SpawnkitConfig;
 
-const worker = Spawnkit.Worker.from(spawnConfig);
 const client = Spawnkit.Client.from(spawnConfig);
 
 const main = async () => {
   await redis.flushall("SYNC");
-  worker.start();
+  client.start();
 
   // attributeExample();
   await Promise.all([
-    // basicExample(),
+    basicExample(),
+    // errorHandlingExample(),
     // streamExample(),
     // streamWithErrors(),
     // scheduleCallExample(),
     // emittedEventsExample(),
-    // errorHandlingExample(),
-    exampleXState(),
+    // exampleXState(),
   ]);
 };
 
@@ -60,14 +59,19 @@ const attributeExample = () => {
 
 const basicExample = async () => {
   const orderBook = client.spawn("OrderBook", "BTC/EUR");
+  const subscription = orderBook.on("orders", (event) => {
+    console.log("ON CLIENT 1", event);
+  });
 
   // Example 1: call methods like the its a real reference.
-  const response = await orderBook.buy({ tick: "APPL" });
-  console.log(response);
+  const response = await orderBook.buy({ tick: "APPL", qty: 10 });
+  console.log("response", response);
 
   // Example 2: call the methods but don't wait for the response
-  await orderBook.skip.buy({ tick: "APPL" });
-  console.log("SENT");
+  // await orderBook.skip.buy({ tick: "APPL" });
+  // console.log("SENT");
+  //
+  subscription.unsubscribe();
 };
 
 const streamExample = async () => {
@@ -76,10 +80,10 @@ const streamExample = async () => {
 
   // Example 1:  consume stream using .map
   // which returns a Promise that is resolved when the stream ends
-  // const stream = await exampleInst.startStream({ count: 4 });
-  // await stream.map((data) => {
-  //   console.log("RECEIVED ->", data);
-  // });
+  const stream = await exampleInst.startStream({ count: 4 });
+  await stream.map((data) => {
+    console.log("RECEIVED ->", data);
+  });
 
   // Example 2: consume stream using an async iterator
   // const stream = await exampleInst.startStream({ count: 4 });
@@ -90,9 +94,9 @@ const streamExample = async () => {
   // We can also just emit and not read the stream
   // This will ensure the backend doesn't send message across the network
   // if the client doesn't intend to read them.
-  await exampleInst.skip.startStream({
-    count: 4,
-  });
+  // await exampleInst.skip.startStream({
+  //   count: 4,
+  // });
 };
 
 const streamWithErrors = async () => {

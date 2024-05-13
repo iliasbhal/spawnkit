@@ -1,5 +1,9 @@
 # Spawnkit lib
 
+- DATA should leverage regular croadcast channels.
+
+- should be able to add meta data to instances.
+
 - Investigate why xstate toggle doesn't produce snapshot event in the TRUE / FALSE / TRUE / FALSe sequence. it sometimes output TRUE TRUE FALSE FALSE for example. We should ensure that data events are in order.
 
 - Should be able to see logs from a UI.

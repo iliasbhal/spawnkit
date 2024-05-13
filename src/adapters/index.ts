@@ -1,4 +1,4 @@
-import { Lock } from "@/models/Lock";
+import type { Client } from "..";
 
 export type InstanceId = string;
 export type InstanceKind = string;
@@ -21,7 +21,7 @@ export interface Adapters {
 
 export interface ScheduleByType {
   event: ScheduleEventConfig;
-  instance: ScheduleInstanceData;
+  instance: InstanceIdentifier;
 }
 
 type CommonScheduleConfig = {
@@ -31,12 +31,12 @@ type CommonScheduleConfig = {
 export type ScheduleConfig = CommonScheduleConfig & (Cron | Delay);
 
 export interface ScheduleEventConfig {
-  instance: ScheduleInstanceData;
+  instance: InstanceIdentifier;
   schedule: ScheduleConfig;
   event: InstanceMethodCall;
 }
 
-export interface ScheduleInstanceData {
+export interface InstanceIdentifier {
   kind: InstanceKind;
   id: InstanceId;
 }
@@ -48,7 +48,9 @@ export interface InstanceMethodCall<
   action: Action;
   args: Args;
   mode: "normal" | "skip" | "scheduled";
-  context?: any;
+  context?: {
+    scheduleId?: string;
+  };
 }
 
 export type InstanceSignal =
@@ -97,7 +99,14 @@ export type InstanceSignal =
       result: any;
     };
 
-export abstract class AdapterLogger {
+export class BaseAdapter {
+  client!: Client<any>;
+  link(client: Client<any>) {
+    this.client = client;
+  }
+}
+
+export abstract class AdapterLogger extends BaseAdapter {
   abstract log(
     kind: InstanceKind,
     id: InstanceId,
@@ -124,7 +133,7 @@ export abstract class AdapterLogger {
   ): Promise<any>;
 }
 
-export abstract class AdapterLock {
+export abstract class AdapterLock extends BaseAdapter {
   /*
    *
    */
@@ -144,7 +153,7 @@ export abstract class AdapterLock {
   abstract release(lockId: RessourceId, ownerId: LockOwnerId): Promise<boolean>;
 }
 
-export abstract class AdapaterData {
+export abstract class AdapaterData extends BaseAdapter {
   abstract get<Data>(
     kind: InstanceKind,
     id: InstanceId,
@@ -158,26 +167,26 @@ export abstract class AdapaterData {
   ): Promise<boolean>;
 }
 
-export abstract class AdapaterMessageBroker {
+export abstract class AdapaterMessageBroker extends BaseAdapter {
   abstract publish<EventData>(
+    instance: InstanceIdentifier,
     channel: string,
     event: EventData,
-    options?: {
-      mode: "pubsub";
+    meta?: {
+      reply: string;
     },
   ): Promise<EventId>;
 
-  abstract ack<EventData>(
+  abstract ack(
+    instance: InstanceIdentifier,
     channel: string,
-    event: { id: EventId; data: EventData },
+    messageId: EventId,
   ): Promise<true>;
-  abstract has(channel: string): Promise<boolean>;
+  abstract has(instance: InstanceIdentifier, channel: string): Promise<boolean>;
   abstract subscribe<EventData>(
+    instance: InstanceIdentifier,
     channel: string,
     onEvent: (event: { id: EventId; data: EventData }) => void,
-    options?: {
-      mode: "pubsub";
-    },
   ): { unsubscribe: Function };
 }
 
@@ -205,7 +214,7 @@ export interface ScheduledCallMetaData {
   error: any;
 }
 
-export abstract class AdapterEventScheduler {
+export abstract class AdapterEventScheduler extends BaseAdapter {
   abstract schedule(schedule: ScheduleEventConfig): Promise<ScheduleId>;
 
   abstract list(
@@ -248,11 +257,11 @@ export abstract class AdapterEventScheduler {
   };
 }
 
-export abstract class AdapaterInstanceScheduler {
-  abstract schedule(schedule: ScheduleInstanceData): Promise<ScheduleId>;
+export abstract class AdapaterInstanceScheduler extends BaseAdapter {
+  abstract schedule(schedule: InstanceIdentifier): Promise<ScheduleId>;
 
   abstract subscribe(
-    callback: (data: ScheduleInstanceData, context: ScheduleContext) => any,
+    callback: (data: InstanceIdentifier, context: ScheduleContext) => any,
   ): {
     unsubscribe: Function;
   };

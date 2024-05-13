@@ -11,10 +11,11 @@ import {
   Delay,
   InstanceId,
   EventId,
-  InstanceKind,
   InstanceMethodCall,
+  BaseAdapter,
 } from "../adapters";
 import { RemoteData } from "./Data";
+import { Worker } from "./Worker";
 
 export interface SpawnkitConfig {
   adapters: Adapters;
@@ -28,38 +29,34 @@ type InternalMessageData = InstanceEventChannels[keyof InstanceEventChannels];
 export class Client<CP extends SpawnkitConfig> {
   private adapters: CP["adapters"];
   private instances: CP["instances"];
+  id = crypto.randomUUID();
 
   constructor(opts: CP) {
     this.adapters = opts.adapters;
     this.instances = opts.instances;
+
+    Object.values(this.adapters).forEach((adapter) => {
+      if (adapter instanceof BaseAdapter) {
+        adapter.link(this);
+        return;
+      }
+
+      throw new Error("Invalid Adapter, need to extend BaseAdapter");
+    });
   }
 
   static from<CP extends SpawnkitConfig>(opts: CP) {
     return new Client<CP>(opts);
   }
 
-  static getChannelForEventResponse(
-    kind: InstanceKind,
-    id: InstanceId,
-    eventId: EventId,
-  ) {
-    return `${kind}:${id}:event:${eventId}` as const;
+  static getChannelForEventResponse(eventId: EventId) {
+    return `reply:${eventId}` as const;
   }
-
-  static getChannelForDataUpdate(
-    kind: InstanceKind,
-    id: InstanceId,
-    eventId: EventId,
-  ) {
-    return `${kind}:${id}:data:${eventId}` as const;
-  }
-
   static getChannelForEventBus<Channel extends string>(
-    kind: InstanceKind,
-    id: InstanceId,
+    type: string,
     channel: Channel,
   ) {
-    return `${kind}:${id}:stream:${channel}` as const;
+    return `broadcast:${type}:${channel}` as const;
   }
 
   static deserializeError(serializedError: { message: string; name: string }) {
@@ -86,6 +83,21 @@ export class Client<CP extends SpawnkitConfig> {
         originalColumn: undefined,
       },
     );
+  }
+
+  worker: Worker<any> | null = null;
+  public start() {
+    const forwardOptions = {
+      adapters: this.adapters,
+      instances: this.instances,
+    } as any;
+
+    const worker = Worker.from(forwardOptions, this);
+    return worker.start();
+  }
+
+  public stop() {
+    return this.worker?.stop();
   }
 
   timestampByInstance = new Map<InstanceId, number>();
@@ -116,12 +128,21 @@ export class Client<CP extends SpawnkitConfig> {
     type SkipRemoteMethods = MakeSkippable<AvailableMethods>;
     type ScheduleRemoteMethods = MakeSchedulable<AvailableMethods>;
 
+    const instanceIdentifier = {
+      id: instanceId,
+      kind: kind.toString(),
+    };
+
     const sendEventToInstance = async (
       methodCallConfig: InstanceMethodCall,
     ) => {
       const shouldScheduleInstance = this.shouldScheduleInstance(instanceId);
       const [eventId] = await Promise.all([
-        this.adapters.messages.publish(instanceId, methodCallConfig),
+        this.adapters.messages.publish(
+          instanceIdentifier,
+          "rpc",
+          methodCallConfig,
+        ),
 
         // when sending an event, we shall always try to spawn an instance
         // to ensure that the event will be processed except In the case that we are sending a lot of events
@@ -131,10 +152,7 @@ export class Client<CP extends SpawnkitConfig> {
         // This is mainly to avoid adding unnessary pressure the the backend.
         // Scheduling too often is guarenteed to fail often as theu won't be able to acquire the locks
         shouldScheduleInstance &&
-          this.adapters.instances.schedule({
-            kind: kind.toString(),
-            id: instanceId,
-          }),
+          this.adapters.instances.schedule(instanceIdentifier),
       ]);
 
       return eventId;
@@ -142,10 +160,7 @@ export class Client<CP extends SpawnkitConfig> {
 
     const data = new RemoteData<InstanceData>({
       adapters: this.adapters,
-      instance: {
-        id: instanceId,
-        kind: kind,
-      },
+      instance: instanceIdentifier,
     });
 
     const createScheduledMethodHandler = () => {
@@ -170,6 +185,7 @@ export class Client<CP extends SpawnkitConfig> {
                   action: prop,
                   args,
                   mode: "scheduled",
+                  context: {},
                 },
               });
 
@@ -189,21 +205,9 @@ export class Client<CP extends SpawnkitConfig> {
             mode,
           });
 
-          if (mode === "skip") {
-            // DO NOTHING -> simply return the eventId na don't wait for an answer
-            return eventId;
-          }
-
           if (mode === "normal") {
             return new Promise((resolve, reject) => {
-              const channelID = Client.getChannelForEventResponse(
-                kind as string,
-                instanceId,
-                eventId,
-              );
-
               const internalStream = new ClientStream();
-
               internalStream.on("end", () => subscription.unsubscribe());
               const handleStreamMessage = (
                 subscription: { unsubscribe: Function },
@@ -220,19 +224,20 @@ export class Client<CP extends SpawnkitConfig> {
                 if ("error" in message) {
                   const error = Client.deserializeError(message.error);
                   reject(error);
-                  subscription.unsubscribe();
                 }
 
                 if ("response" in message) {
                   resolve(message.response);
-                  subscription.unsubscribe();
                 }
+
+                subscription.unsubscribe();
               };
 
               const subscription: ReturnType<
                 typeof this.adapters.messages.subscribe<InternalMessageData>
               > = this.adapters.messages.subscribe<InternalMessageData>(
-                channelID,
+                instanceIdentifier,
+                Client.getChannelForEventResponse(eventId),
                 (message) => {
                   // console.log("SUB", channelID, message);
 
@@ -272,30 +277,14 @@ export class Client<CP extends SpawnkitConfig> {
         channel: Channel,
         callback: (data: InstanceChannels[Channel]) => any,
       ) => {
-        const channelID = Client.getChannelForEventBus(
-          kind.toString(),
-          instanceId,
-          channel.toString(),
-        );
-
         return this.adapters.messages.subscribe<InstanceChannels[Channel]>(
-          channelID,
+          instanceIdentifier,
+          Client.getChannelForEventBus("instance", channel.toString()),
           (message) => {
             callback(message.data);
           },
-          {
-            mode: "pubsub",
-          },
         );
       },
-
-      skip: new Proxy({} as SkipRemoteMethods, {
-        get(target, prop, receiver) {
-          if (prop in target) return Reflect.get(target, prop, receiver);
-          if (typeof prop !== "string") return;
-          return skipRemoteMethodHandler(prop);
-        },
-      }),
 
       data: data,
 
@@ -361,7 +350,7 @@ class ClientStream extends Stream<any> {
   }
 
   injest(message: InstanceEventStreamMessage) {
-    console.log("INJEST", message);
+    // console.log("INJEST", message);
     if ("start" in message) this.store("start");
     if ("data" in message) this.store("data", message.data);
 

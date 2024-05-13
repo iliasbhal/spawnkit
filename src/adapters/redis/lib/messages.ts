@@ -1,119 +1,304 @@
-import { Redis } from "ioredis";
+import { Client } from "@/models/Client";
 import * as Adapters from "../../index";
 import { RedisAdapter } from "./_base";
 import wait from "wait";
-// import { MaintenanceQueue } from "./_common";
+
+interface Message<DataShape> {
+  id: Adapters.EventId;
+  data: DataShape;
+  meta: {
+    client: string;
+  };
+}
 
 export class MessageBroker
   extends RedisAdapter
   implements Adapters.AdapaterMessageBroker
 {
-  // maintenanceQ: MaintenanceQueue;
-
-  constructor(redis: Redis) {
-    super(redis);
-    // this.maintenanceQ = new MaintenanceQueue(redis);
+  link(client: Client<any>): void {
+    super.link(client);
+    this.initializeGlobalPubSub();
   }
-  private withPrefix(channelName: string) {
-    return `spawnkit:messages:${channelName}`;
+
+  private callbackByChannel = new Map<
+    string,
+    Set<Parameters<typeof this.subscribe>[2]>
+  >();
+
+  getClientChannel() {
+    const channel = `spawnkit:pubsub-clients:${this.client.id}`;
+    return channel;
+  }
+
+  initializeGlobalPubSub() {
+    const pubsub = this.clone();
+    const clientChannel = this.getClientChannel();
+
+    pubsub.subscribe(clientChannel);
+    pubsub.on("message", (clientChannel, message) => {
+      const parsed = JSON.parse(message);
+
+      const callbacks = this.callbackByChannel.get(parsed.channel);
+      if (callbacks) {
+        callbacks.forEach((callback) => {
+          callback(parsed.message);
+        });
+      }
+    });
+
+    return {
+      unsubscribe() {
+        pubsub.unsubscribe();
+      },
+    };
+  }
+
+  private getChannel(instance: Adapters.InstanceIdentifier, channel: string) {
+    return `spawnkit:messages:${instance.kind}:${instance.id}:${channel}`;
   }
 
   async publish<EventData>(
+    instance: Adapters.InstanceIdentifier,
     channel: string,
     event: EventData,
-    options?: { mode: "pubsub" },
   ): Promise<Adapters.EventId> {
-    const hashID = this.withPrefix(channel);
+    const messageChannel = this.getChannel(instance, channel);
     const eventId = crypto.randomUUID();
-    const zmember = JSON.stringify({
+    const message: Message<EventData> = {
       id: eventId,
       data: event,
-    });
+      meta: {
+        client: this.client.id,
+      },
+    };
 
-    const now = Date.now();
-    await this.redis.zadd(hashID, now, zmember);
-    // console.log(await this.redis.zrevrange(hashID, 0, -1));
+    console.log("pub - channel", channel);
 
-    if (options?.mode === "pubsub") {
-      // Since We don't need to prune the set for evey event
-      // We just need to prune it from time to time so that it doesn't grow much
-      // only schedule a task on in ten events
-      const oneEvery = 1 / 20;
-      const isSampled = Math.random() < oneEvery;
-      if (isSampled) {
-        // this.maintenanceQ.schedule({
-        //   runInNext: "EVERY_MIN",
-        //   task: {
-        //     name: "zttl",
-        //     config: {
-        //       key: hashID,
-        //       below: now,
-        //     },
-        //   },
-        // });
-      }
+    const isRpcCall = channel.startsWith("rpc");
+    if (isRpcCall) {
+      await this.publishMQ(messageChannel, message);
+      return eventId;
     }
 
-    return eventId;
+    const isReply = channel.startsWith("reply:");
+    if (isReply) {
+      const rpcIncomingMessageId = channel.split(":").pop();
+      if (!rpcIncomingMessageId) throw new Error("AAA");
+      const originRpc = this.rpcOriginByMessageId.get(rpcIncomingMessageId);
+      if (!originRpc) throw new Error("AAAA");
+      await this.publishClientPubSub(originRpc, messageChannel, message);
+      return eventId;
+    }
+
+    const isBroadcastEvent = channel.startsWith("broadcast:");
+    if (isBroadcastEvent) {
+      await this.publishClientBroadcast(messageChannel, message);
+      return eventId;
+    }
+
+    throw new Error("Unhandled channel type");
   }
 
-  async ack<EventData>(
+  rpcOriginByMessageId = new Map<string, string>();
+  subscribe<E>(
+    instance: Adapters.InstanceIdentifier,
     channel: string,
-    event: { id: Adapters.EventId; data: EventData },
+    callback: (event: E) => any,
+  ): { unsubscribe: Function } {
+    console.log("sub - channel", channel);
+    const messageChannel = this.getChannel(instance, channel);
+    const isRpcCall = channel.startsWith("rpc");
+    if (isRpcCall) {
+      const subscription = this.listenMQ(messageChannel, (event) => {
+        const replyToClient = event.meta.client;
+        if (replyToClient) {
+          this.rpcOriginByMessageId.set(event.id, event.meta.client);
+        }
+
+        return callback(event);
+      });
+
+      return {
+        unsubscribe: () => {
+          subscription.unsubscribe();
+        },
+      };
+    }
+
+    const isReply = channel.startsWith("reply:");
+    if (isReply) {
+      const subscription = this.listenClientPubSub(
+        messageChannel,
+        (event: any) => {
+          return callback(event);
+        },
+      );
+
+      return {
+        unsubscribe: () => {
+          subscription.unsubscribe();
+        },
+      };
+    }
+
+    const isBroadcastEvent = channel.startsWith("broadcast:");
+    if (isBroadcastEvent) {
+      const subscription = this.listenBroadcast(
+        messageChannel,
+        (event: any) => {
+          return callback(event);
+        },
+      );
+
+      return {
+        unsubscribe: () => {
+          subscription.unsubscribe();
+        },
+      };
+    }
+
+    throw new Error("Unhandled channel type");
+  }
+
+  listenBroadcast<Data>(channel: string, callback: (data: Data) => any) {
+    this.redis.zadd(channel, Date.now(), this.client.id);
+
+    const intervalID = setInterval(() => {
+      this.redis.zadd(channel, Date.now(), this.client.id);
+    }, 4000);
+
+    const subscription = this.listenClientPubSub(channel, callback);
+
+    return {
+      unsubscribe: () => {
+        subscription.unsubscribe();
+        clearInterval(intervalID);
+        const isStillListening = this.isClientListeningToChannel(channel);
+        if (!isStillListening) {
+          this.redis.zrem(channel, this.client.id);
+        }
+      },
+    };
+  }
+
+  async publishClientBroadcast<EventData>(
+    channel: string,
+    message: Message<EventData>,
+  ) {
+    // 1. get the list of clients subscribed to this channel
+    // And delete outdated client that didn't renew their subscription
+    const now = Date.now();
+    const [_, members] = await Promise.all([
+      this.redis.zremrangebyscore(channel, 0, now - 20_000),
+      this.redis.zrange(channel, 0, now),
+    ]);
+
+    // 2. publish to their channel
+    await Promise.all(
+      members.map((clientId) =>
+        this.publishClientPubSub(clientId, channel, message),
+      ),
+    );
+  }
+
+  async publishClientPubSub<EventData>(
+    client: string,
+    channel: string,
+    message: Message<EventData>,
+  ) {
+    await this.redis.publish(
+      `spawnkit:pubsub-clients:${client}`,
+      JSON.stringify({
+        channel,
+        message,
+      }),
+    );
+  }
+
+  listenClientPubSub<Data>(channel: string, callback: (data: Data) => any) {
+    if (!this.callbackByChannel.has(channel)) {
+      this.callbackByChannel.set(channel, new Set<any>());
+    }
+
+    const callbacks = this.callbackByChannel.get(channel)!;
+    callbacks.add(callback as any);
+    const subscription = {
+      unsubscribe: () => {
+        callbacks.delete(callback as any);
+        if (callbacks.size === 0) {
+          this.callbackByChannel.delete(channel);
+        }
+      },
+    };
+
+    return subscription;
+  }
+
+  private isClientListeningToChannel(channel: string) {
+    const callbacks = this.callbackByChannel.get(channel);
+    if (!callbacks) {
+      return false;
+    }
+
+    const hasActiveListeners = callbacks.size > 0;
+    return hasActiveListeners;
+  }
+
+  async ack(
+    instance: Adapters.InstanceIdentifier,
+    channel: string,
+    messageId: Adapters.EventId,
   ): Promise<true> {
-    const hashID = this.withPrefix(channel);
-    const zmember = JSON.stringify(event);
-    await this.redis.zrem(hashID, zmember);
+    const messageChannel = this.getChannel(instance, channel);
+
+    console.log("hashID", messageChannel);
+    await Promise.all([
+      this.redis.zrem(messageChannel, messageId),
+      this.redis.hdel(messageChannel + ":data", messageId),
+    ]);
+
     return true;
   }
 
-  async has(channel: string): Promise<boolean> {
-    const hashID = this.withPrefix(channel);
+  async has(
+    instance: Adapters.InstanceIdentifier,
+    channel: string,
+  ): Promise<boolean> {
+    const hashID = this.getChannel(instance, channel);
     const size = await this.redis.zcard(hashID);
     const hasUnprocessedEvents = size > 0;
     return hasUnprocessedEvents;
   }
 
-  private async getLatestMessages(
+  private async publishMQ<EventData>(
     channel: string,
-    range: { from: number; to: number },
+    message: Message<EventData>,
   ) {
-    const hashID = this.withPrefix(channel);
-    const rawEvents = await this.redis.zrangebyscore(
-      hashID,
-      range.from,
-      range.to,
-    );
-    const events = rawEvents.map((rawEvent) => JSON.parse(rawEvent));
-    return events;
+    const now = Date.now();
+    await Promise.all([
+      this.redis.zadd(channel, now, message.id),
+      this.redis.hset(channel + ":data", message.id, JSON.stringify(message)),
+    ]);
   }
 
-  subscribe<E>(
-    channel: string,
-    callback: (event: E) => any,
-    options?: {
-      mode: "pubsub";
-    },
-  ): { unsubscribe: Function } {
+  private listenMQ(channel: string, callback: (event: any) => any) {
     const abortCtl = new AbortController();
-    const abortSignal = abortCtl.signal;
 
     Promise.resolve().then(async () => {
       const previousEventsIds = new Set();
       const range = {
-        // If pubsub, we don't care about past events
-        from: options?.mode === "pubsub" ? Date.now() : 0,
+        from: 0,
         to: Infinity,
       };
 
-      while (!abortSignal.aborted) {
+      while (!abortCtl.signal.aborted) {
         const timestampBeforeRequest = Date.now();
         const events = await this.getLatestMessages(channel, range);
         range.from = timestampBeforeRequest;
 
         if (events.length) {
           events.forEach((event) => {
-            if (abortSignal.aborted) return;
+            if (abortCtl.signal.aborted) return;
             if (previousEventsIds.has(event.id)) return;
             callback(event as any);
           });
@@ -124,7 +309,7 @@ export class MessageBroker
           });
         }
 
-        await wait(1);
+        await wait(50);
       }
     });
 
@@ -133,5 +318,30 @@ export class MessageBroker
         abortCtl.abort();
       },
     };
+  }
+
+  private async getLatestMessages(
+    channel: string,
+    range: { from: number; to: number },
+  ) {
+    const messageIds = await this.redis.zrangebyscore(
+      channel,
+      range.from,
+      range.to,
+    );
+
+    if (!messageIds.length) {
+      return [];
+    }
+
+    const rawMessages = await this.redis.hmget(
+      channel + ":data",
+      ...messageIds,
+    );
+    const messages = rawMessages.flatMap((raw) =>
+      raw ? [JSON.parse(raw)] : [],
+    );
+
+    return messages;
   }
 }

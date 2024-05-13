@@ -63,21 +63,14 @@ export class Data<DataShape extends Record<string, any>> {
         value,
       );
 
-      const channel = Client.getChannelForDataUpdate(
-        this.instance.kind,
-        this.instance.id,
-        key.toString(),
-      );
-
       this.logger.log({
         type: "data:set",
         key: key.toString(),
         value: value,
       });
 
-      await this.adapters.messages.publish(channel, value, {
-        mode: "pubsub",
-      });
+      const channel = Client.getChannelForEventBus("data", key.toString());
+      await this.adapters.messages.publish(this.instance, channel, value);
       // cleanup to ensure we don't end up with a big object
       // in the case where the instance is using a lot of keys
       this.debounceByKey.delete(key);
@@ -112,15 +105,15 @@ export class RemoteData<DataShape extends Record<string, any>> {
   }
 
   on<K extends keyof DataShape>(key: K, callback: (next: DataShape[K]) => any) {
-    const channel = Client.getChannelForDataUpdate(
-      this.instance.kind,
-      this.instance.id,
-      key.toString(),
-    );
+    const channel = Client.getChannelForEventBus("data", key.toString());
 
-    return this.adapters.messages.subscribe<DataShape[K]>(channel, (event) => {
-      callback(event.data);
-    });
+    return this.adapters.messages.subscribe<DataShape[K]>(
+      this.instance,
+      channel,
+      (event) => {
+        callback(event.data);
+      },
+    );
   }
 }
 

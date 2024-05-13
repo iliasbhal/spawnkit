@@ -22,18 +22,18 @@ export class OrderBook extends Spawnkit.Instance<
     console.log("ON INSTANCE", this.id, channel, message);
   }
 
-  async buy(stock: Stock) {
+  async buy(order: Stock) {
     this.logger.log("-----BUYYYYY------");
     // this.data = this.data || ({} as any);
     // this.data!.count = this.data?.count || 0;
     // this.data!.count++;
-    this.emit("orders", [stock.tick]);
+    this.emit("orders", [order.tick]);
 
     return {
       success: true,
+      status: "pending...",
       // count: this.data!.count,
-      qty: 1000,
-      stock,
+      order,
     };
   }
 

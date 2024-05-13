@@ -7,13 +7,13 @@ export class InstanceScheduler
   extends BaseQueue
   implements Adapters.AdapaterInstanceScheduler
 {
-  queue: BullMQ.Queue<Adapters.ScheduleInstanceData, any, string>;
+  queue: BullMQ.Queue<Adapters.InstanceIdentifier, any, string>;
   constructor(redis: Redis) {
     super(redis);
     this.queue = this.createQueue("instances");
   }
 
-  async schedule(data: Adapters.ScheduleInstanceData) {
+  async schedule(data: Adapters.InstanceIdentifier) {
     // `bullmq` will discard job with same ids
     // We leverage this behaviour to ensure we don't schedule
     // actors instance if they  that are already in the pipeline
@@ -34,9 +34,9 @@ export class InstanceScheduler
   }
 
   subscribe(
-    callback: (event: Adapters.ScheduleInstanceData, context: {}) => any,
+    callback: (event: Adapters.InstanceIdentifier, context: {}) => any,
   ) {
-    const worker = new BullMQ.Worker<Adapters.ScheduleInstanceData>(
+    const worker = new BullMQ.Worker<Adapters.InstanceIdentifier>(
       this.queue.name,
       async (job) => {
         await callback(job.data, {});

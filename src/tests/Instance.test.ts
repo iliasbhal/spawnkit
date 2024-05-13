@@ -1,4 +1,4 @@
-import { Instance } from "@/.";
+import { Instance } from "@/models/Instance";
 
 describe("Instance", () => {
   it.todo("should stay alive while a streaming is happening");
