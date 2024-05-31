@@ -271,7 +271,7 @@ export class InstanceProxy<Inst extends Instance> {
         });
     });
 
-    result.on("error", (err) => {
+    const handleError = (error: Error) => {
       const serializedError = Client.serializeError(err);
       config.callMetaData.error = serializedError;
 
@@ -282,12 +282,23 @@ export class InstanceProxy<Inst extends Instance> {
           error: serializedError as Error,
         });
 
-      promise.resolve(err);
+      promise.resolve(error);
+    };
+
+    result.on("error", (err) => {
+      handleError(err);
+    });
+
+    const syncAbort = this.createAbortHandler(this.abortSignal, () => {
+      handleError(new Error("Worker Aborted"));
     });
 
     result.on("end", () => {
+      syncAbort.dispose();
+
       config.callMetaData.ended_at = Date.now();
 
+      // once the stream has ended, we shall store the result of the compute;
       if (config.scheduleId) {
         this.adapters.events.store(
           this.instance.kind,
@@ -326,7 +337,11 @@ export class InstanceProxy<Inst extends Instance> {
 
     this.subscribeToInstanceEvent();
 
-    const syncAbort = this.syncAbortSignal(this.abortSignal);
+    const syncAbort = this.createAbortHandler(this.abortSignal, () => {
+      if (!this.live) return;
+      this.aborted.resolve(true);
+    });
+
     this.aborted.await.finally(() => {
       this.keepAlive.clear();
       syncAbort.dispose();
@@ -429,23 +444,15 @@ export class InstanceProxy<Inst extends Instance> {
     });
   }
 
-  public syncAbortSignal(abortSignal: AbortSignal) {
-    const onAbortCallback = () => {
-      if (!this.live) {
-        return;
-      }
-
-      this.aborted.resolve(true);
-    };
-
-    abortSignal.addEventListener("abort", onAbortCallback);
+  public createAbortHandler(abortSignal: AbortSignal, callback: () => any) {
+    abortSignal.addEventListener("abort", callback);
     this.aborted.await.finally(() => {
-      abortSignal.removeEventListener("abort", onAbortCallback);
+      abortSignal.removeEventListener("abort", callback);
     });
 
     return {
       dispose: () => {
-        abortSignal.removeEventListener("abort", onAbortCallback);
+        abortSignal.removeEventListener("abort", callback);
       },
     };
   }
