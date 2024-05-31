@@ -1,10 +1,5 @@
 import wait from "wait";
-import {
-  Adapters,
-  InstanceId,
-  InstanceKind,
-  InstanceSignal,
-} from "../adapters";
+import { Adapters, InstanceId, InstanceKind } from "../adapters";
 import { ControlledPromise } from "@/utils/ControlledPromise";
 import { Logger } from "./Logger";
 
