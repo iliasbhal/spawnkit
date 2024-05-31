@@ -2,33 +2,21 @@ import wait from "wait";
 import * as Spawnkit from "@/.";
 import * as RedisAdapter from "@/adapters/redis";
 import { redis } from "@/adapters/redis/client";
-import {
-  StreamExample,
-  AgentLLM,
-  OrderBook,
-  ToggleMachine,
-  ErrorExample,
-} from "../example/_index";
+import * as instances from "../example/_index";
 
-const spawnConfig = {
-  adapters: {
-    lock: new RedisAdapter.Lock(redis),
-    data: new RedisAdapter.Data(redis),
-    messages: new RedisAdapter.MessageBroker(redis),
-    events: new RedisAdapter.EventScheduler(redis),
-    instances: new RedisAdapter.InstanceScheduler(redis),
-    logger: new RedisAdapter.Logger(redis),
-  },
-  instances: {
-    StreamExample,
-    AgentLLM,
-    ToggleMachine,
-    OrderBook,
-    ErrorExample,
-  },
-} satisfies Spawnkit.SpawnkitConfig;
+const adapters = {
+  lock: new RedisAdapter.Lock(redis),
+  data: new RedisAdapter.Data(redis),
+  messages: new RedisAdapter.MessageBroker(redis),
+  events: new RedisAdapter.EventScheduler(redis),
+  instances: new RedisAdapter.InstanceScheduler(redis),
+  logger: new RedisAdapter.Logger(redis),
+};
 
-const client = Spawnkit.Client.from(spawnConfig);
+const client = Spawnkit.Client.from({
+  adapters: adapters,
+  instances: instances,
+});
 
 const main = async () => {
   await redis.flushall("SYNC");
@@ -152,10 +140,10 @@ const emittedEventsExample = async () => {
   });
 
   await orderBook.buy({ tick: "BTC/USD" });
-  await orderBook.skip.buy({ tick: "BTC/USD (via skip)" });
+  await orderBook.buy({ tick: "BTC/USD (via skip)" });
 
   await orderBook2.buy({ tick: "ETH/USD" });
-  await orderBook2.skip.buy({ tick: "ETH/USD (via skip)" });
+  await orderBook2.buy({ tick: "ETH/USD (via skip)" });
 
   // const intervalId = setInterval(async () => {
   //   const isSkip = Math.random() > 0.5;
@@ -285,7 +273,7 @@ const exampleXState = async () => {
   for (let i = 0; i < 1000; i++) {
     await wait(0);
     console.log(i);
-    toggle.skip.send({ type: "TOGGLE" });
+    toggle.send({ type: "TOGGLE" });
   }
 
   // const response = await toggle.send({ type: "TOGGLE" });

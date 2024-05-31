@@ -14,6 +14,10 @@ interface Stock {
   tick: string;
 }
 
+interface Order extends Pick<Stock, "tick"> {
+  qty: number;
+}
+
 export class OrderBook extends Spawnkit.Instance<
   OrderBookData,
   OrderBookEvent
@@ -22,7 +26,7 @@ export class OrderBook extends Spawnkit.Instance<
     console.log("ON INSTANCE", this.id, channel, message);
   }
 
-  async buy(order: Stock) {
+  async buy(order: Order) {
     this.logger.log("-----BUYYYYY------");
     // this.data = this.data || ({} as any);
     // this.data!.count = this.data?.count || 0;
