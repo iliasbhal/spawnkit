@@ -272,7 +272,7 @@ export class InstanceProxy<Inst extends Instance> {
     });
 
     const handleError = (error: Error) => {
-      const serializedError = Client.serializeError(err);
+      const serializedError = Client.serializeError(error);
       config.callMetaData.error = serializedError;
 
       if (config.requestId)

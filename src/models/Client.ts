@@ -15,7 +15,7 @@ import {
   BaseAdapter,
 } from "../adapters";
 import { RemoteData } from "./Data";
-import { Worker } from "./Worker";
+import { Queue } from "./Queue";
 
 export interface SpawnkitConfig {
   adapters: Adapters;
@@ -85,15 +85,15 @@ export class Client<CP extends SpawnkitConfig> {
     );
   }
 
-  worker: Worker<any> | null = null;
+  worker: Queue<any> | null = null;
   public start() {
     const forwardOptions = {
       adapters: this.adapters,
       instances: this.instances,
     } as any;
 
-    const worker = Worker.from(forwardOptions, this);
-    return worker.start();
+    const workerQueue = Queue.from(forwardOptions, this);
+    return workerQueue.start();
   }
 
   public stop() {

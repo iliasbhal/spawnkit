@@ -6,7 +6,7 @@ import { InstanceProxy } from "./InstanceProxy";
 import { Data } from "./Data";
 import { Logger } from "./Logger";
 
-export class Worker<O extends SpawnkitConfig> {
+export class Queue<O extends SpawnkitConfig> {
   instances: O["instances"];
   adapters: O["adapters"];
   client: Client<O>;
@@ -122,8 +122,10 @@ export class Worker<O extends SpawnkitConfig> {
           await wait(waitTime);
 
           const hasUnprocessedEvents = await this.adapters.messages.has(
+            instanceConfig,
             instanceConfig.id,
           );
+
           if (hasUnprocessedEvents) {
             this.adapters.instances.schedule(instanceConfig);
           }
@@ -146,7 +148,7 @@ export class Worker<O extends SpawnkitConfig> {
   }
 
   static from<O extends SpawnkitConfig>(opts: O, client: Client<any>) {
-    Worker.verify(opts.instances);
+    Queue.verify(opts.instances);
 
     if (process.env.NODE_ENV !== "test") {
       Object.keys(opts.instances).forEach((kind) => {
@@ -154,7 +156,7 @@ export class Worker<O extends SpawnkitConfig> {
       });
     }
 
-    return new Worker<O>(opts, client);
+    return new Queue<O>(opts, client);
   }
 
   static verify(instances: SpawnkitConfig["instances"]) {
