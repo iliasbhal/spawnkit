@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { wait } from "../src/utils/wait";
 import * as Spawnkit from "@/.";
 import * as RedisAdapter from "@/adapters/redis";
