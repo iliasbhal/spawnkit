@@ -1,7 +1,8 @@
 import { Client } from "@/models/Client";
 import * as Adapters from "../../index";
 import { RedisAdapter } from "./_base";
-import wait from "wait";
+import { wait } from "../../../utils/wait";
+import superjson from 'superjson';
 
 interface Message<DataShape> {
   id: Adapters.EventId;
@@ -13,8 +14,7 @@ interface Message<DataShape> {
 
 export class MessageBroker
   extends RedisAdapter
-  implements Adapters.AdapaterMessageBroker
-{
+  implements Adapters.AdapaterMessageBroker {
   link(client: Client<any>): void {
     super.link(client);
     this.initializeGlobalPubSub();
@@ -36,7 +36,7 @@ export class MessageBroker
 
     pubsub.subscribe(clientChannel);
     pubsub.on("message", (clientChannel, message) => {
-      const parsed = JSON.parse(message);
+      const parsed = superjson.parse(message) as any;
 
       const callbacks = this.callbackByChannel.get(parsed.channel);
       if (callbacks) {
@@ -72,8 +72,6 @@ export class MessageBroker
       },
     };
 
-    console.log("pub - channel", channel);
-
     const isRpcCall = channel.startsWith("rpc");
     if (isRpcCall) {
       await this.publishMQ(messageChannel, message);
@@ -105,7 +103,6 @@ export class MessageBroker
     channel: string,
     callback: (event: E) => any,
   ): { unsubscribe: Function } {
-    console.log("sub - channel", channel);
     const messageChannel = this.getChannel(instance, channel);
     const isRpcCall = channel.startsWith("rpc");
     if (isRpcCall) {
@@ -130,15 +127,6 @@ export class MessageBroker
       const subscription = this.listenClientPubSub(
         messageChannel,
         (event: any) => {
-          // Fixes: { response: undefined } is serialized to '{}' when published 
-          // which mean we loose the key "response"
-          // We need to reconstruct the orignal object;
-          const isEmptyResponse = Object.keys(event.data).length === 0;
-          if (isEmptyResponse) {
-            event.data = {
-              response: undefined,
-            };
-          }
           return callback(event);
         },
       );
@@ -217,7 +205,7 @@ export class MessageBroker
   ) {
     await this.redis.publish(
       `spawnkit:pubsub-clients:${client}`,
-      JSON.stringify({
+      superjson.stringify({
         channel,
         message,
       }),
@@ -259,8 +247,6 @@ export class MessageBroker
     messageId: Adapters.EventId,
   ): Promise<true> {
     const messageChannel = this.getChannel(instance, channel);
-
-    console.log("hashID", messageChannel);
     await Promise.all([
       this.redis.zrem(messageChannel, messageId),
       this.redis.hdel(messageChannel + ":data", messageId),
@@ -286,7 +272,7 @@ export class MessageBroker
     const now = Date.now();
     await Promise.all([
       this.redis.zadd(channel, now, message.id),
-      this.redis.hset(channel + ":data", message.id, JSON.stringify(message)),
+      this.redis.hset(channel + ":data", message.id, superjson.stringify(message)),
     ]);
   }
 
@@ -347,9 +333,10 @@ export class MessageBroker
       channel + ":data",
       ...messageIds,
     );
-    const messages = rawMessages.flatMap((raw) =>
-      raw ? [JSON.parse(raw)] : [],
-    );
+    const messages = rawMessages.flatMap((raw) => {
+      if (raw) return [superjson.parse(raw) as any];
+      return [];
+    });
 
     return messages;
   }
