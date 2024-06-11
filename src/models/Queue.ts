@@ -1,4 +1,4 @@
-import wait from "wait";
+import { wait } from "../utils/wait";
 import { Lock } from "./Lock";
 import { ScheduleByType, ScheduleContext } from "../adapters";
 import type { Client, SpawnkitConfig } from "./Client";

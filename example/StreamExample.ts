@@ -1,5 +1,5 @@
 import * as Spawnkit from "@/.";
-import wait from "wait";
+import { wait } from "../src/utils/wait";
 
 export class StreamExample extends Spawnkit.Instance {
   startStream(someData: { count: number }) {

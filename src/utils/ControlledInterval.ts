@@ -1,4 +1,4 @@
-import wait from "wait";
+import { wait } from "./wait";
 
 export class ControlledInterval<V> {
   getValue: () => Promise<V>;

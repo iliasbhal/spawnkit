@@ -7,6 +7,7 @@ export class Data extends RedisAdapter implements Adapters.AdapaterData {
     id: Adapters.InstanceId,
     key: string,
   ): Promise<Data | null> {
+    // console.log('GET DATA', kind, id, key);
     const data = await this.redis.get(`spawnkit:data:${kind}:${id}:${key}`);
     if (!data) return null;
     return JSON.parse(data);
@@ -18,6 +19,7 @@ export class Data extends RedisAdapter implements Adapters.AdapaterData {
     key: string,
     value: Data,
   ): Promise<true> {
+    // console.log('SET DATA', kind, id, key, value);
     const serialized = JSON.stringify(value);
     await this.redis.set(`spawnkit:data:${kind}:${id}:${key}`, serialized);
     return true;

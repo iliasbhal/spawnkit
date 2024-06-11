@@ -1,4 +1,3 @@
-require("dotenv-mono").load();
 import { Redis, RedisOptions } from "ioredis";
 
 export const redisConfig: RedisOptions = {

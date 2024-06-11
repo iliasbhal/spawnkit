@@ -1,9 +1,9 @@
-import wait from "wait";
+import { wait } from "../utils/wait";
 import { Adapters, InstanceId, InstanceKind } from "../adapters";
 import { ControlledPromise } from "@/utils/ControlledPromise";
 import { Logger } from "./Logger";
 
-export class LockError extends Error {}
+export class LockError extends Error { }
 
 export class AcquireLockError extends LockError {
   constructor(resource: string, lockId: string) {

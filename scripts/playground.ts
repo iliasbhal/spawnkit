@@ -1,4 +1,4 @@
-import wait from "wait";
+import { wait } from "../src/utils/wait";
 import * as Spawnkit from "@/.";
 import * as RedisAdapter from "@/adapters/redis";
 import { redis } from "@/adapters/redis/client";
@@ -24,13 +24,14 @@ const main = async () => {
 
   // attributeExample();
   await Promise.all([
-    basicExample(),
+    // basicExample(),
     // errorHandlingExample(),
     // streamExample(),
     // streamWithErrors(),
     // scheduleCallExample(),
     // emittedEventsExample(),
     // exampleXState(),
+    exampleData(),
   ]);
 };
 
@@ -139,11 +140,11 @@ const emittedEventsExample = async () => {
     console.log("ON CLIENT 2", event);
   });
 
-  await orderBook.buy({ tick: "BTC/USD" });
-  await orderBook.buy({ tick: "BTC/USD (via skip)" });
+  await orderBook.buy({ tick: "BTC/USD", qty: 1 });
+  await orderBook.buy({ tick: "BTC/USD (via skip)", qty: 1 });
 
-  await orderBook2.buy({ tick: "ETH/USD" });
-  await orderBook2.buy({ tick: "ETH/USD (via skip)" });
+  await orderBook2.buy({ tick: "ETH/USD", qty: 1 });
+  await orderBook2.buy({ tick: "ETH/USD (via skip)", qty: 1 });
 
   // const intervalId = setInterval(async () => {
   //   const isSkip = Math.random() > 0.5;
@@ -284,6 +285,21 @@ const exampleXState = async () => {
   // console.log("after", after);
   // toggle.data.get();
 };
+
+
+const exampleData = async () => {
+  const toggle = client.spawn("GameSession", "AAAA");
+  const initial = await toggle.get();
+  // console.log('BEFORE', initial);
+
+  await toggle.set([['0', '0', '0'], ['1', '1', '1']]);
+  const afterSave = await toggle.get();
+  // console.log('AFTER', afterSave);
+
+
+  // console.log('----------')
+
+}
 
 const startTime = Date.now();
 console.log("START");

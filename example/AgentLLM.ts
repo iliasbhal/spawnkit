@@ -1,11 +1,11 @@
 import * as Spawnkit from "@/.";
-import wait from "wait";
+import { wait } from "../src/utils/wait";
 
 interface AgentAIData {
   messages: string[];
 }
 
-interface AgenAIChannels {}
+interface AgenAIChannels { }
 
 interface Prompt {
   taskId: string;
@@ -14,7 +14,7 @@ interface Prompt {
 }
 
 export class AgentLLM extends Spawnkit.Instance<AgentAIData, AgenAIChannels> {
-  on(channel: any, message: any): void {}
+  on(channel: any, message: any): void { }
 
   prompt(config: Prompt) {
     return new Spawnkit.Stream<string>(async (stream) => {

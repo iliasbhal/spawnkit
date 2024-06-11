@@ -1,4 +1,3 @@
-require("dotenv-mono").load();
 import { PrismaClient } from "./generated/client";
 
 export * as Zod from "./generated/zod";

@@ -34,8 +34,8 @@ export type InstanceEventStreamMessage =
 
 export interface InstanceEventChannels {
   [key: `kind:${string}:id:${string}:event:${string}`]:
-    | InstanceEventRequestMessage
-    | InstanceEventStreamMessage;
+  | InstanceEventRequestMessage
+  | InstanceEventStreamMessage;
 }
 
 type Emit<Channels extends Record<string, any>> = <
@@ -423,7 +423,6 @@ export class InstanceProxy<Inst extends Instance> {
    **/
   public async respond(messageId: string, data: any) {
     const channelID = Client.getChannelForEventResponse(messageId);
-
     return this.runExternalEffect(async () => {
       // console.log("EMIT REQUEST RESPONSE", data);
       return await this.adapters.messages.publish(
@@ -435,10 +434,11 @@ export class InstanceProxy<Inst extends Instance> {
   }
 
   public async emit(channel: string, data: any) {
+    const channelID = Client.getChannelForEventBus("instance", channel.toString());
     return this.runExternalEffect(async () => {
       return await this.adapters.messages.publish(
         this.instance,
-        Client.getChannelForEventBus("instance", channel.toString()),
+        channelID,
         data,
       );
     });

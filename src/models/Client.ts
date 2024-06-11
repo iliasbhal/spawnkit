@@ -22,7 +22,7 @@ export interface SpawnkitConfig {
   instances: { [key: string]: typeof Instance<any, any> };
 }
 
-export class RemoteError extends Error {}
+export class RemoteError extends Error { }
 
 type InternalMessageData = InstanceEventChannels[keyof InstanceEventChannels];
 
@@ -152,7 +152,7 @@ export class Client<CP extends SpawnkitConfig> {
         // This is mainly to avoid adding unnessary pressure the the backend.
         // Scheduling too often is guarenteed to fail often as theu won't be able to acquire the locks
         shouldScheduleInstance &&
-          this.adapters.instances.schedule(instanceIdentifier),
+        this.adapters.instances.schedule(instanceIdentifier),
       ]);
 
       return eventId;
@@ -224,23 +224,20 @@ export class Client<CP extends SpawnkitConfig> {
                 if ("error" in message) {
                   const error = Client.deserializeError(message.error);
                   reject(error);
-                }
-
-                if ("response" in message) {
+                } else if ("response" in message) {
                   resolve(message.response);
                 }
 
                 subscription.unsubscribe();
               };
 
+              const channel = Client.getChannelForEventResponse(eventId);
               const subscription: ReturnType<
                 typeof this.adapters.messages.subscribe<InternalMessageData>
               > = this.adapters.messages.subscribe<InternalMessageData>(
                 instanceIdentifier,
-                Client.getChannelForEventResponse(eventId),
+                channel,
                 (message) => {
-                  // console.log("SUB", channelID, message);
-
                   if ("stream" in message.data)
                     return handleStreamMessage(subscription, message.data);
                   if ("response" in message.data)
@@ -325,7 +322,7 @@ export class Client<CP extends SpawnkitConfig> {
 
 class ClientStream extends Stream<any> {
   constructor() {
-    super(() => {});
+    super(() => { });
   }
 
   lastIndex = -1;
@@ -373,20 +370,20 @@ type ExtractMethods<T> = Pick<T, ExtractMethodNames<T>>;
 
 type MakeRemote<T> = {
   [K in keyof T]: T[K] extends (...args: any[]) => any
-    ? // If the function is sychronouse, we want to cast the return to a Promise
-      // And it it's already a promise, it's gonna stay a promise.
-      (...args: Parameters<T[K]>) => Promise<Awaited<ReturnType<T[K]>>>
-    : never;
+  ? // If the function is sychronouse, we want to cast the return to a Promise
+  // And it it's already a promise, it's gonna stay a promise.
+  (...args: Parameters<T[K]>) => Promise<Awaited<ReturnType<T[K]>>>
+  : never;
 };
 
 type MakeSkippable<T> = {
   [K in keyof T]: T[K] extends (...args: any[]) => any
-    ? (...args: Parameters<T[K]>) => Promise<boolean>
-    : never;
+  ? (...args: Parameters<T[K]>) => Promise<boolean>
+  : never;
 };
 
 type MakeSchedulable<T> = {
   [K in keyof T]: T[K] extends (...args: any[]) => any
-    ? (...args: Parameters<T[K]>) => Promise<ScheduleId>
-    : never;
+  ? (...args: Parameters<T[K]>) => Promise<ScheduleId>
+  : never;
 };

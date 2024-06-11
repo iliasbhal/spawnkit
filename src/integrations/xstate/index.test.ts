@@ -1,4 +1,4 @@
-import wait from "wait";
+import { wait } from "../../utils/wait";
 import { Machine } from "@/integrations/xstate";
 import { toggle, toggleWithSync, createInvokeMachine } from "./fixtures";
 import { InstanceSnapshot, InstanceEvent } from "../repositories";

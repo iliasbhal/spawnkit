@@ -1,9 +1,9 @@
 import * as Spawnkit from "../";
-import wait from "wait";
+import { wait } from "../utils/wait";
 
 describe("Spawnkit", () => {
   describe("Base", () => {
-    it("client can use instance methods", () => {});
+    it("client can use instance methods", () => { });
     it.todo("can call for instance method and not wait for the resonse");
   });
 

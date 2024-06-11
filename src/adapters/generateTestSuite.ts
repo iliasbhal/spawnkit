@@ -1,5 +1,5 @@
 import { Adapters } from "./";
-import wait from "wait";
+import { wait } from "../utils/wait";
 import { waitFor } from "poll-until-promise";
 
 export const generateTestSuite = (
