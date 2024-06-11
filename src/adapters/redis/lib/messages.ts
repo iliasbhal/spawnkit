@@ -130,6 +130,15 @@ export class MessageBroker
       const subscription = this.listenClientPubSub(
         messageChannel,
         (event: any) => {
+          // Fixes: { response: undefined } is serialized to '{}' when published 
+          // which mean we loose the key "response"
+          // We need to reconstruct the orignal object;
+          const isEmptyResponse = Object.keys(event.data).length === 0;
+          if (isEmptyResponse) {
+            event.data = {
+              response: undefined,
+            };
+          }
           return callback(event);
         },
       );
