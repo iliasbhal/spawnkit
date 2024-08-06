@@ -134,15 +134,15 @@ export const generateTestSuite = (
     });
 
     describe("MessageBroker", () => {
-      const creatStreamId = createStreamIdGenerator();
+      const createStreamConfig = createPubSubTestConfig();
 
       it("should be able to emit and receive events ", async () => {
         const adapters = await getAdapters();
 
-        const streamId = creatStreamId();
+        const config = createStreamConfig();
         const callback = jest.fn();
-        const sub = adapters.messages.subscribe(streamId, callback);
-        await adapters.messages.publish(streamId, { aaa: true });
+        const sub = adapters.messages.subscribe(config.instance, config.channel, callback);
+        await adapters.messages.publish(config.instance, config.channel, { aaa: true });
 
         await waitUntilOK(() => {
           expect(callback).toHaveBeenCalled();
@@ -157,11 +157,11 @@ export const generateTestSuite = (
       it("should not receive event on different channels ", async () => {
         const adapters = await getAdapters();
 
-        const streamId = creatStreamId();
-        const streamId2 = creatStreamId();
+        const streamId = createStreamConfig();
+        const streamId2 = createStreamConfig();
         const callback = jest.fn();
-        const sub = adapters.messages.subscribe(streamId, callback);
-        await adapters.messages.publish(streamId2, { aaa: true });
+        const sub = adapters.messages.subscribe(streamId.instance, streamId.channel, callback);
+        await adapters.messages.publish(streamId2.instance, streamId2.channel, { aaa: true });
 
         await wait(1000);
         expect(callback).not.toHaveBeenCalled();
@@ -171,18 +171,18 @@ export const generateTestSuite = (
       it("should trigger the callback on every emitted value once", async () => {
         const adapters = await getAdapters();
 
-        const streamId = creatStreamId();
+        const streamId = createStreamConfig();
         const callback = jest.fn();
-        const sub = adapters.messages.subscribe(streamId, callback);
-        await adapters.messages.publish(streamId, { test: 1 });
+        const sub = adapters.messages.subscribe(streamId.instance, streamId.channel, callback);
+        await adapters.messages.publish(streamId.instance, streamId.channel, { test: 1 });
         await wait(10);
 
-        await adapters.messages.publish(streamId, { test: 2 });
-        await adapters.messages.publish(streamId, { test: 3 });
+        await adapters.messages.publish(streamId.instance, streamId.channel, { test: 2 });
+        await adapters.messages.publish(streamId.instance, streamId.channel, { test: 3 });
 
         await wait(10);
 
-        await adapters.messages.publish(streamId, { test: 4 });
+        await adapters.messages.publish(streamId.instance, streamId.channel, { test: 4 });
 
         await waitUntilOK(() => {
           expect(callback).toHaveBeenCalled();
@@ -206,18 +206,18 @@ export const generateTestSuite = (
       it("should allow for several subscriber to receive events", async () => {
         const adapters = await getAdapters();
 
-        const streamId = creatStreamId();
+        const streamId = createStreamConfig();
 
         const subscribers = Array.from({ length: 16 }).map(() => {
           const callback = jest.fn();
-          const subscription = adapters.messages.subscribe(streamId, callback);
+          const subscription = adapters.messages.subscribe(streamId.instance, streamId.channel, callback);
           return {
             callback,
             subscription,
           };
         });
 
-        await adapters.messages.publish(streamId, { aaa: true });
+        await adapters.messages.publish(streamId.instance, streamId.channel, { aaa: true });
 
         await waitUntilOK(() => {
           subscribers.forEach(({ callback, subscription }) => {
@@ -234,9 +234,16 @@ export const generateTestSuite = (
   });
 };
 
-function createStreamIdGenerator() {
+function createPubSubTestConfig() {
+  const instance = {
+    kind: "test",
+    id: nanoid(),
+  }
   let i = 0;
-  return () => `stream:${i++}`;
+  return () => ({
+    instance: instance,
+    channel: `stream:${i++}`,
+  })
 }
 
 async function waitUntilOK(callback: Function) {
