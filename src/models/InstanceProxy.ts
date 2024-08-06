@@ -14,6 +14,7 @@ import {
 import { Client } from "./Client";
 import { Data } from "./Data";
 import { Logger } from "./Logger";
+import { nanoid } from "nanoid";
 
 export interface InstanceProps {
   kind: string;
@@ -141,7 +142,7 @@ export class InstanceProxy<Inst extends Instance> {
     // Wrap the method in a Promise. to ensure that if the method is sync
     // We still catch the error if one happens.
     const startedAt = Date.now();
-    const callID = crypto.randomUUID();
+    const callID = nanoid();
     this.trace({
       type: "proxy:call:start",
       id: callID,

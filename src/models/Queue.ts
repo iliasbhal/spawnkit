@@ -5,6 +5,7 @@ import type { Client, SpawnkitConfig } from "./Client";
 import { InstanceProxy } from "./InstanceProxy";
 import { Data } from "./Data";
 import { Logger } from "./Logger";
+import { nanoid } from "nanoid";
 
 export class Queue<O extends SpawnkitConfig> {
   instances: O["instances"];
@@ -75,7 +76,7 @@ export class Queue<O extends SpawnkitConfig> {
       // When instantiating a new instance, we should acquire a lock
       // So that only one worker in the cloud is instantiating the instance
       // This is to prevent from executing side effects twice and race conditions.
-      const executionId = crypto.randomUUID();
+      const executionId = nanoid();
       const logger = new Logger({
         adapters: this.adapters,
         groupId: executionId,

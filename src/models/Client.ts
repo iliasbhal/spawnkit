@@ -16,6 +16,7 @@ import {
 } from "../adapters";
 import { RemoteData } from "./Data";
 import { Queue } from "./Queue";
+import { nanoid } from "nanoid";
 
 export interface SpawnkitConfig {
   adapters: Adapters;
@@ -29,7 +30,7 @@ type InternalMessageData = InstanceEventChannels[keyof InstanceEventChannels];
 export class Client<CP extends SpawnkitConfig> {
   private adapters: CP["adapters"];
   private instances: CP["instances"];
-  id = crypto.randomUUID();
+  id = nanoid();
 
   constructor(opts: CP) {
     this.adapters = opts.adapters;

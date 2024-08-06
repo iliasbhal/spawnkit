@@ -3,6 +3,7 @@ import * as Adapters from "../../index";
 import { RedisAdapter } from "./_base";
 import { wait } from "../../../utils/wait";
 import superjson from 'superjson';
+import { nanoid } from "nanoid";
 
 interface Message<DataShape> {
   id: Adapters.EventId;
@@ -63,7 +64,7 @@ export class MessageBroker
     event: EventData,
   ): Promise<Adapters.EventId> {
     const messageChannel = this.getChannel(instance, channel);
-    const eventId = crypto.randomUUID();
+    const eventId = nanoid();
     const message: Message<EventData> = {
       id: eventId,
       data: event,

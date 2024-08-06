@@ -2,11 +2,11 @@ import { Redis } from "ioredis";
 import * as BullMQ from "bullmq";
 import * as Adapters from "../../index";
 import { BaseQueue } from "./_base";
+import { nanoid } from "nanoid";
 
 export class EventScheduler
   extends BaseQueue
-  implements Adapters.AdapterEventScheduler
-{
+  implements Adapters.AdapterEventScheduler {
   queue: BullMQ.Queue<Adapters.ScheduleEventConfig, any, string>;
   constructor(redis: Redis) {
     super(redis);
@@ -76,14 +76,14 @@ export class EventScheduler
     const bullJobConfig =
       "delay" in config.schedule
         ? {
-            delay: config.schedule.delay,
-          }
+          delay: config.schedule.delay,
+        }
         : "cron" in config.schedule
           ? {
-              repeat: {
-                pattern: config.schedule.cron,
-              },
-            }
+            repeat: {
+              pattern: config.schedule.cron,
+            },
+          }
           : null;
 
     if (!bullJobConfig) {
@@ -91,7 +91,7 @@ export class EventScheduler
     }
 
     const jobName =
-      `event:${config.instance.kind}:${config.instance.id}:${crypto.randomUUID()}` as const;
+      `event:${config.instance.kind}:${config.instance.id}:${nanoid()}` as const;
     const job = await this.queue.add(jobName, config, bullJobConfig);
     const scheduleId = this.getScheduleID(job);
     if (!scheduleId) {
