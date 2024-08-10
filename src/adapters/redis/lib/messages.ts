@@ -2,6 +2,7 @@ import { Client } from "@/models/Client";
 import * as Adapters from "../../index";
 import { RedisAdapter } from "./_base";
 import { wait } from "../../../utils/wait";
+import { lerp } from "../../../utils/lerp";
 import superjson from 'superjson';
 import { nanoid } from "nanoid";
 
@@ -282,15 +283,18 @@ export class MessageBroker
 
     Promise.resolve().then(async () => {
       const previousEventsIds = new Set();
-      const range = {
-        from: 0,
-        to: Infinity,
+      const loop = {
+        emptyRunsCount: 0,
+        range: {
+          from: 0,
+          to: Infinity,
+        }
       };
 
       while (!abortCtl.signal.aborted) {
         const timestampBeforeRequest = Date.now();
-        const events = await this.getLatestMessages(channel, range);
-        range.from = timestampBeforeRequest;
+        const events = await this.getLatestMessages(channel, loop.range);
+        loop.range.from = timestampBeforeRequest;
 
         if (events.length) {
           events.forEach((event) => {
@@ -298,14 +302,25 @@ export class MessageBroker
             if (previousEventsIds.has(event.id)) return;
             callback(event as any);
           });
-
-          previousEventsIds.clear();
-          events.forEach((event) => {
-            previousEventsIds.add(event.id);
-          });
         }
 
-        await wait(50);
+        // Reset & update the list of processed events
+        // So that we don't reprocess them when we fetch the next batch
+        previousEventsIds.clear();
+        events.forEach((event) => {
+          previousEventsIds.add(event.id);
+        });
+
+        const isEmptyRun = previousEventsIds.size === 0;
+        loop.emptyRunsCount = isEmptyRun ? loop.emptyRunsCount + 1 : 0;
+
+        const MIN_WAIT_TIME = 0;
+        const MAX_WAIT_TIME = 500;
+        const MAX_EMPTY_RUNS = 5;
+
+        const ratio = Math.min(MAX_EMPTY_RUNS, loop.emptyRunsCount) / MAX_EMPTY_RUNS;
+        const waitTimeMs = lerp(MIN_WAIT_TIME, MAX_WAIT_TIME, ratio);
+        await wait(waitTimeMs);
       }
     });
 
