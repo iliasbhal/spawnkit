@@ -56,6 +56,9 @@ const basicExample = async () => {
   // Example 1: call methods like the its a real reference.
   const response = await orderBook.buy({ tick: "APPL", qty: 10 });
   console.log("response", response);
+  await wait(300);
+  const response2 = await orderBook.buy({ tick: "APPL", qty: 50 });
+  console.log("response2", response2);
 
   // Example 2: call the methods but don't wait for the response
   // await orderBook.skip.buy({ tick: "APPL" });
