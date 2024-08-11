@@ -157,8 +157,6 @@ export class MessageBroker
       };
     }
 
-    console.log('channel', channel)
-
     throw new Error("Unhandled channel type");
   }
 
