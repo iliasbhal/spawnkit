@@ -154,6 +154,11 @@ export const generateTestSuite = (
         });
       });
 
+      it("should emit and receive events in same order", async () => {
+        // Sometimes, the order is not maintained if two message are sent in the same timestamp.
+        throw new Error('TODO');
+      });
+
       it("should not receive event on different channels ", async () => {
         const adapters = await getAdapters();
 

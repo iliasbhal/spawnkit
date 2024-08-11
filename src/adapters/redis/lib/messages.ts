@@ -267,15 +267,40 @@ export class MessageBroker
     return hasUnprocessedEvents;
   }
 
+  currentOrder = {
+    timestamp: Date.now(),
+    order: 0,
+  };
+
+  private getTimestampAndOrder = (): { timestamp: number, order: number } => {
+    const timestamp = Date.now();
+
+    const timestampChanged = this.currentOrder.timestamp !== timestamp;
+    if (timestampChanged) {
+      this.currentOrder = {
+        timestamp,
+        order: 0,
+      };
+    }
+
+    this.currentOrder.order++;
+    return this.currentOrder;
+  }
+
   private async publishMQ<EventData>(
     channel: string,
     message: Message<EventData>,
   ) {
-    const now = Date.now();
+    const { timestamp, order } = this.getTimestampAndOrder();
     await Promise.all([
-      this.redis.zadd(channel, now, message.id),
-      this.redis.hset(channel + ":data", message.id, superjson.stringify(message)),
+      this.redis.zadd(channel, timestamp, message.id),
+      this.redis.hset(channel + ":data", message.id, superjson.stringify({ message, order })),
     ]);
+
+    return {
+      message,
+      order
+    }
   }
 
   private listenMQ(channel: string, callback: (event: any) => any) {
@@ -293,7 +318,11 @@ export class MessageBroker
 
       while (!abortCtl.signal.aborted) {
         const timestampBeforeRequest = Date.now();
-        const events = await this.getLatestMessages(channel, loop.range);
+        const rawEvents = await this.getLatestMessagesRaw(channel, loop.range);
+        const events = rawEvents.map((e => superjson.parse(e) as Awaited<ReturnType<typeof this.publishMQ>>))
+          .sort((a, b) => a.order - b.order)
+          .map(a => a.message);
+
         loop.range.from = timestampBeforeRequest;
 
         if (events.length) {
@@ -331,7 +360,7 @@ export class MessageBroker
     };
   }
 
-  private async getLatestMessages(
+  private async getLatestMessagesRaw(
     channel: string,
     range: { from: number; to: number },
   ) {
@@ -349,11 +378,12 @@ export class MessageBroker
       channel + ":data",
       ...messageIds,
     );
+
     const messages = rawMessages.flatMap((raw) => {
-      if (raw) return [superjson.parse(raw) as any];
+      if (raw) return [raw];
       return [];
     });
 
-    return messages;
+    return messages
   }
 }
