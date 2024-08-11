@@ -1,5 +1,6 @@
 import { Adapters } from "@/adapters";
 import { AsyncDebounceHandler } from "@/utils/AsyncDebounceHandler";
+import { CacheMap } from '@/utils/CacheMap';
 import { Logger } from "./Logger";
 import { Client } from "./Client";
 
@@ -11,7 +12,7 @@ export class Data<DataShape extends Record<string, any>> {
     id: string;
   };
 
-  cache = new Cache();
+  cache = new CacheMap();
 
   constructor(config: {
     adapters: Adapters;
@@ -75,66 +76,5 @@ export class Data<DataShape extends Record<string, any>> {
       // in the case where the instance is using a lot of keys
       this.debounceByKey.delete(key);
     });
-  }
-}
-
-export class RemoteData<DataShape extends Record<string, any>> {
-  adapters: Pick<Adapters, "data" | "messages">;
-  instance: {
-    kind: string;
-    id: string;
-  };
-
-  constructor(config: {
-    adapters: Pick<Adapters, "data" | "messages">;
-    instance: {
-      kind: string;
-      id: string;
-    };
-  }) {
-    this.adapters = config.adapters;
-    this.instance = config.instance;
-  }
-
-  async get<K extends keyof DataShape>(key: K): Promise<DataShape[K] | null> {
-    return await this.adapters.data.get(
-      this.instance.kind,
-      this.instance.id,
-      key.toString(),
-    );
-  }
-
-  on<K extends keyof DataShape>(key: K, callback: (next: DataShape[K]) => any) {
-    const channel = Client.getChannelForEventBus("data", key.toString());
-
-    return this.adapters.messages.subscribe<DataShape[K]>(
-      this.instance,
-      channel,
-      (event) => {
-        callback(event.data);
-      },
-    );
-  }
-}
-
-class Cache extends Map {
-  get(key: any) {
-    this.scheduleCleanup(key);
-    return super.get(key);
-  }
-
-  set(key: any, value: any) {
-    super.set(key, value);
-    this.scheduleCleanup(key);
-    return this;
-  }
-
-  timeouts: Record<any, any> = {};
-  private scheduleCleanup(key: any) {
-    const timeoutId = setTimeout(() => {
-      this.delete(key);
-    }, 10_000);
-
-    this.timeouts[key] = timeoutId;
   }
 }

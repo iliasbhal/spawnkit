@@ -66,86 +66,74 @@ export class Queue<O extends SpawnkitConfig> {
   ) {
     const Instance = this.instances[instanceConfig.kind];
     if (!Instance) {
-      throw new Error("Machine Not implemented");
+      throw new Error(`Instance Kind Not Implemented (received: ${instanceConfig.kind})`);
     }
 
+    // When instantiating a new instance, we should acquire a lock
+    // So that only one worker in the cloud is instantiating the instance
+    // This is to prevent from executing side effects twice and race conditions.
+    const executionId = nanoid();
+    const logger = new Logger({
+      adapters: this.adapters,
+      groupId: executionId,
+      instance: instanceConfig,
+    });
+
+    const MIN_LOCK_DURATION = 2_000;
+    const RESOURCE_ID = `${instanceConfig.kind}:${instanceConfig.id}`;
+    const lock = new Lock({
+      adapters: this.adapters,
+      ownerId: executionId,
+      resource: RESOURCE_ID,
+      instance: instanceConfig,
+      duration: MIN_LOCK_DURATION,
+      logger,
+    });
+
     try {
-      const MIN_LOCK_DURATION = 2_000;
-      const RESOURCE_ID = `${instanceConfig.kind}:${instanceConfig.id}`;
-
-      // When instantiating a new instance, we should acquire a lock
-      // So that only one worker in the cloud is instantiating the instance
-      // This is to prevent from executing side effects twice and race conditions.
-      const executionId = nanoid();
-      const logger = new Logger({
-        adapters: this.adapters,
-        groupId: executionId,
-        instance: instanceConfig,
-      });
-
-      const lock = new Lock({
-        lockId: executionId,
-        logger,
-        adapters: this.adapters,
-        resource: RESOURCE_ID,
-        duration: MIN_LOCK_DURATION,
-        instance: instanceConfig,
-      });
-
-      const data = new Data<any>({
-        adapters: this.adapters,
-        logger,
-        instance: instanceConfig,
-      });
-
-      const result = await lock.using(async (abortSignal) => {
+      await lock.using(async (abortSignal) => {
         const instance = new Instance();
-        const proxy = new InstanceProxy(
-          logger,
+        const proxy = new InstanceProxy({
+          adapters: this.adapters,
+          config: instanceConfig,
           instance,
-          instanceConfig,
-          this.adapters,
           abortSignal,
-          data,
-        );
+          logger,
+        });
 
         await proxy.start();
-      });
-
-      // // In order to make sure that we didn't miss any event and to avoid any race conditions
-      // // we'll check if there any event left to process. But we do it outside of the lock.
-      // // This will ensure that if there is another process trying to pick up those event
-      // // this process doesn't acquire the lock.
-      Promise.resolve().then(async () => {
-        const waitTimeBeforeAttemp = [200, 400, 800];
-
-        for (const waitTime of waitTimeBeforeAttemp) {
-          await wait(waitTime);
-
-          const hasUnprocessedEvents = await this.adapters.messages.has(
-            instanceConfig,
-            instanceConfig.id,
-          );
-
-          if (hasUnprocessedEvents) {
-            this.adapters.instances.schedule(instanceConfig);
-          }
-        }
-      });
-
-      return result;
+      })
     } catch (err) {
       const shouldSilenceError =
         err instanceof Lock.AcquireLockError ||
         err instanceof Lock.ExtendError ||
         err instanceof Lock.ReleaseError;
-      if (shouldSilenceError) {
-        return;
+      if (!shouldSilenceError) {
+        console.error(err);
+        throw err;;
       }
-
-      console.error(err);
-      throw err;
     }
+
+    // // In order to make sure that we didn't miss any event and to avoid any race conditions
+    // // we'll check if there any event left to process. But we do it outside of the lock.
+    // // This will ensure that if there is another process trying to pick up those event
+    // // this process doesn't acquire the lock.
+    Promise.resolve().then(async () => {
+      const waitTimeBeforeAttemp = [200, 400, 800];
+
+      for (const waitTime of waitTimeBeforeAttemp) {
+        await wait(waitTime);
+
+        const hasUnprocessedEvents = await this.adapters.messages.has(
+          instanceConfig,
+          instanceConfig.id,
+        );
+
+        if (hasUnprocessedEvents) {
+          this.adapters.instances.schedule(instanceConfig);
+        }
+      }
+    });
   }
 
   static from<O extends SpawnkitConfig>(opts: O, client: Client<any>) {

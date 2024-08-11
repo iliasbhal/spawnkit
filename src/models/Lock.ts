@@ -6,20 +6,20 @@ import { Logger } from "./Logger";
 export class LockError extends Error { }
 
 export class AcquireLockError extends LockError {
-  constructor(resource: string, lockId: string) {
-    super(`Couldn\'t acquire lock (${resource} | ${lockId})`);
+  constructor(resource: string, ownerId: string) {
+    super(`Couldn\'t acquire lock (resource:${resource} | owner:${ownerId})`);
   }
 }
 
 export class LockReleaseError extends LockError {
-  constructor(resource: string, lockId: string) {
-    super(`Couldn\'t release lock (${resource} | ${lockId})`);
+  constructor(resource: string, ownerId: string) {
+    super(`Couldn\'t release lock (resource:${resource} | owner:${ownerId})`);
   }
 }
 
 export class LockExtendError extends LockError {
-  constructor(resource: string, lockId: string) {
-    super(`Couldn\'t extend lock (${resource} | ${lockId})`);
+  constructor(resource: string, ownerId: string) {
+    super(`Couldn\'t extend lock (resource:${resource} | owner:${ownerId})`);
   }
 }
 
@@ -47,7 +47,7 @@ export class Lock {
   config: InstanceLockConfig;
   adapters: Adapters;
   logger: Logger;
-  lockId: string;
+  ownerId: string;
   expireAt: number = 0;
 
   getConfig(input: LockConfig): InstanceLockConfig {
@@ -72,10 +72,10 @@ export class Lock {
   }
 
   constructor(
-    config: LockConfig & { adapters: Adapters; lockId: string; logger: Logger },
+    config: LockConfig & { adapters: Adapters; ownerId: string; logger: Logger },
   ) {
     this.config = this.getConfig(config);
-    this.lockId = config.lockId;
+    this.ownerId = config.ownerId;
     this.adapters = config.adapters;
     this.logger = config.logger;
   }
@@ -92,11 +92,11 @@ export class Lock {
 
     const acquired = await this.adapters.lock.acquire(
       resource,
-      this.lockId,
+      this.ownerId,
       duration,
     );
 
-    if (!acquired) throw new AcquireLockError(resource, this.lockId);
+    if (!acquired) throw new AcquireLockError(resource, this.ownerId);
 
     this.expireAt = expireAt;
     return acquired;
@@ -113,10 +113,10 @@ export class Lock {
 
     const extended = await this.adapters.lock.extend(
       resource,
-      this.lockId,
+      this.ownerId,
       duration,
     );
-    if (!extended) throw new LockExtendError(resource, this.lockId);
+    if (!extended) throw new LockExtendError(resource, this.ownerId);
 
     this.expireAt = expireAt;
   }
@@ -128,8 +128,8 @@ export class Lock {
       type: "lock:release",
     });
 
-    const released = await this.adapters.lock.release(resource, this.lockId);
-    if (!released) throw new LockReleaseError(resource, this.lockId);
+    const released = await this.adapters.lock.release(resource, this.ownerId);
+    if (!released) throw new LockReleaseError(resource, this.ownerId);
 
     this.expireAt = 0;
   }

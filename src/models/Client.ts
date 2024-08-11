@@ -3,7 +3,8 @@ import type {
   InstanceEventChannels,
   InstanceEventStreamMessage,
 } from "./InstanceProxy";
-import { Stream } from "@/models/Stream";
+import { ClientStream } from "./ClientStream";
+import { RemoteError } from "./RemoteError";
 import {
   Adapters,
   ScheduleId,
@@ -14,7 +15,7 @@ import {
   InstanceMethodCall,
   BaseAdapter,
 } from "../adapters";
-import { RemoteData } from "./Data";
+import { ClientData } from "./ClientData";
 import { Queue } from "./Queue";
 import { nanoid } from "nanoid";
 
@@ -22,8 +23,6 @@ export interface SpawnkitConfig {
   adapters: Adapters;
   instances: { [key: string]: typeof Instance<any, any> };
 }
-
-export class RemoteError extends Error { }
 
 type InternalMessageData = InstanceEventChannels[keyof InstanceEventChannels];
 
@@ -60,32 +59,6 @@ export class Client<CP extends SpawnkitConfig> {
     return `broadcast:${type}:${channel}` as const;
   }
 
-  static deserializeError(serializedError: { message: string; name: string }) {
-    const error = new RemoteError();
-    Object.assign(error, serializedError);
-    return error;
-  }
-
-  static serializeError(error: Error) {
-    if (!error) {
-      return null;
-    }
-
-    return Object.assign(
-      {},
-      error,
-      {
-        message: error.message,
-        name: error.constructor.name,
-        stack: error.stack,
-      },
-      {
-        originalLine: undefined,
-        originalColumn: undefined,
-      },
-    );
-  }
-
   worker: Queue<any> | null = null;
   public start() {
     const forwardOptions = {
@@ -116,6 +89,21 @@ export class Client<CP extends SpawnkitConfig> {
     return shouldScheduleInstance;
   }
 
+  private tryWakeInstanceUp<Kind extends Extract<keyof CP["instances"], string>>(kind: Kind, instanceId: InstanceId) {
+    // In the case that we are sending a lot of events
+    // We don't have to try to schedule an instance together with every event we send.
+    // Once an instance terminate, it will try again 3 times to check if there are pending events process.
+    // We can rely on this fact to only schedule an instance if it has been a long time since last event push.
+    // This is mainly to avoid adding unnessessary pressure the backend.
+    const canScheduleInstance = this.shouldScheduleInstance(instanceId);
+    if (canScheduleInstance) {
+      this.adapters.instances.schedule({
+        id: instanceId,
+        kind: kind.toString(),
+      })
+    }
+  }
+
   spawn<Kind extends Extract<keyof CP["instances"], string>>(
     kind: Kind,
     instanceId: InstanceId,
@@ -137,29 +125,21 @@ export class Client<CP extends SpawnkitConfig> {
     const sendEventToInstance = async (
       methodCallConfig: InstanceMethodCall,
     ) => {
-      const shouldScheduleInstance = this.shouldScheduleInstance(instanceId);
-      const [eventId] = await Promise.all([
+      const [_, eventId] = await Promise.all([
+        // when sending an event, we shall always try to spawn an instance
+        // to ensure that the event will be processed
+        this.tryWakeInstanceUp(kind, instanceId),
         this.adapters.messages.publish(
           instanceIdentifier,
           "rpc",
           methodCallConfig,
         ),
-
-        // when sending an event, we shall always try to spawn an instance
-        // to ensure that the event will be processed except In the case that we are sending a lot of events
-        // We don't have to try t schedule an instance together with every event we send.
-        // Once an instance terminate, it will try again 3 times to check if there are pending events process.
-        // We can rely on this fact to only schedule an instance if it has been a long time since last event push.
-        // This is mainly to avoid adding unnessary pressure the the backend.
-        // Scheduling too often is guarenteed to fail often as theu won't be able to acquire the locks
-        shouldScheduleInstance &&
-        this.adapters.instances.schedule(instanceIdentifier),
       ]);
 
       return eventId;
     };
 
-    const data = new RemoteData<InstanceData>({
+    const data = new ClientData<InstanceData>({
       adapters: this.adapters,
       instance: instanceIdentifier,
     });
@@ -206,6 +186,9 @@ export class Client<CP extends SpawnkitConfig> {
             mode,
           });
 
+          if (mode === 'skip') return true;
+          if (mode === 'scheduled') return true;
+
           if (mode === "normal") {
             return new Promise((resolve, reject) => {
               const internalStream = new ClientStream();
@@ -223,7 +206,7 @@ export class Client<CP extends SpawnkitConfig> {
                 message: InternalMessageData,
               ) => {
                 if ("error" in message) {
-                  const error = Client.deserializeError(message.error);
+                  const error = RemoteError.deserialize(message.error);
                   reject(error);
                 } else if ("response" in message) {
                   resolve(message.response);
@@ -288,6 +271,7 @@ export class Client<CP extends SpawnkitConfig> {
 
       __INTERNAL__: {
         sendEventToInstance,
+        wakeUpInstance: () => this.tryWakeInstanceUp(kind, instanceId),
       },
 
       schedule: scheduleRemoteMethodHandler,
@@ -318,46 +302,6 @@ export class Client<CP extends SpawnkitConfig> {
         return normalRemoteMethodHandler(prop);
       },
     }) as Spawn<Inst>;
-  }
-}
-
-class ClientStream extends Stream<any> {
-  constructor() {
-    super(() => { });
-  }
-
-  lastIndex = -1;
-  receivedMessageBuffer: InstanceEventStreamMessage[] = [];
-  async forward(message: InstanceEventStreamMessage) {
-    // await this.ensureStarted();
-    this.receivedMessageBuffer.push(message);
-    this.receivedMessageBuffer.sort((left, right) => left.index - right.index);
-    // console.log("this.receivedMessageBuffer", this.receivedMessageBuffer);
-
-    while (this.receivedMessageBuffer[0]) {
-      const bufferedMsg = this.receivedMessageBuffer.shift()!;
-      const isMessageInOrder = bufferedMsg.index == this.lastIndex + 1;
-      if (!isMessageInOrder) {
-        this.receivedMessageBuffer.unshift(bufferedMsg);
-        break;
-      }
-
-      this.lastIndex = bufferedMsg.index;
-      this.injest(bufferedMsg);
-    }
-  }
-
-  injest(message: InstanceEventStreamMessage) {
-    // console.log("INJEST", message);
-    if ("start" in message) this.store("start");
-    if ("data" in message) this.store("data", message.data);
-
-    if ("error" in message) {
-      const error = Client.deserializeError(message.error);
-      this.error(error);
-    }
-
-    if ("end" in message) this.store("end");
   }
 }
 

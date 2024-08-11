@@ -15,6 +15,7 @@ import { Client } from "./Client";
 import { Data } from "./Data";
 import { Logger } from "./Logger";
 import { nanoid } from "nanoid";
+import { RemoteError } from "./RemoteError";
 
 export interface InstanceProps {
   kind: string;
@@ -72,21 +73,26 @@ export class InstanceProxy<Inst extends Instance> {
   public adapters: Adapters;
   public abortSignal: AbortSignal;
 
-  constructor(
+  constructor(config: {
     logger: Logger,
     instance: Inst,
     config: InstanceIdentifier,
     adapters: Adapters,
     abortSignal: AbortSignal,
-    data: Data<Inst["__types"]["InstanceData"]>,
-  ) {
-    this.logger = logger;
-    this.config = config;
-    this.adapters = adapters;
-    this.instance = instance;
-    this.abortSignal = abortSignal;
+  }) {
+    this.logger = config.logger;
+    this.config = config.config;
+    this.adapters = config.adapters;
+    this.instance = config.instance;
+    this.abortSignal = config.abortSignal;
 
-    InstanceProxy.configureInstance(instance, config, {
+    const data = new Data<any>({
+      adapters: this.adapters,
+      instance: this.config,
+      logger: this.logger,
+    });
+
+    InstanceProxy.configureInstance(this.instance, config.config, {
       emit: (channel, data) => {
         return this.emit(channel, data);
       },
@@ -197,7 +203,7 @@ export class InstanceProxy<Inst extends Instance> {
     config.callMetaData.ended_at = Date.now();
 
     if (result.error) {
-      const serializedError = Client.serializeError(result.error);
+      const serializedError = RemoteError.serialize(result.error);
       config.callMetaData.error = serializedError;
 
       if (config.messageId) {
@@ -273,7 +279,7 @@ export class InstanceProxy<Inst extends Instance> {
     });
 
     const handleError = (error: Error) => {
-      const serializedError = Client.serializeError(error);
+      const serializedError = RemoteError.serialize(error);
       config.callMetaData.error = serializedError;
 
       if (config.requestId)
@@ -290,7 +296,7 @@ export class InstanceProxy<Inst extends Instance> {
       handleError(err);
     });
 
-    const syncAbort = this.createAbortHandler(this.abortSignal, () => {
+    const syncAbort = this.addAbortListener(() => {
       handleError(new Error("Worker Aborted"));
     });
 
@@ -338,20 +344,16 @@ export class InstanceProxy<Inst extends Instance> {
 
     this.subscribeToInstanceEvent();
 
-    const syncAbort = this.createAbortHandler(this.abortSignal, () => {
+    const syncAbort = this.addAbortListener(() => {
       if (!this.live) return;
+
+      this.keepAlive.clear();
+      this.dispose();
       this.aborted.resolve(true);
     });
 
-    this.aborted.await.finally(() => {
-      this.keepAlive.clear();
-      syncAbort.dispose();
-      this.dispose();
-    });
-
-    await this.keepAliveUntilNothingHappens().finally(() => {
-      syncAbort.dispose();
-    });
+    await this.keepAliveUntilNothingHappens()
+      .finally(() => syncAbort.dispose());
   }
 
   public async dispose() {
@@ -445,16 +447,17 @@ export class InstanceProxy<Inst extends Instance> {
     });
   }
 
-  public createAbortHandler(abortSignal: AbortSignal, callback: () => any) {
-    abortSignal.addEventListener("abort", callback);
-    this.aborted.await.finally(() => {
-      abortSignal.removeEventListener("abort", callback);
-    });
+  private addAbortListener(callback: () => any) {
+    this.abortSignal.addEventListener("abort", callback);
+
+    const disposeListener = () => {
+      this.abortSignal.removeEventListener("abort", callback);
+    };
+
+    this.aborted.await.finally(() => disposeListener());
 
     return {
-      dispose: () => {
-        abortSignal.removeEventListener("abort", callback);
-      },
+      dispose: disposeListener
     };
   }
 

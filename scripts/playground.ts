@@ -1,4 +1,5 @@
 import 'dotenv/config';
+
 import { wait } from "../src/utils/wait";
 import * as Spawnkit from "@/.";
 import * as RedisAdapter from "@/adapters/redis";
@@ -23,16 +24,16 @@ const main = async () => {
   await redis.flushall("SYNC");
   client.start();
 
-  // attributeExample();
+  //   // attributeExample();
   await Promise.all([
     // basicExample(),
-    // errorHandlingExample(),
-    // streamExample(),
-    // streamWithErrors(),
-    // scheduleCallExample(),
-    // emittedEventsExample(),
-    // exampleXState(),
-    exampleData(),
+    //     // errorHandlingExample(),
+    //     // streamExample(),
+    //     // streamWithErrors(),
+    //     // scheduleCallExample(),
+    emittedEventsExample(),
+    //     // exampleXState(),
+    //     // exampleData(),
   ]);
 };
 
@@ -57,11 +58,12 @@ const basicExample = async () => {
   const response = await orderBook.buy({ tick: "APPL", qty: 10 });
   console.log("response", response);
   await wait(300);
+
   const response2 = await orderBook.buy({ tick: "APPL", qty: 50 });
   console.log("response2", response2);
 
   // Example 2: call the methods but don't wait for the response
-  // await orderBook.skip.buy({ tick: "APPL" });
+  // await orderBook.emit.buy({ tick: "APPL" });
   // console.log("SENT");
   //
   subscription.unsubscribe();
@@ -136,19 +138,21 @@ const emittedEventsExample = async () => {
   // and from client as well
   orderBook.emit("alphachannel", "asddas");
   orderBook.emit("orders", ["asddas"]);
-  orderBook.on("orders", (event) => {
-    console.log("ON CLIENT 1", event);
-  });
 
-  orderBook2.on("orders", (event) => {
-    console.log("ON CLIENT 2", event);
-  });
 
-  await orderBook.buy({ tick: "BTC/USD", qty: 1 });
-  await orderBook.buy({ tick: "BTC/USD (via skip)", qty: 1 });
+  // orderBook.on("orders", (event) => {
+  //   console.log("ON CLIENT 1", event);
+  // });
 
-  await orderBook2.buy({ tick: "ETH/USD", qty: 1 });
-  await orderBook2.buy({ tick: "ETH/USD (via skip)", qty: 1 });
+  // orderBook2.on("orders", (event) => {
+  //   console.log("ON CLIENT 2", event);
+  // });
+
+  // await orderBook.buy({ tick: "BTC/USD", qty: 1 });
+  // await orderBook.buy({ tick: "BTC/USD (via skip)", qty: 1 });
+
+  // await orderBook2.buy({ tick: "ETH/USD", qty: 1 });
+  // await orderBook2.buy({ tick: "ETH/USD (via skip)", qty: 1 });
 
   // const intervalId = setInterval(async () => {
   //   const isSkip = Math.random() > 0.5;
