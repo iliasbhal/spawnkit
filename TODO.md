@@ -1,6 +1,6 @@
 # Spawnkit lib
 
-// -
+- Remove playground in favor of integration test suites
 
 # Spawnkit cloud
 
