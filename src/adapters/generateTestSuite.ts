@@ -247,8 +247,8 @@ function createPubSubTestConfig() {
   let i = 0;
   return () => ({
     instance: instance,
-    channel: `stream:${i++}`,
-  })
+    channel: 'rpc',
+  } as const)
 }
 
 async function waitUntilOK(callback: Function) {

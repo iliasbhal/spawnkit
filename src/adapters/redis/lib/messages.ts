@@ -3,8 +3,9 @@ import * as Adapters from "../../index";
 import { RedisAdapter } from "./_base";
 import { wait } from "../../../utils/wait";
 import { lerp } from "../../../utils/lerp";
-import superjson from 'superjson';
-import { nanoid } from "nanoid";
+
+const { nanoid } = require("nanoid");
+const superjson = require('superjson');
 
 interface Message<DataShape> {
   id: Adapters.EventId;
@@ -61,8 +62,8 @@ export class MessageBroker
 
   async publish<EventData>(
     instance: Adapters.InstanceIdentifier,
-    channel: string,
-    event: EventData,
+    channel: Adapters.MessageChannel,
+    event: EventData
   ): Promise<Adapters.EventId> {
     const messageChannel = this.getChannel(instance, channel);
     const eventId = nanoid();
@@ -155,6 +156,8 @@ export class MessageBroker
         },
       };
     }
+
+    console.log('channel', channel)
 
     throw new Error("Unhandled channel type");
   }

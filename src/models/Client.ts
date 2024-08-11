@@ -131,7 +131,7 @@ export class Client<CP extends SpawnkitConfig> {
         this.tryWakeInstanceUp(kind, instanceId),
         this.adapters.messages.publish(
           instanceIdentifier,
-          "rpc",
+          `rpc`,
           methodCallConfig,
         ),
       ]);

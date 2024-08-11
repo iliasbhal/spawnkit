@@ -55,49 +55,49 @@ export interface InstanceMethodCall<
 
 export type InstanceSignal =
   | {
-      type: "log";
-      message: string;
-    }
+    type: "log";
+    message: string;
+  }
   | {
-      type: "lock:acquire";
-      duration: number;
-    }
+    type: "lock:acquire";
+    duration: number;
+  }
   | {
-      type: "lock:abort";
-    }
+    type: "lock:abort";
+  }
   | {
-      type: "lock:extend";
-      duration: number;
-    }
+    type: "lock:extend";
+    duration: number;
+  }
   | {
-      type: "lock:release";
-    }
+    type: "lock:release";
+  }
   | {
-      type: "data:get";
-      key: string;
-    }
+    type: "data:get";
+    key: string;
+  }
   | {
-      type: "data:set";
-      key: string;
-      value: any;
-    }
+    type: "data:set";
+    key: string;
+    value: any;
+  }
   | {
-      type: "proxy:start";
-    }
+    type: "proxy:start";
+  }
   | {
-      type: "proxy:dispose";
-    }
+    type: "proxy:dispose";
+  }
   | {
-      type: "proxy:call:start";
-      id: string;
-      method: string;
-      args: any[];
-    }
+    type: "proxy:call:start";
+    id: string;
+    method: string;
+    args: any[];
+  }
   | {
-      type: "proxy:call:end";
-      id: string;
-      result: any;
-    };
+    type: "proxy:call:end";
+    id: string;
+    result: any;
+  };
 
 export class BaseAdapter {
   client!: Client<any>;
@@ -167,25 +167,27 @@ export abstract class AdapaterData extends BaseAdapter {
   ): Promise<boolean>;
 }
 
+export type MessageChannel = 'rpc' | `reply:${string}` | `broadcast:${string}`;
+
 export abstract class AdapaterMessageBroker extends BaseAdapter {
   abstract publish<EventData>(
     instance: InstanceIdentifier,
-    channel: string,
+    channel: MessageChannel,
     event: EventData,
     meta?: {
-      reply: string;
+      client: string,
     },
   ): Promise<EventId>;
 
   abstract ack(
     instance: InstanceIdentifier,
-    channel: string,
+    channel: MessageChannel,
     messageId: EventId,
   ): Promise<true>;
   abstract has(instance: InstanceIdentifier, channel: string): Promise<boolean>;
   abstract subscribe<EventData>(
     instance: InstanceIdentifier,
-    channel: string,
+    channel: MessageChannel,
     onEvent: (event: { id: EventId; data: EventData }) => void,
   ): { unsubscribe: Function };
 }
