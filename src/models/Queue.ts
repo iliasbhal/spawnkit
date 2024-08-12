@@ -3,7 +3,6 @@ import { Lock } from "./Lock";
 import { ScheduleByType, ScheduleContext } from "../adapters";
 import type { Client, SpawnkitConfig } from "./Client";
 import { InstanceProxy } from "./InstanceProxy";
-import { Data } from "./Data";
 import { Logger } from "./Logger";
 import { nanoid } from "nanoid";
 
@@ -106,7 +105,7 @@ export class Queue<O extends SpawnkitConfig> {
     } catch (err) {
       const shouldSilenceError =
         err instanceof Lock.AcquireLockError ||
-        err instanceof Lock.ExtendError ||
+        // err instanceof Lock.ExtendError ||
         err instanceof Lock.ReleaseError;
       if (!shouldSilenceError) {
         console.error(err);
@@ -118,22 +117,25 @@ export class Queue<O extends SpawnkitConfig> {
     // // we'll check if there any event left to process. But we do it outside of the lock.
     // // This will ensure that if there is another process trying to pick up those event
     // // this process doesn't acquire the lock.
-    Promise.resolve().then(async () => {
-      const waitTimeBeforeAttemp = [200, 400, 800];
+    const wasJustLive = !!lock.acquired;
+    if (wasJustLive) {
+      Promise.resolve().then(async () => {
+        const waitTimeBeforeAttemp = [200, 400, 800];
 
-      for (const waitTime of waitTimeBeforeAttemp) {
-        await wait(waitTime);
+        for (const waitTime of waitTimeBeforeAttemp) {
+          await wait(waitTime);
 
-        const hasUnprocessedEvents = await this.adapters.messages.has(
-          instanceConfig,
-          instanceConfig.id,
-        );
+          const hasUnprocessedEvents = await this.adapters.messages.has(
+            instanceConfig,
+            instanceConfig.id,
+          );
 
-        if (hasUnprocessedEvents) {
-          this.adapters.instances.schedule(instanceConfig);
+          if (hasUnprocessedEvents) {
+            this.adapters.instances.schedule(instanceConfig);
+          }
         }
-      }
-    });
+      });
+    }
   }
 
   static from<O extends SpawnkitConfig>(opts: O, client: Client<any>) {
