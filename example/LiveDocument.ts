@@ -1,4 +1,4 @@
-import * as Spawnkit from "@/.";
+import * as Spawnkit from "../src";
 
 interface LiveDocumentData {
   pages: string[];
@@ -9,5 +9,5 @@ interface DocumentChange {
 }
 
 export class LiveDocument extends Spawnkit.Instance<LiveDocumentData> {
-  update(change: DocumentChange) {}
+  update(change: DocumentChange) { }
 }

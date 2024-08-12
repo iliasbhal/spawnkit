@@ -1,4 +1,4 @@
-import * as Spawnkit from "@/.";
+import * as Spawnkit from "../src";
 
 class SomeSpetialError extends Error {
   lol = "AAAAAAAA";

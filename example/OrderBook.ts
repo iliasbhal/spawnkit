@@ -1,4 +1,4 @@
-import * as Spawnkit from "@/.";
+import * as Spawnkit from "../src";
 
 interface OrderBookData {
   orderBook: string[];
@@ -6,7 +6,7 @@ interface OrderBookData {
 }
 
 interface OrderBookEvent {
-  orders: string[];
+  orders: any[];
   alphachannel: string;
 }
 
@@ -23,15 +23,23 @@ export class OrderBook extends Spawnkit.Instance<
   OrderBookEvent
 > {
   on<C extends keyof OrderBookEvent>(channel: C, message: OrderBookEvent[C]) {
-    console.log("ON INSTANCE", this.id, channel, message);
+    // console.log("ON INSTANCE", this.id, channel, message);
   }
 
   async buy(order: Order) {
     this.logger.log("-----BUYYYYY------");
+    console.log('___BUY___', order);
     // this.data = this.data || ({} as any);
     // this.data!.count = this.data?.count || 0;
     // this.data!.count++;
-    this.emit("orders", [order.tick]);
+
+    // const interval = setInterval(() => {
+    //   this.emit("orders", [order.tick, order.qty]);
+    // })
+    // setTimeout(() => {
+    //   clearInterval(interval);
+    // }, 400);
+
 
     return {
       success: true,

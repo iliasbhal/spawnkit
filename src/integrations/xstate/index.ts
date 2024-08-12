@@ -1,6 +1,6 @@
 import * as x from "xstate";
 import { ControlledPromise } from "@/utils/ControlledPromise";
-import * as Spawnkit from "@/.";
+import * as Spawnkit from "../../../src";
 
 type MachineEvent<M extends x.AnyStateMachine> = Parameters<
   ReturnType<typeof x.createActor<M>>["send"]
@@ -184,7 +184,7 @@ export class Machine<
           const pending = this.childActorDoneByActor.get(actor);
           pending?.resolve(err);
         },
-        complete: () => {},
+        complete: () => { },
       }),
     );
   }

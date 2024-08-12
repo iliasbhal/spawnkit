@@ -1,6 +1,6 @@
 import { Redis } from "ioredis";
 import * as BullMQ from "bullmq";
-import { BaseAdapter } from "@/adapters";
+import { BaseAdapter } from "../../../adapters";
 
 export class RedisAdapter extends BaseAdapter {
   redis: Redis;

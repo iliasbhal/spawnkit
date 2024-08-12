@@ -1,4 +1,4 @@
-import * as Spawnkit from "@/.";
+import * as Spawnkit from "../src";
 
 interface ChatRoomData {
   messages: string[];
@@ -9,5 +9,5 @@ export class ChatRoom extends Spawnkit.Instance<ChatRoomData> {
     console.log("ON", channel, message);
   }
 
-  sendMessage(msg: string) {}
+  sendMessage(msg: string) { }
 }

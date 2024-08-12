@@ -5,37 +5,104 @@ import * as Spawnkit from "@/.";
 import * as RedisAdapter from "@/adapters/redis";
 import { redis } from "@/adapters/redis/client";
 import * as instances from "../example/_index";
+import { nanoid } from 'nanoid';
+import { Logger } from '@/models/Logger';
+import { Lock } from '@/models/Lock';
 
-const adapters = {
+const createAdapters = () => ({
   lock: new RedisAdapter.Lock(redis),
   data: new RedisAdapter.Data(redis),
   messages: new RedisAdapter.MessageBroker(redis),
   events: new RedisAdapter.EventScheduler(redis),
   instances: new RedisAdapter.InstanceScheduler(redis),
   logger: new RedisAdapter.Logger(redis),
-};
+});
 
 const client = Spawnkit.Client.from({
-  adapters: adapters,
+  adapters: createAdapters(),
   instances: instances,
 });
 
 const main = async () => {
-  await redis.flushall("SYNC");
+  console.log('-----');
+  console.log('-----');
+  console.log('-----');
+  console.log('-----');
+  console.log('-----');
+  console.log('-----');
+  console.log('-----');
+  console.log('-----');
+  // await redis.flushall("SYNC");
   client.start();
 
   //   // attributeExample();
   await Promise.all([
+    // verifyLock(),
+    // severalClients(),
     // basicExample(),
     //     // errorHandlingExample(),
-    //     // streamExample(),
+    // streamExample(),
     //     // streamWithErrors(),
-    //     // scheduleCallExample(),
-    emittedEventsExample(),
+    scheduleCallExample(),
+    // emittedEventsExample(),
     //     // exampleXState(),
     //     // exampleData(),
+    // exampleBadCall(),
   ]);
 };
+
+const verifyLock = async () => {
+
+
+  const createLock = async (kind: string, id: string) => {
+    const executionId = nanoid();
+    const instanceConfig = {
+      kind,
+      id,
+    };
+
+    const adapters = createAdapters();
+    const logger = new Logger({
+      adapters: adapters,
+      groupId: executionId,
+      instance: instanceConfig,
+    });
+
+    const MIN_LOCK_DURATION = 2_000;
+    const RESOURCE_ID = `${instanceConfig.kind}:${instanceConfig.id}`;
+    return new Lock({
+      adapters: adapters,
+      ownerId: executionId,
+      resource: RESOURCE_ID,
+      instance: instanceConfig,
+      duration: MIN_LOCK_DURATION,
+      logger,
+    });
+  }
+
+  const lock1 = await createLock('OrderBook', 'BTC/USD');
+
+
+  lock1.using(async () => {
+    await wait(2000);
+  }).catch(err => {
+    console.log('LOCK 1 ERROR', err);
+  });
+
+  await wait(600);
+
+  Array.from({ length: 1 }).forEach(async () => {
+    const lock2 = await createLock('OrderBook', 'BTC/USD');
+    lock2.using(async () => {
+      await wait(2000);
+    }).catch(err => {
+      console.log('LOCK 2 ERROR', err);
+    });;
+  })
+
+  await wait(3000);
+
+}
 
 const attributeExample = () => {
   const exampleInst = client.spawn("StreamExample", "Hector");
@@ -55,9 +122,15 @@ const basicExample = async () => {
   });
 
   // Example 1: call methods like the its a real reference.
-  const response = await orderBook.buy({ tick: "APPL", qty: 10 });
+  const uid = crypto.randomUUID();
+  const tick = Math.random() > 0.5 ? "GOOG" : "APPL";
+  const response = await orderBook.buy({
+    tick,
+    qty: 10,
+    uuid: uid
+  });
+
   console.log("response", response);
-  await wait(300);
 
   const response2 = await orderBook.buy({ tick: "APPL", qty: 50 });
   console.log("response2", response2);
@@ -66,6 +139,8 @@ const basicExample = async () => {
   // await orderBook.emit.buy({ tick: "APPL" });
   // console.log("SENT");
   //
+
+  await wait(1000);
   subscription.unsubscribe();
 };
 
@@ -189,7 +264,7 @@ const scheduleCallExample = async () => {
   //   console.log("DATA", data);
   // }, 10_000);
 
-  // const orderBook = client.spawn("OrderBook", "BTC/ETH");
+  const orderBook = client.spawn("OrderBook", "BTC/ETH");
 
   // orderBook.emit("orders", ["asddsa"]);
 
@@ -222,6 +297,7 @@ const scheduleCallExample = async () => {
 
   // const scheduleId2 = await orderBook.schedule({ delay: 3000 }).buy({
   //   tick: "AAPL",
+  //   qty: 4,
   // });
 
   // const before2 = await orderBook.scheduled.list();
@@ -306,6 +382,49 @@ const exampleData = async () => {
 
 
   // console.log('----------')
+
+}
+
+const exampleBadCall = async () => {
+  const orderBook = client.spawn("OrderBook", "BTC/EUR")
+
+  try {
+    // @ts-expect-error
+    const response = await orderBook.elbaf({ tick: "APPL", qty: 10 });
+    console.log(response)
+  } catch (err) {
+    console.log('ERR', err);
+  }
+}
+
+
+const severalClients = async () => {
+  const client1 = Spawnkit.Client.from({
+    adapters: createAdapters(),
+    instances: instances,
+  });
+
+  const client2 = Spawnkit.Client.from({
+    adapters: createAdapters(),
+    instances: instances,
+  });
+
+
+  const orderBook = client1.spawn("OrderBook", "BTC/EUR");
+  await orderBook.buy({
+    tick: 'AAPL',
+    qty: 10,
+  });
+
+  await wait(1000)
+  const orderBook2 = client2.spawn("OrderBook", "BTC/EUR");
+  await orderBook2.buy({
+    tick: 'GOOG',
+    qty: 10,
+  })
+
+
+
 
 }
 

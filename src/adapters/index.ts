@@ -59,18 +59,25 @@ export type InstanceSignal =
     message: string;
   }
   | {
-    type: "lock:acquire";
+    type: "lock:acquire:start" | "lock:acquire:failed" | "lock:acquire:success";
+    duration: number;
+    attemptId: string;
+    resourceId: string;
+  }
+  | {
+    type: "lock:extend:start" | "lock:extend:failed" | "lock:extend:success";
+    resourceId: string;
+    attemptId: string;
+    duration: number;
+  }
+  | {
+    type: "lock:release:start" | "lock:release:failed" | "lock:release:success";
+    resourceId: string;
+    attemptId: string;
     duration: number;
   }
   | {
     type: "lock:abort";
-  }
-  | {
-    type: "lock:extend";
-    duration: number;
-  }
-  | {
-    type: "lock:release";
   }
   | {
     type: "data:get";
@@ -90,11 +97,10 @@ export type InstanceSignal =
   | {
     type: "proxy:call:start";
     id: string;
-    method: string;
-    args: any[];
+    event: InstanceMethodCall;
   }
   | {
-    type: "proxy:call:end";
+    type: "proxy:call:result";
     id: string;
     result: any;
   };
@@ -211,9 +217,11 @@ export interface ScheduleContext {
 export interface ScheduledCallMetaData {
   start_at: number;
   ended_at: number;
-  stream: boolean;
-  result: any;
-  error: any;
+  response: {
+    stream: any[] | null;
+    data: any | null;
+    error: any | null;
+  },
 }
 
 export abstract class AdapterEventScheduler extends BaseAdapter {

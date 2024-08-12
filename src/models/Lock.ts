@@ -87,7 +87,6 @@ export class Lock {
         this.logger.log({
           type: `lock:${type}:start`,
           attemptId: lockAttemptId,
-          ownerId: this.ownerId,
           resourceId: resource,
           duration: duration,
         });
@@ -96,7 +95,6 @@ export class Lock {
         this.logger.log({
           type: `lock:${type}:failed`,
           attemptId: lockAttemptId,
-          ownerId: this.ownerId,
           resourceId: resource,
           duration: duration,
         });
@@ -105,7 +103,6 @@ export class Lock {
         this.logger.log({
           type: `lock:${type}:success`,
           attemptId: lockAttemptId,
-          ownerId: this.ownerId,
           resourceId: resource,
           duration: duration,
         });

@@ -9,6 +9,7 @@ export class Lock extends RedisAdapter implements Adapters.AdapterLock {
     super(client);
     this.redlock = new Redlock([client], {
       retryCount: 0,
+      driftFactor: 0.05,
     });
   }
 
@@ -29,8 +30,8 @@ export class Lock extends RedisAdapter implements Adapters.AdapterLock {
   ): Promise<boolean> {
     try {
       const key = this.withPrefix(resource);
-      const lock = await this.redlock.acquire([key], duration);
       const ownerKey = this.createOwnerKey(resource, ownerId);
+      const lock = await this.redlock.acquire([key], duration);
       this.lockByOwnerKey.set(ownerKey, lock);
       return true;
     } catch (err) {
@@ -54,7 +55,7 @@ export class Lock extends RedisAdapter implements Adapters.AdapterLock {
     if (!lock) return false;
 
     try {
-      const newLock = await this.redlock.extend(lock, duration);
+      const newLock = await lock.extend(duration);
       this.lockByOwnerKey.set(ownerKey, newLock);
       return true;
     } catch (err) {
@@ -69,7 +70,7 @@ export class Lock extends RedisAdapter implements Adapters.AdapterLock {
     if (!lock) return false;
 
     try {
-      await this.redlock.release(lock);
+      await lock.release();
       return true;
     } catch (err) {
       return false;

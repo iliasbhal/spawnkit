@@ -1,4 +1,4 @@
-import * as Spawnkit from "@/.";
+import * as Spawnkit from "../src";
 import { wait } from "../src/utils/wait";
 
 interface AgentAIData {

@@ -4,7 +4,7 @@ import * as RedisAdapters from "./";
 import { Adapters } from "../";
 import { generateTestSuite } from "../generateTestSuite";
 
-generateTestSuite("Redis Adapter", createGetAdapters);
+generateTestSuite("Redis Adapter", createAdapterFactory);
 
 describe("Redis Adapter", () => {
   describe("MessageBroker", () => {
@@ -14,7 +14,7 @@ describe("Redis Adapter", () => {
   });
 });
 
-function createGetAdapters() {
+function createAdapterFactory() {
   const redisServer = new RedisMemoryServer();
 
   const adapters = Promise.resolve().then(async () => {
