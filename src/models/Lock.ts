@@ -58,7 +58,7 @@ export class Lock {
     }
 
     const extendBeforeThreshold =
-      config.extendBeforeThreshold || config.duration / 2;
+      config.extendBeforeThreshold || config.duration * 2 / 3;
     const isValidExtension = extendBeforeThreshold > config.duration - 100;
     if (isValidExtension) {
       throw new Error(
@@ -80,15 +80,46 @@ export class Lock {
     this.logger = config.logger;
   }
 
+  createLockTimelineLogger(type: 'acquire' | 'extend' | 'release', resource: string, duration: number) {
+    const lockAttemptId = crypto.randomUUID();
+    return {
+      start: () => {
+        this.logger.log({
+          type: `lock:${type}:start`,
+          attemptId: lockAttemptId,
+          ownerId: this.ownerId,
+          resourceId: resource,
+          duration: duration,
+        });
+      },
+      failed: () => {
+        this.logger.log({
+          type: `lock:${type}:failed`,
+          attemptId: lockAttemptId,
+          ownerId: this.ownerId,
+          resourceId: resource,
+          duration: duration,
+        });
+      },
+      success: () => {
+        this.logger.log({
+          type: `lock:${type}:success`,
+          attemptId: lockAttemptId,
+          ownerId: this.ownerId,
+          resourceId: resource,
+          duration: duration,
+        });
+      }
+    }
+  }
+
+  acquired = false;
   async acquire() {
     const { resource, duration } = this.config;
-
     const expireAt = Date.now() + duration;
 
-    this.logger.log({
-      type: "lock:acquire",
-      duration: duration,
-    });
+    const logger = this.createLockTimelineLogger('acquire', resource, duration);
+    logger.start();
 
     const acquired = await this.adapters.lock.acquire(
       resource,
@@ -96,9 +127,14 @@ export class Lock {
       duration,
     );
 
-    if (!acquired) throw new AcquireLockError(resource, this.ownerId);
+    if (!acquired) {
+      logger.failed();
+      throw new AcquireLockError(resource, this.ownerId);
+    }
 
+    logger.success();
     this.expireAt = expireAt;
+    this.acquired = true;
     return acquired;
   }
 
@@ -106,35 +142,40 @@ export class Lock {
     const { resource, duration } = this.config;
     const expireAt = Date.now() + duration;
 
-    this.logger.log({
-      type: "lock:extend",
-      duration: duration,
-    });
+    const logger = this.createLockTimelineLogger('extend', resource, duration);
+    logger.start();
 
     const extended = await this.adapters.lock.extend(
       resource,
       this.ownerId,
       duration,
     );
-    if (!extended) throw new LockExtendError(resource, this.ownerId);
+    if (!extended) {
+      logger.failed();
+      throw new LockExtendError(resource, this.ownerId);
+    }
 
+    logger.success();
     this.expireAt = expireAt;
   }
 
   async release() {
     const { resource } = this.config;
 
-    this.logger.log({
-      type: "lock:release",
-    });
+    const logger = this.createLockTimelineLogger('extend', resource, 0);
+    logger.start();
 
     const released = await this.adapters.lock.release(resource, this.ownerId);
-    if (!released) throw new LockReleaseError(resource, this.ownerId);
+    if (!released) {
+      logger.failed();
+      throw new LockReleaseError(resource, this.ownerId)
+    }
 
+    logger.success();
     this.expireAt = 0;
   }
 
-  autoExtendLockInBackground(stopExtendingSignal: AbortSignal) {
+  autoExtendLockInBackground(routineAbortSignal: AbortSignal) {
     const extendAbortCtl = new AbortController();
     extendAbortCtl.signal.addEventListener("abort", () => {
       this.logger.log({
@@ -149,17 +190,17 @@ export class Lock {
         loop: while (true) {
           const timeBeforeExpire = this.expireAt - Date.now();
           const timeBeforeExtend = timeBeforeExpire - extendBeforeThreshold;
-          if (stopExtendingSignal.aborted) break loop;
+          if (routineAbortSignal.aborted) break loop;
           await wait(timeBeforeExtend);
 
-          if (stopExtendingSignal.aborted) break loop;
+          if (routineAbortSignal.aborted) break loop;
           await this.extend();
         }
       })
       .catch((err) => {
         // If an error happens after the routine has completed,
         // we can safely ignore, otherwise, we throw the error;
-        if (stopExtendingSignal.aborted) return;
+        if (routineAbortSignal.aborted) return;
         extendAbortCtl.abort(err);
         throw err;
       });
