@@ -62,6 +62,12 @@ export interface InterfaceAPI<
   waitFor: (promise: Promise<any>) => any;
 }
 
+interface MessageContext {
+  event: InstanceMethodCall,
+  messageId: EventId;
+  metadata: ScheduledCallMetaData;
+}
+
 export class InstanceProxy<Inst extends Instance> {
   public logger: Logger;
   public instance: Inst;
@@ -135,198 +141,163 @@ export class InstanceProxy<Inst extends Instance> {
     messageId: EventId,
     event: InstanceMethodCall,
   ): Promise<any> {
-    const { action, args, mode = "normal", context } = event;
+    const { action, args } = event;
 
-    // @ts-ignore
-    const method = this.instance[action]?.bind(this.instance);
-    const isActionDefined = typeof method == "function";
-    if (!isActionDefined) {
-      // TODO: Maybe emit an Error that can be forawarded to the client ???
-      return;
-    }
+    const logger = this.createCallLoggerFor(messageId);
+    const handleMethodResponse = this.createResultHandler(messageId, event);
 
     // Wrap the method in a Promise. to ensure that if the method is sync
     // We still catch the error if one happens.
-    const startedAt = Date.now();
-    const callID = nanoid();
-    this.trace({
-      type: "proxy:call:start",
-      id: callID,
-      method: action,
-      args,
-    });
-
+    logger.start(event);
     const [error, response] = await Promise.resolve()
-      .then(() => method?.(...args))
+      .then(() => {
+        // @ts-ignore
+        const method = this.instance[action]?.bind(this.instance);
+        const methodExists = typeof method == "function";
+        if (!methodExists) throw new Error("Bad Request: Method not found");
+        return method?.(...args)
+      })
       .then((res) => [null, res])
       .catch((err) => [err, null]);
 
-    const callMetaData = {
-      start_at: startedAt,
-      ended_at: null as any,
-      stream: false,
-      result: null,
-      error: null,
-    };
-
-    const shouldStoreResult = !!context?.scheduleId;
-    const chouldEmitResponseBack = mode === "normal";
-    const reponseContext = {
-      messageId: chouldEmitResponseBack ? messageId : undefined,
-      scheduleId: shouldStoreResult ? context?.scheduleId : undefined,
-      callMetaData,
-    };
-
-    const isStream = response instanceof Stream;
-    const result = await Promise.resolve().then(() =>
-      isStream
-        ? this.handleStreamResult(response, reponseContext)
-        : this.handleBasicResult({ error, response }, reponseContext),
-    );
-
-    this.trace({
-      type: "proxy:call:end",
-      id: callID,
-      result,
+    await handleMethodResponse({
+      error,
+      response,
     });
   }
 
-  handleBasicResult(
+  createCallLoggerFor(messageId: EventId) {
+    return {
+      start: (event: InstanceMethodCall) => {
+        this.trace({
+          type: "proxy:call:start",
+          id: messageId,
+          event,
+        });
+      },
+      result: (result: any) => {
+        this.trace({
+          type: "proxy:call:result",
+          id: messageId,
+          result,
+        });
+      }
+    }
+  }
+
+  createResultHandler(
+    messageId: EventId,
+    event: InstanceMethodCall,
+  ) {
+    const startedAt = Date.now();
+    const reponseContext: MessageContext = {
+      messageId,
+      event,
+      metadata: {
+        start_at: startedAt,
+        ended_at: null as any,
+        response: {
+          stream: null,
+          data: null,
+          error: null,
+        }
+      },
+    };
+
+    return async (result: { error: Error, response: any }) => {
+      const isStream = result.response instanceof Stream;
+      const response = isStream
+        ? await this.handleStreamResult(result.response, reponseContext)
+        : await this.handleBasicResult(result, reponseContext);
+
+      return response;
+    };
+  }
+
+  async handleBasicResult(
     result: { error: Error; response: any },
-    config: {
-      messageId?: EventId;
-      scheduleId?: ScheduleId;
-      callMetaData: ScheduledCallMetaData;
-    },
+    context: MessageContext,
   ) {
     const promise = this.keepAlive.addControlled();
-    config.callMetaData.ended_at = Date.now();
+    context.metadata.ended_at = Date.now();
 
     if (result.error) {
       const serializedError = RemoteError.serialize(result.error);
-      config.callMetaData.error = serializedError;
+      context.metadata.response.error = serializedError;
+      await this.respond(context, {
+        error: serializedError,
+      });
 
-      if (config.messageId) {
-        this.adapters.events.store(
-          this.instance.kind,
-          this.instance.id,
-          config.messageId,
-          config.callMetaData,
-        );
-      }
-
-      if (config.messageId) {
-        this.respond(config.messageId, {
-          error: serializedError,
-        });
-      }
-
-      promise.resolve(result);
     } else {
-      config.callMetaData.result = result.response;
-
-      if (config.messageId) {
-        this.respond(config.messageId, {
-          response: result.response,
-        });
-      }
-
-      if (config.scheduleId) {
-        this.adapters.events.store(
-          this.instance.kind,
-          this.instance.id,
-          config.scheduleId,
-          config.callMetaData,
-        );
-      }
-
-      promise.resolve(result);
+      context.metadata.response.data = result.response;
+      await this.respond(context, {
+        response: result.response,
+      });
     }
 
+    await this.storeMetadataForScheduledCall(context);
+    promise.resolve(result);
     return promise.await;
   }
 
   handleStreamResult(
-    result: Stream<any>,
-    config: {
-      requestId?: EventId;
-      scheduleId?: ScheduleId;
-      callMetaData: ScheduledCallMetaData;
-    },
+    stream: Stream<any>,
+    context: MessageContext,
   ) {
     const promise = this.keepAlive.addControlled();
-    config.callMetaData.stream = true;
-    config.callMetaData.result = [];
+    context.metadata.response.stream = [];
     let steamIdx = 0;
 
-    result.on("start", () => {
-      if (config.requestId)
-        this.respond(config.requestId, {
-          stream: true,
-          index: steamIdx++,
-          start: true,
-        });
+    stream.on("start", () => {
+      this.respond(context, {
+        stream: true,
+        index: steamIdx++,
+        start: true,
+      });
     });
 
-    result.on("data", (data) => {
-      config.callMetaData.result.push(data);
-      if (config.requestId)
-        this.respond(config.requestId, {
-          stream: true,
-          index: steamIdx++,
-          data: data,
-        });
+    stream.on("data", (data) => {
+      context.metadata.response.stream!.push(data);
+      this.respond(context, {
+        stream: true,
+        index: steamIdx++,
+        data: data,
+      });
     });
 
-    const handleError = (error: Error) => {
+    const handleError = async (error: Error) => {
       const serializedError = RemoteError.serialize(error);
-      config.callMetaData.error = serializedError;
-
-      if (config.requestId)
-        this.respond(config.requestId, {
-          stream: true,
-          index: steamIdx++,
-          error: serializedError as Error,
-        });
+      context.metadata.response.error = serializedError;
+      await this.respond(context, {
+        stream: true,
+        index: steamIdx++,
+        error: serializedError as Error,
+      });
 
       promise.resolve(error);
     };
 
-    result.on("error", (err) => {
-      handleError(err);
-    });
-
+    stream.on("error", (err) => handleError(err));
     const syncAbort = this.addAbortListener(() => {
       handleError(new Error("Worker Aborted"));
     });
 
-    result.on("end", () => {
+    stream.on("end", async () => {
       syncAbort.dispose();
 
-      config.callMetaData.ended_at = Date.now();
+      context.metadata.ended_at = Date.now();
+      await this.respond(context, {
+        stream: true,
+        index: steamIdx++,
+        end: true,
+      });
 
       // once the stream has ended, we shall store the result of the compute;
-      if (config.scheduleId) {
-        this.adapters.events.store(
-          this.instance.kind,
-          this.instance.id,
-          config.scheduleId,
-          config.callMetaData,
-        );
-      }
-
-      if (config.requestId) {
-        this.respond(config.requestId, {
-          stream: true,
-          index: steamIdx++,
-          end: true,
-        });
-      }
-
+      await this.storeMetadataForScheduledCall(context);
       promise.resolve(true);
     });
 
-    result.start();
+    stream.start();
     return promise.await;
   }
 
@@ -424,8 +395,19 @@ export class InstanceProxy<Inst extends Instance> {
   /** this function is used to emit message to one client,
    * also for type safety, so that so that it doesn't show on client.on channel name autocomplete
    **/
-  public async respond(messageId: string, data: any) {
-    const channelID = Client.getChannelForEventResponse(messageId);
+  public async respond(context: MessageContext, data: any) {
+    const logger = this.createCallLoggerFor(context.messageId);
+    logger.result(data);
+
+    // only when mode is normal, we should respond
+    // when mode is 'scheduled' or 'skip' we should not respond
+    // since there is no client waiting for the response
+    const shouldRespond = context.event.mode === 'normal';
+    if (!shouldRespond) {
+      return;
+    }
+
+    const channelID = Client.getChannelForEventResponse(context.messageId);
     return this.runExternalEffect(async () => {
       // console.log("EMIT REQUEST RESPONSE", data);
       return await this.adapters.messages.publish(
@@ -434,6 +416,20 @@ export class InstanceProxy<Inst extends Instance> {
         data,
       );
     });
+  }
+
+  public async storeMetadataForScheduledCall(context: MessageContext) {
+    const scheduleId = context.event.context?.scheduleId;
+    if (!scheduleId) {
+      return;
+    }
+
+    await this.adapters.events.store(
+      this.instance.kind,
+      this.instance.id,
+      scheduleId,
+      context.metadata,
+    );
   }
 
   public async emit(channel: string, data: any) {
