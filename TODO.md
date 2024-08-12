@@ -1,6 +1,7 @@
 # Spawnkit lib
 
 - Remove playground in favor of integration test suites
+- Redis Logger should also make use of an object storage(s3) ??
 
 # Spawnkit cloud
 
