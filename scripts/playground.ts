@@ -39,11 +39,11 @@ const main = async () => {
   await Promise.all([
     // verifyLock(),
     // severalClients(),
-    // basicExample(),
+    basicExample(),
     //     // errorHandlingExample(),
     // streamExample(),
     //     // streamWithErrors(),
-    scheduleCallExample(),
+    // scheduleCallExample(),
     // emittedEventsExample(),
     //     // exampleXState(),
     //     // exampleData(),
@@ -127,7 +127,6 @@ const basicExample = async () => {
   const response = await orderBook.buy({
     tick,
     qty: 10,
-    uuid: uid
   });
 
   console.log("response", response);

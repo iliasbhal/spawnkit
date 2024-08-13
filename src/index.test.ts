@@ -1,45 +1,76 @@
 import 'dotenv/config';
 
-import { RedisMemoryServer } from "redis-memory-server";
 import { redis } from './adapters/redis/client'
 
 import * as Spawnkit from ".";
 import * as RedisAdapter from "./adapters/redis";
-import * as instances from "../example/_index";
-
-const createNewClientFactory = () => {
-  const redisServer = new RedisMemoryServer();
-
-  const adapters = Promise.resolve().then(async () => {
-    return {
-      lock: new RedisAdapter.Lock(redis),
-      data: new RedisAdapter.Data(redis),
-      messages: new RedisAdapter.MessageBroker(redis),
-      events: new RedisAdapter.EventScheduler(redis),
-      instances: new RedisAdapter.InstanceScheduler(redis),
-      logger: new RedisAdapter.Logger(redis),
-    };
-  });
-
-  return async () => Spawnkit.Client.from({
-    adapters: await adapters,
-    instances: instances,
-  });
-}
+import { ControlledPromise } from './utils/ControlledPromise';
+import { OrderBook } from './index.test.fixtures'
 
 describe.only("Base", () => {
-  const createClient = createNewClientFactory();
+  const createAdapters = () => ({
+    lock: new RedisAdapter.Lock(redis),
+    data: new RedisAdapter.Data(redis),
+    messages: new RedisAdapter.MessageBroker(redis),
+    events: new RedisAdapter.EventScheduler(redis),
+    instances: new RedisAdapter.InstanceScheduler(redis),
+    logger: new RedisAdapter.Logger(redis),
+  });
 
-  it("client can use instance methods", async () => {
-    const client = await createClient();
+  const client = Spawnkit.Client.from({
+    adapters: createAdapters(),
+    instances: {
+      OrderBook,
+    },
+  });
+
+  it('should not allow usage of reserved keywords', () => {
+    // RESERVED KEYWORDS are the properties that are used internally by the client 
+    // And that are not part of the instance prototype
+    // ex: __INTERNAL__ , schedule, scheduled,
+
+    class BadExample extends Spawnkit.Instance {
+      __INTERNAL__ = 'this is bad';
+      example() { }
+    }
+
+    const createClient = () => Spawnkit.Client.from({
+      adapters: createAdapters(),
+      instances: {
+        BadExample,
+      },
+    });
+
+    expect(createClient).toThrow();
+
+  })
+
+  it.only("client can use instance methods", async () => {
     const orderbook = client.spawn('OrderBook', 'BTC/EUR');
-    const order = await orderbook.buy({ tick: 'APPL', qty: 10 });
+
+    const randomNumber = Math.random();
+    const order = await orderbook.buy({ tick: 'APPL', qty: randomNumber });
     expect(order).toEqual({
       success: true,
       status: "pending...",
-      order: { tick: 'APPL', qty: 10 }
+      order: { tick: 'APPL', qty: randomNumber }
     });
   });
+
+  it.skip('client is notified when instance emits event', async () => {
+    const orderbook = client.spawn('OrderBook', 'BTC/EUR');
+
+    const hasBeenCalled = new ControlledPromise();
+    const ordersStub = jest.fn().mockImplementation((args) => hasBeenCalled.resolve(args));
+
+    orderbook.on('orders', ordersStub);
+    orderbook.buy({ tick: 'APPL', qty: 10 });
+
+    await hasBeenCalled.await
+    await expect(ordersStub).toHaveBeenCalled()
+    await expect(ordersStub).toHaveBeenCalledTimes(1);
+  })
+
   it.todo("can call for instance method and not wait for the resonse");
 });
 

@@ -28,17 +28,7 @@ export class OrderBook extends Spawnkit.Instance<
 
   async buy(order: Order) {
     this.logger.log("-----BUYYYYY------");
-    console.log('___BUY___', order);
-    // this.data = this.data || ({} as any);
-    // this.data!.count = this.data?.count || 0;
-    // this.data!.count++;
-
-    // const interval = setInterval(() => {
     this.emit("orders", [order.tick, order.qty]);
-    // })
-    // setTimeout(() => {
-    //   clearInterval(interval);
-    // }, 400);
 
     return {
       success: true,

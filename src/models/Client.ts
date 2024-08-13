@@ -35,6 +35,11 @@ export class Client<CP extends SpawnkitConfig> {
     this.adapters = opts.adapters;
     this.instances = opts.instances;
 
+    this.linkAndValidateAdapters();
+    this.validateInstancces();
+  }
+
+  private linkAndValidateAdapters = () => {
     Object.values(this.adapters).forEach((adapter) => {
       if (adapter instanceof BaseAdapter) {
         adapter.link(this);
@@ -42,6 +47,30 @@ export class Client<CP extends SpawnkitConfig> {
       }
 
       throw new Error("Invalid Adapter, need to extend BaseAdapter");
+    });
+  }
+
+  private validateInstancces = () => {
+    Object.values(this.instances).forEach((InstanceClass: any) => {
+      const inst = new InstanceClass();
+      const instanceName = InstanceClass.name;
+
+      const clientInst = this.spawn(instanceName, '__TEST_ID__');
+      const clientKeys = new Set(Object.keys(clientInst));
+      const instanceKeys = new Set(Object.getOwnPropertyNames(
+        Object.getPrototypeOf(inst)).concat(Object.keys(inst))
+      );
+
+      const instanceProtoKeys = new Set(Object.getOwnPropertyNames(
+        Object.getPrototypeOf(Object.getPrototypeOf(inst)))
+      );
+
+      const intersect = new Set([...Array.from(clientKeys)].filter(i => instanceKeys.has(i)));
+      const cannotUseKeys = new Set([...Array.from(intersect)].filter(i => !instanceProtoKeys.has(i)));
+
+      if (cannotUseKeys.size > 0) {
+        throw new Error(`Cannot use reserved keys: ${Array.from(cannotUseKeys).join(', ')} in instance ${instanceName}`);
+      }
     });
   }
 
