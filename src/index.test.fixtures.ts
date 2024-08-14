@@ -1,4 +1,5 @@
 import * as Spawnkit from "../src";
+import { wait } from "./utils/wait";
 
 interface OrderBookData {
   orderBook: string[];
@@ -28,6 +29,7 @@ export class OrderBook extends Spawnkit.Instance<
 
   async buy(order: Order) {
     this.logger.log("-----BUYYYYY------");
+
     this.emit("orders", [order.tick, order.qty]);
 
     return {
@@ -43,5 +45,17 @@ export class OrderBook extends Spawnkit.Instance<
 
   async sell(stock: Stock): Promise<true> {
     return true;
+  }
+}
+
+
+export class BadExample extends Spawnkit.Instance {
+  __INTERNAL__ = 'this is bad';
+  example() { }
+}
+
+export class EmptyResponseInstance extends Spawnkit.Instance {
+  async doSomethingAndReturnUndefined() {
+    await wait(1000);
   }
 }

@@ -24,15 +24,12 @@ describe.only("Base", () => {
     },
   });
 
+  client.start();
+
   it('should not allow usage of reserved keywords', () => {
     // RESERVED KEYWORDS are the properties that are used internally by the client 
     // And that are not part of the instance prototype
     // ex: __INTERNAL__ , schedule, scheduled,
-
-    class BadExample extends Spawnkit.Instance {
-      __INTERNAL__ = 'this is bad';
-      example() { }
-    }
 
     const createClient = () => Spawnkit.Client.from({
       adapters: createAdapters(),
@@ -45,7 +42,7 @@ describe.only("Base", () => {
 
   })
 
-  it.only("client can use instance methods", async () => {
+  it("client can use instance methods", async () => {
     const orderbook = client.spawn('OrderBook', 'BTC/EUR');
 
     const randomNumber = Math.random();
@@ -57,18 +54,28 @@ describe.only("Base", () => {
     });
   });
 
-  it.skip('client is notified when instance emits event', async () => {
+  it('client is notified when instance emits event', async () => {
     const orderbook = client.spawn('OrderBook', 'BTC/EUR');
 
     const hasBeenCalled = new ControlledPromise();
-    const ordersStub = jest.fn().mockImplementation((args) => hasBeenCalled.resolve(args));
+    const ordersStub = jest.fn().mockResolvedValue(true).mockImplementation((args) => hasBeenCalled.resolve(args));
 
     orderbook.on('orders', ordersStub);
     orderbook.buy({ tick: 'APPL', qty: 10 });
 
+    orderbook.data.on('count', (data) => {
+
+    });
+
     await hasBeenCalled.await
     await expect(ordersStub).toHaveBeenCalled()
     await expect(ordersStub).toHaveBeenCalledTimes(1);
+  })
+
+  it('client resolves even if response is undefined', async () => {
+    const emptyInst = client.spawn('EmptyResponseInstance', 'lol');
+    const response = await emptyInst.doSomethingAndReturnUndefined();
+    expect(response).toBeUndefined();
   })
 
   it.todo("can call for instance method and not wait for the resonse");
