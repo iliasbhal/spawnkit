@@ -88,6 +88,13 @@ export class Client<CP extends SpawnkitConfig> {
     return `broadcast:${type}:${channel}` as const;
   }
 
+  static getChannelForHealthSignal<Channel extends string>(
+    type: string,
+    channel: Channel,
+  ) {
+    return `broadcast:${type}:${channel}:__INTERNAL__health` as const;
+  }
+
   worker: Queue<any> | null = null;
   public start() {
     const forwardOptions = {
@@ -168,6 +175,50 @@ export class Client<CP extends SpawnkitConfig> {
       return eventId;
     };
 
+    const createHealthSignal = (config: { maxWait: number }) => {
+      const abortCtl = new AbortController();
+
+      const createHealthTimeout = () => {
+        const healthTimeout = {
+          id: null as any,
+          create: () => {
+            healthTimeout.id = setTimeout(() => abortCtl.abort(), config.maxWait);
+          },
+          reset: () => {
+            healthTimeout.dispose();
+            healthTimeout.create();
+          },
+          dispose: () => {
+            if (healthTimeout.id) clearTimeout(healthTimeout.id);
+          }
+        };
+
+        healthTimeout.create();
+        return healthTimeout;
+      }
+
+      const healthTimeout = createHealthTimeout();
+      const subscription = this.adapters.messages.subscribe<InternalMessageData>(
+        instanceIdentifier,
+        Client.getChannelForEventBus("__INTERNAL__", 'health'),
+        (message) => {
+          healthTimeout.reset();
+        },
+      );
+
+      const onAbort = () => healthTimeout.dispose();
+      abortCtl.signal.addEventListener("abort", onAbort)
+
+      return {
+        signal: abortCtl.signal,
+        unsunbscribe: () => {
+          subscription.unsubscribe();
+          healthTimeout.dispose();
+          abortCtl.signal.removeEventListener("abort", onAbort);
+        },
+      }
+    }
+
     const data = new ClientData<InstanceData>({
       adapters: this.adapters,
       instance: instanceIdentifier,
@@ -220,43 +271,61 @@ export class Client<CP extends SpawnkitConfig> {
 
           if (mode === "normal") {
             return new Promise((resolve, reject) => {
+              const healthCheck = createHealthSignal({ maxWait: 5000 });
               const internalStream = new ClientStream();
-              internalStream.on("end", () => subscription.unsubscribe());
-              const handleStreamMessage = (
-                subscription: { unsubscribe: Function },
-                message: InstanceEventStreamMessage,
-              ) => {
+              const scope = {
+                response: undefined as any,
+              };
+
+              const isDoneWaitingForResponse = () => {
+                healthCheck.unsunbscribe();
+                internalStream.close();
+                scope.response?.unsubscribe();
+
+                healthCheck.signal.removeEventListener("abort", onHealthCheckAbort);
+                healthCheck.unsunbscribe();
+              }
+
+              const onHealthCheckAbort = () => {
+                isDoneWaitingForResponse();
+                const error = new Error("Spawnkit Instance Timeout");
+                reject(error);
+              };
+
+              healthCheck.signal.addEventListener("abort", onHealthCheckAbort);
+
+              internalStream.on("end", () => isDoneWaitingForResponse());
+              const handleStreamMessage = (message: InstanceEventStreamMessage) => {
                 resolve(internalStream);
                 internalStream.forward(message);
               };
 
-              const handleDefaultMessage = (
-                subscription: { unsubscribe: Function },
-                message: InternalMessageData,
-              ) => {
+              const handleDefaultMessage = (message: InternalMessageData) => {
+                isDoneWaitingForResponse();
+
                 if ("error" in message) {
                   const error = RemoteError.deserialize(message.error);
                   reject(error);
-                } else if ("response" in message) {
-                  resolve(message.response);
+                  return;
                 }
 
-                subscription.unsubscribe();
+                if ("response" in message) {
+                  resolve(message.response);
+                  return;
+                }
               };
 
               const channel = Client.getChannelForEventResponse(eventId);
-              const subscription: ReturnType<
-                typeof this.adapters.messages.subscribe<InternalMessageData>
-              > = this.adapters.messages.subscribe<InternalMessageData>(
+              scope.response = this.adapters.messages.subscribe<InternalMessageData>(
                 instanceIdentifier,
                 channel,
                 (message) => {
                   if ("stream" in message.data)
-                    return handleStreamMessage(subscription, message.data);
+                    return handleStreamMessage(message.data);
                   if ("response" in message.data)
-                    return handleDefaultMessage(subscription, message.data);
+                    return handleDefaultMessage(message.data);
                   if ("error" in message.data)
-                    return handleDefaultMessage(subscription, message.data);
+                    return handleDefaultMessage(message.data);
                 },
               );
             });
@@ -287,13 +356,19 @@ export class Client<CP extends SpawnkitConfig> {
         channel: Channel,
         callback: (data: InstanceChannels[Channel]) => any,
       ) => {
-        return this.adapters.messages.subscribe<InstanceChannels[Channel]>(
+        const subscribe = this.adapters.messages.subscribe<InstanceChannels[Channel]>(
           instanceIdentifier,
           Client.getChannelForEventBus("instance", channel.toString()),
           (message) => {
             callback(message.data);
           },
         );
+
+        return {
+          unsubscribe: () => {
+            subscribe.unsubscribe();
+          },
+        };
       },
 
       data: data,
