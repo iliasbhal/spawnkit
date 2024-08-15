@@ -179,25 +179,23 @@ export class Client<CP extends SpawnkitConfig> {
       const abortCtl = new AbortController();
 
       const createHealthTimeout = () => {
-        const healthTimeout = {
+        return {
           id: null as any,
-          create: () => {
+          start: () => {
             healthTimeout.id = setTimeout(() => abortCtl.abort(), config.maxWait);
           },
           reset: () => {
             healthTimeout.dispose();
-            healthTimeout.create();
+            healthTimeout.start();
           },
           dispose: () => {
             if (healthTimeout.id) clearTimeout(healthTimeout.id);
           }
         };
-
-        healthTimeout.create();
-        return healthTimeout;
       }
 
       const healthTimeout = createHealthTimeout();
+      healthTimeout.start();
       const subscription = this.adapters.messages.subscribe<InternalMessageData>(
         instanceIdentifier,
         Client.getChannelForEventBus("__INTERNAL__", 'health'),
@@ -206,15 +204,27 @@ export class Client<CP extends SpawnkitConfig> {
         },
       );
 
-      const onAbort = () => healthTimeout.dispose();
-      abortCtl.signal.addEventListener("abort", onAbort)
+      const onAbortCallbacks: (() => void)[] = [];
+      const addAbortCallback = (abortCallback: () => void) => {
+        abortCtl.signal.addEventListener("abort", abortCallback);
+        onAbortCallbacks.push(abortCallback);
+      }
+
+      addAbortCallback(() => {
+        healthTimeout.dispose()
+      });
 
       return {
         signal: abortCtl.signal,
+        onAbort: addAbortCallback,
+        reset: () => healthTimeout.reset(),
         unsunbscribe: () => {
           subscription.unsubscribe();
           healthTimeout.dispose();
-          abortCtl.signal.removeEventListener("abort", onAbort);
+
+          onAbortCallbacks.forEach(callback => {
+            abortCtl.signal.removeEventListener("abort", callback);
+          });
         },
       }
     }
@@ -281,20 +291,18 @@ export class Client<CP extends SpawnkitConfig> {
                 healthCheck.unsunbscribe();
                 internalStream.close();
                 scope.response?.unsubscribe();
-
-                healthCheck.signal.removeEventListener("abort", onHealthCheckAbort);
-                healthCheck.unsunbscribe();
               }
 
-              const onHealthCheckAbort = () => {
+              healthCheck.onAbort(() => {
                 isDoneWaitingForResponse();
                 const error = new Error("Spawnkit Instance Timeout");
                 reject(error);
-              };
+              });
 
-              healthCheck.signal.addEventListener("abort", onHealthCheckAbort);
+              internalStream.on("end", () => {
+                isDoneWaitingForResponse();
+              });
 
-              internalStream.on("end", () => isDoneWaitingForResponse());
               const handleStreamMessage = (message: InstanceEventStreamMessage) => {
                 resolve(internalStream);
                 internalStream.forward(message);
@@ -356,17 +364,29 @@ export class Client<CP extends SpawnkitConfig> {
         channel: Channel,
         callback: (data: InstanceChannels[Channel]) => any,
       ) => {
+        const healthCheck = createHealthSignal({ maxWait: 5000 });
         const subscribe = this.adapters.messages.subscribe<InstanceChannels[Channel]>(
           instanceIdentifier,
           Client.getChannelForEventBus("instance", channel.toString()),
           (message) => {
+            healthCheck.reset();
             callback(message.data);
           },
         );
 
+        const dispose = () => {
+          subscribe.unsubscribe();
+          healthCheck.unsunbscribe();
+        }
+
+        healthCheck.onAbort(() => {
+          dispose();
+        })
+
         return {
           unsubscribe: () => {
-            subscribe.unsubscribe();
+            healthCheck.unsunbscribe();
+            dispose();
           },
         };
       },
