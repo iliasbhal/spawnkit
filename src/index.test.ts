@@ -4,8 +4,8 @@ import { redis } from './adapters/redis/client'
 
 import * as Spawnkit from ".";
 import * as RedisAdapter from "./adapters/redis";
+import { OrderBook, EmptyResponseInstance, BadExample, IntrospectExample } from './index.test.fixtures'
 import { ControlledPromise } from './utils/ControlledPromise';
-import { OrderBook } from './index.test.fixtures'
 
 describe.only("Base", () => {
   const createAdapters = () => ({
@@ -21,6 +21,8 @@ describe.only("Base", () => {
     adapters: createAdapters(),
     instances: {
       OrderBook,
+      EmptyResponseInstance,
+      IntrospectExample,
     },
   });
 
@@ -78,37 +80,47 @@ describe.only("Base", () => {
     expect(response).toBeUndefined();
   })
 
+  it('instances can know which id they are', async () => {
+    const exampleInst = client.spawn('IntrospectExample', 'intro-123123132');
+
+    const info = await exampleInst.getInfo();
+    expect(info).toEqual({
+      id: 'intro-123123132',
+      kind: 'IntrospectExample',
+    });
+  })
+
   it.todo("can call for instance method and not wait for the resonse");
 });
 
-describe("Errors", () => {
-  it.todo("forwards message, stacktrace and other attributes");
-  it.todo("forwards errors thrown during the method call (sync method)");
-  it.todo("forwards errors thrown during the method call (async method)");
-  it.todo("forwards error if happen during stream ( .map )");
-  it.todo("forwards error if happen during stream ( for await )");
-});
+// describe("Errors", () => {
+//   it.todo("forwards message, stacktrace and other attributes");
+//   it.todo("forwards errors thrown during the method call (sync method)");
+//   it.todo("forwards errors thrown during the method call (async method)");
+//   it.todo("forwards error if happen during stream ( .map )");
+//   it.todo("forwards error if happen during stream ( for await )");
+// });
 
-describe("Data", () => {
-  it.todo("can use .data.get() remotely");
-  it.todo("can subscribe to data changes via .data.on('key', subscriber)");
-});
+// describe("Data", () => {
+//   it.todo("can use .data.get() remotely");
+//   it.todo("can subscribe to data changes via .data.on('key', subscriber)");
+// });
 
-describe("Stream", () => {
-  it.todo("forwards returned stream to client (.map)");
-  it.todo("forwards returned stream to client (async iterator)");
-  it.todo("should replay messages in the same order they have been emitted");
-});
+// describe("Stream", () => {
+//   it.todo("forwards returned stream to client (.map)");
+//   it.todo("forwards returned stream to client (async iterator)");
+//   it.todo("should replay messages in the same order they have been emitted");
+// });
 
-describe("Schedule", () => {
-  it.todo("can schedule method call (delay)");
-  it.todo("can cancel schedule method call (delay)");
-  it.todo("can schedule method call (cron)");
-  it.todo("can cancel schedule method call (cron)");
-  it.todo("can list all scheduled method call");
-});
+// describe("Schedule", () => {
+//   it.todo("can schedule method call (delay)");
+//   it.todo("can cancel schedule method call (delay)");
+//   it.todo("can schedule method call (cron)");
+//   it.todo("can cancel schedule method call (cron)");
+//   it.todo("can list all scheduled method call");
+// });
 
-describe("PubSub", () => {
-  it.todo("can emit and listen to instance channels");
-  it.todo("when subscrbing to channel, it should not replay past events");
-});
+// describe("PubSub", () => {
+//   it.todo("can emit and listen to instance channels");
+//   it.todo("when subscrbing to channel, it should not replay past events");
+// });

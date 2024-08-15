@@ -59,3 +59,12 @@ export class EmptyResponseInstance extends Spawnkit.Instance {
     await wait(1000);
   }
 }
+
+export class IntrospectExample extends Spawnkit.Instance {
+  async getInfo() {
+    return {
+      kind: this.kind,
+      id: this.id,
+    };
+  }
+}

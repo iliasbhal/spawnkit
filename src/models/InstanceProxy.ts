@@ -51,6 +51,8 @@ export interface InterfaceAPI<
   InstanceData extends Record<string, any>,
   InstanceChannels extends Record<string, any> = Record<string, any>,
 > {
+  id: string;
+  kind: string;
   data: {
     get: Data<InstanceData>["get"];
     set: Data<InstanceData>["set"];
@@ -98,7 +100,9 @@ export class InstanceProxy<Inst extends Instance> {
       logger: this.logger,
     });
 
-    InstanceProxy.configureInstance(this.instance, config.config, {
+    InstanceProxy.configureInstance(this.instance, {
+      id: config.config.id,
+      kind: config.config.kind,
       emit: (channel, data) => {
         return this.emit(channel, data);
       },
@@ -126,14 +130,11 @@ export class InstanceProxy<Inst extends Instance> {
 
   static configureInstance(
     instance: Instance,
-    config: InstanceProps,
     api: InterfaceAPI<
       Instance["__types"]["InstanceData"],
       Instance["__types"]["InstanceChannels"]
     >,
   ) {
-    instance.id = config.id;
-    instance.kind = config.kind;
     instance.api = api;
   }
 

@@ -12,14 +12,19 @@ export class Instance<
     InstanceChannels: InstanceChannels;
   };
 
-  signal(signal: InstanceSignal) {}
+  signal(signal: InstanceSignal) { }
 
   // TODO: FIX TYPING HERE
   // For some reason, adding types here break the client types.
-  on(channel: any, message: any) {}
+  on(channel: keyof InstanceChannels, message: InstanceChannels[keyof InstanceChannels]) { }
 
-  id!: string;
-  kind!: string;
+  get id() {
+    return this.api.id;
+  }
+  get kind() {
+    return this.api.kind;
+  }
+
   api!: InterfaceAPI<InstanceData, InstanceChannels>;
 
   get logger() {
