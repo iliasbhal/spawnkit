@@ -1,9 +1,6 @@
 # Spawnkit lib
 
 - Remove playground in favor of integration test suites
-- Instance should ping while its live. 
-  ✅ throw if healthcheck didn't go through during request response / stream response
-     throw if healthcheck didn't go through during .on() 
      remove .data from client, it's redundant. and remove .data.on
 
 

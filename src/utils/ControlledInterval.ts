@@ -1,59 +1,59 @@
+import { ControlledPromise } from "./ControlledPromise";
 import { wait } from "./wait";
 
-export class ControlledInterval<V> {
-  getValue: () => Promise<V>;
-  onChange: (value: V) => void;
-  pollInterval: number;
-  live = true;
-  value: V | undefined = undefined;
+interface ControlledIntervalConfig {
+  interval: number;
+  execute: () => unknown;
+}
 
-  constructor(config: { onChange: any; pollInterval: number; getValue: any }) {
-    this.getValue = config.getValue;
-    this.pollInterval = config.pollInterval;
-    this.onChange = config.onChange;
+export class ControlledInterval {
+  interval: number;
+  execute: () => unknown;
+  promiseCtl = new ControlledPromise<boolean>();
+
+  constructor(config: ControlledIntervalConfig) {
+    this.interval = config.interval;
+    this.execute = config.execute;
   }
 
-  static new<V>(config: {
-    onChange: (value: V) => void;
-    pollInterval: number;
-    getValue: () => Promise<V>;
-  }) {
-    const poll = new ControlledInterval<V>(config);
-    poll.subscribe((value) => poll.onChange(value));
+  static new(config: ControlledIntervalConfig) {
+    const poll = new ControlledInterval(config);
+    poll.start();
     return poll;
   }
 
-  unsubscribe() {
+  live: boolean = false;
+  dispose() {
+    this.live = false;
+    this.promiseCtl.resolve(true);
+  }
+
+  get await() {
+    return this.promiseCtl.await;
+  }
+
+  stop() {
     this.live = false;
   }
 
-  subscribe(onChange: (value: any) => void | Promise<void>) {
+  start() {
+    this.live = true;
     Promise.resolve().then(async () => {
       let loopCount = 0;
       polling: while (this.live) {
-        const newValue = await this.getValue();
         if (!this.live) {
           break polling;
         }
 
-        const isFirstLoop = loopCount === 0;
-        if (isFirstLoop) {
-          this.value = newValue;
-          await onChange(newValue);
-        } else {
-          const newData = JSON.stringify(JSON.parse(JSON.stringify(newValue)));
-          const oldData = JSON.stringify(
-            JSON.parse(JSON.stringify(this.value)),
-          );
-
-          const hasChanged = newData !== oldData;
-          if (hasChanged) {
-            this.value = newValue;
-            await onChange(newValue);
-          }
+        const response = this.execute();
+        if (response instanceof Promise) {
+          await response.catch((error) => {
+            this.promiseCtl.reject(error);
+            this.dispose();
+          });
         }
 
-        await wait(this.pollInterval);
+        await wait(this.interval);
         loopCount++;
       }
     });

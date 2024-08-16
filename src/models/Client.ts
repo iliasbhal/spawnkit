@@ -3,6 +3,7 @@ import type {
   InstanceEventChannels,
   InstanceEventStreamMessage,
 } from "./InstanceProxy";
+import { HEALTH_CHECK_INTERVAL } from './InstanceProxy'
 import { ClientStream } from "./ClientStream";
 import { RemoteError } from "./RemoteError";
 import {
@@ -175,14 +176,14 @@ export class Client<CP extends SpawnkitConfig> {
       return eventId;
     };
 
-    const createHealthSignal = (config: { maxWait: number }) => {
+    const createHealthSignal = () => {
       const abortCtl = new AbortController();
 
       const createHealthTimeout = () => {
         return {
           id: null as any,
           start: () => {
-            healthTimeout.id = setTimeout(() => abortCtl.abort(), config.maxWait);
+            healthTimeout.id = setTimeout(() => abortCtl.abort(), HEALTH_CHECK_INTERVAL);
           },
           reset: () => {
             healthTimeout.dispose();
@@ -281,7 +282,7 @@ export class Client<CP extends SpawnkitConfig> {
 
           if (mode === "normal") {
             return new Promise((resolve, reject) => {
-              const healthCheck = createHealthSignal({ maxWait: 5000 });
+              const healthCheck = createHealthSignal();
               const internalStream = new ClientStream();
               const scope = {
                 response: undefined as any,
@@ -364,7 +365,7 @@ export class Client<CP extends SpawnkitConfig> {
         channel: Channel,
         callback: (data: InstanceChannels[Channel]) => any,
       ) => {
-        const healthCheck = createHealthSignal({ maxWait: 5000 });
+        const healthCheck = createHealthSignal();
         const subscribe = this.adapters.messages.subscribe<InstanceChannels[Channel]>(
           instanceIdentifier,
           Client.getChannelForEventBus("instance", channel.toString()),

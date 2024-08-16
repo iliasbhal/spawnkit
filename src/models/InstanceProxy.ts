@@ -14,8 +14,8 @@ import {
 import { Client } from "./Client";
 import { Data } from "./Data";
 import { Logger } from "./Logger";
-import { nanoid } from "nanoid";
 import { RemoteError } from "./RemoteError";
+import { ControlledInterval } from "@/utils/ControlledInterval";
 
 export interface InstanceProps {
   kind: string;
@@ -63,6 +63,9 @@ export interface InterfaceAPI<
   emit: Emit<InstanceChannels>;
   waitFor: (promise: Promise<any>) => any;
 }
+
+export const HEALTH_CHECK_INTERVAL = 5000;
+export const HEALTH_CHECK_NOTIFY_PER_INTERVAL = 3;
 
 interface MessageContext {
   event: InstanceMethodCall,
@@ -315,6 +318,7 @@ export class InstanceProxy<Inst extends Instance> {
     this.trace({ type: "proxy:start" });
 
     this.subscribeToInstanceEvent();
+    this.continouslyEmitHealthCheckSignal();
 
     const syncAbort = this.addAbortListener(() => {
       if (!this.live) return;
@@ -332,6 +336,7 @@ export class InstanceProxy<Inst extends Instance> {
     if (!this.running) return;
     this.running = false;
     this.onEventSubscription?.unsubscribe();
+    this.healthCheckInterval?.dispose();
     this.trace({ type: "proxy:dispose" });
 
     // When the instance receives the 'dispose' event
@@ -364,6 +369,16 @@ export class InstanceProxy<Inst extends Instance> {
       .catch((err) => pending.reject(err));
 
     await pending.await;
+  }
+
+  public healthCheckInterval: ControlledInterval | undefined;
+  public continouslyEmitHealthCheckSignal() {
+    this.healthCheckInterval = ControlledInterval.new({
+      interval: HEALTH_CHECK_INTERVAL / HEALTH_CHECK_NOTIFY_PER_INTERVAL,
+      execute: () => {
+        this.emit("health", { status: "ok" })
+      },
+    });
   }
 
   public onEventSubscription: { unsubscribe: Function } | undefined;
@@ -462,7 +477,8 @@ export class InstanceProxy<Inst extends Instance> {
     await this.keepAlive.waitOnAll();
     await this.dispose();
 
-    // When we call .stop() there is a new snapshot that is generated
+    // When we call .dispose() there is maybe a new effect
+    // that is initiated to save or do some cleanup.
     // we should wait for newly created operation to complete
     // before yielding the promise. It the equivalent of a gracefull shutdown
     await this.keepAlive.waitOnAll();
