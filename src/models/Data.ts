@@ -1,6 +1,6 @@
 import { Adapters } from "@/adapters";
 import { AsyncDebounceHandler } from "@/utils/AsyncDebounceHandler";
-import { CacheMap } from '@/utils/CacheMap';
+import { CacheMap } from "@/utils/CacheMap";
 import { Logger } from "./Logger";
 import { Client } from "./Client";
 

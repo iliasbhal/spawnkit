@@ -5,7 +5,7 @@ import { wait } from "../../../utils/wait";
 import { lerp } from "../../../utils/lerp";
 
 const { nanoid } = require("nanoid");
-const superjson = require('superjson');
+const superjson = require("superjson");
 
 interface Message<DataShape> {
   id: Adapters.EventId;
@@ -17,7 +17,8 @@ interface Message<DataShape> {
 
 export class MessageBroker
   extends RedisAdapter
-  implements Adapters.AdapaterMessageBroker {
+  implements Adapters.AdapaterMessageBroker
+{
   link(client: Client<any>): void {
     super.link(client);
     this.initializeGlobalPubSub();
@@ -63,7 +64,7 @@ export class MessageBroker
   async publish<EventData>(
     instance: Adapters.InstanceIdentifier,
     channel: Adapters.MessageChannel,
-    event: EventData
+    event: EventData,
   ): Promise<Adapters.EventId> {
     const messageChannel = this.getChannel(instance, channel);
     const eventId = nanoid();
@@ -273,7 +274,7 @@ export class MessageBroker
     order: 0,
   };
 
-  private getTimestampAndOrder = (): { timestamp: number, order: number } => {
+  private getTimestampAndOrder = (): { timestamp: number; order: number } => {
     const timestamp = Date.now();
 
     const timestampChanged = this.currentOrder.timestamp !== timestamp;
@@ -286,7 +287,7 @@ export class MessageBroker
 
     this.currentOrder.order++;
     return this.currentOrder;
-  }
+  };
 
   private async publishMQ<EventData>(
     channel: string,
@@ -295,13 +296,17 @@ export class MessageBroker
     const { timestamp, order } = this.getTimestampAndOrder();
     await Promise.all([
       this.redis.zadd(channel, timestamp, message.id),
-      this.redis.hset(channel + ":data", message.id, superjson.stringify({ message, order })),
+      this.redis.hset(
+        channel + ":data",
+        message.id,
+        superjson.stringify({ message, order }),
+      ),
     ]);
 
     return {
       message,
-      order
-    }
+      order,
+    };
   }
 
   private listenMQ(channel: string, callback: (event: any) => any) {
@@ -314,15 +319,19 @@ export class MessageBroker
         range: {
           from: 0,
           to: Infinity,
-        }
+        },
       };
 
       while (!abortCtl.signal.aborted) {
         const timestampBeforeRequest = Date.now();
         const rawEvents = await this.getLatestMessagesRaw(channel, loop.range);
-        const events = rawEvents.map((e => superjson.parse(e) as Awaited<ReturnType<typeof this.publishMQ>>))
+        const events = rawEvents
+          .map(
+            (e) =>
+              superjson.parse(e) as Awaited<ReturnType<typeof this.publishMQ>>,
+          )
           .sort((a, b) => a.order - b.order)
-          .map(a => a.message);
+          .map((a) => a.message);
 
         loop.range.from = timestampBeforeRequest;
 
@@ -348,7 +357,8 @@ export class MessageBroker
         const MAX_WAIT_TIME = 500;
         const MAX_EMPTY_RUNS = 5;
 
-        const ratio = Math.min(MAX_EMPTY_RUNS, loop.emptyRunsCount) / MAX_EMPTY_RUNS;
+        const ratio =
+          Math.min(MAX_EMPTY_RUNS, loop.emptyRunsCount) / MAX_EMPTY_RUNS;
         const waitTimeMs = lerp(MIN_WAIT_TIME, MAX_WAIT_TIME, ratio);
         await wait(waitTimeMs);
       }
@@ -385,6 +395,6 @@ export class MessageBroker
       return [];
     });
 
-    return messages
+    return messages;
   }
 }

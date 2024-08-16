@@ -1,10 +1,10 @@
-import { Stream } from './Stream';
-import type { InstanceEventStreamMessage } from './InstanceProxy';
-import { RemoteError } from './RemoteError';
+import { Stream } from "./Stream";
+import type { InstanceEventStreamMessage } from "./InstanceProxy";
+import { RemoteError } from "./RemoteError";
 
 export class ClientStream extends Stream<any> {
   constructor() {
-    super(() => { });
+    super(() => {});
   }
 
   lastIndex = -1;

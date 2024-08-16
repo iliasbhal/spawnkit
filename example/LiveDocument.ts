@@ -9,5 +9,5 @@ interface DocumentChange {
 }
 
 export class LiveDocument extends Spawnkit.Instance<LiveDocumentData> {
-  update(change: DocumentChange) { }
+  update(change: DocumentChange) {}
 }

@@ -55,55 +55,61 @@ export interface InstanceMethodCall<
 
 export type InstanceSignal =
   | {
-    type: "log";
-    message: string;
-  }
+      type: "log";
+      message: string;
+    }
   | {
-    type: "lock:acquire:start" | "lock:acquire:failed" | "lock:acquire:success";
-    duration: number;
-    attemptId: string;
-    resourceId: string;
-  }
+      type:
+        | "lock:acquire:start"
+        | "lock:acquire:failed"
+        | "lock:acquire:success";
+      duration: number;
+      attemptId: string;
+      resourceId: string;
+    }
   | {
-    type: "lock:extend:start" | "lock:extend:failed" | "lock:extend:success";
-    resourceId: string;
-    attemptId: string;
-    duration: number;
-  }
+      type: "lock:extend:start" | "lock:extend:failed" | "lock:extend:success";
+      resourceId: string;
+      attemptId: string;
+      duration: number;
+    }
   | {
-    type: "lock:release:start" | "lock:release:failed" | "lock:release:success";
-    resourceId: string;
-    attemptId: string;
-    duration: number;
-  }
+      type:
+        | "lock:release:start"
+        | "lock:release:failed"
+        | "lock:release:success";
+      resourceId: string;
+      attemptId: string;
+      duration: number;
+    }
   | {
-    type: "lock:abort";
-  }
+      type: "lock:abort";
+    }
   | {
-    type: "data:get";
-    key: string;
-  }
+      type: "data:get";
+      key: string;
+    }
   | {
-    type: "data:set";
-    key: string;
-    value: any;
-  }
+      type: "data:set";
+      key: string;
+      value: any;
+    }
   | {
-    type: "proxy:start";
-  }
+      type: "proxy:start";
+    }
   | {
-    type: "proxy:dispose";
-  }
+      type: "proxy:dispose";
+    }
   | {
-    type: "proxy:call:start";
-    id: string;
-    event: InstanceMethodCall;
-  }
+      type: "proxy:call:start";
+      id: string;
+      event: InstanceMethodCall;
+    }
   | {
-    type: "proxy:call:result";
-    id: string;
-    result: any;
-  };
+      type: "proxy:call:result";
+      id: string;
+      result: any;
+    };
 
 export class BaseAdapter {
   client!: Client<any>;
@@ -173,7 +179,7 @@ export abstract class AdapaterData extends BaseAdapter {
   ): Promise<boolean>;
 }
 
-export type MessageChannel = 'rpc' | `reply:${string}` | `broadcast:${string}`;
+export type MessageChannel = "rpc" | `reply:${string}` | `broadcast:${string}`;
 
 export abstract class AdapaterMessageBroker extends BaseAdapter {
   abstract publish<EventData>(
@@ -181,7 +187,7 @@ export abstract class AdapaterMessageBroker extends BaseAdapter {
     channel: MessageChannel,
     event: EventData,
     meta?: {
-      client: string,
+      client: string;
     },
   ): Promise<EventId>;
 
@@ -221,7 +227,7 @@ export interface ScheduledCallMetaData {
     stream: any[] | null;
     data: any | null;
     error: any | null;
-  },
+  };
 }
 
 export abstract class AdapterEventScheduler extends BaseAdapter {

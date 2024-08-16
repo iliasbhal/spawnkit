@@ -184,7 +184,7 @@ export class Machine<
           const pending = this.childActorDoneByActor.get(actor);
           pending?.resolve(err);
         },
-        complete: () => { },
+        complete: () => {},
       }),
     );
   }

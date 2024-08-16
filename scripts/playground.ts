@@ -1,13 +1,13 @@
-import 'dotenv/config';
+import "dotenv/config";
 
 import { wait } from "../src/utils/wait";
 import * as Spawnkit from "@/.";
 import * as RedisAdapter from "@/adapters/redis";
 import { redis } from "@/adapters/redis/client";
 import * as instances from "../example/_index";
-import { nanoid } from 'nanoid';
-import { Logger } from '@/models/Logger';
-import { Lock } from '@/models/Lock';
+import { nanoid } from "nanoid";
+import { Logger } from "@/models/Logger";
+import { Lock } from "@/models/Lock";
 
 const createAdapters = () => ({
   lock: new RedisAdapter.Lock(redis),
@@ -24,15 +24,15 @@ const client = Spawnkit.Client.from({
 });
 
 const main = async () => {
-  console.log('-----');
-  console.log('-----');
-  console.log('-----');
-  console.log('-----');
-  console.log('-----');
-  console.log('-----');
-  console.log('-----');
-  console.log('-----');
-  // await redis.flushall("SYNC");
+  console.log("-----");
+  console.log("-----");
+  console.log("-----");
+  console.log("-----");
+  console.log("-----");
+  console.log("-----");
+  console.log("-----");
+  console.log("-----");
+  await redis.flushall("SYNC");
   client.start();
 
   //   // attributeExample();
@@ -52,8 +52,6 @@ const main = async () => {
 };
 
 const verifyLock = async () => {
-
-
   const createLock = async (kind: string, id: string) => {
     const executionId = nanoid();
     const instanceConfig = {
@@ -78,31 +76,33 @@ const verifyLock = async () => {
       duration: MIN_LOCK_DURATION,
       logger,
     });
-  }
+  };
 
-  const lock1 = await createLock('OrderBook', 'BTC/USD');
+  const lock1 = await createLock("OrderBook", "BTC/USD");
 
-
-  lock1.using(async () => {
-    await wait(2000);
-  }).catch(err => {
-    console.log('LOCK 1 ERROR', err);
-  });
+  lock1
+    .using(async () => {
+      await wait(2000);
+    })
+    .catch((err) => {
+      console.log("LOCK 1 ERROR", err);
+    });
 
   await wait(600);
 
   Array.from({ length: 1 }).forEach(async () => {
-    const lock2 = await createLock('OrderBook', 'BTC/USD');
-    lock2.using(async () => {
-      await wait(2000);
-    }).catch(err => {
-      console.log('LOCK 2 ERROR', err);
-    });;
-  })
+    const lock2 = await createLock("OrderBook", "BTC/USD");
+    lock2
+      .using(async () => {
+        await wait(2000);
+      })
+      .catch((err) => {
+        console.log("LOCK 2 ERROR", err);
+      });
+  });
 
   await wait(3000);
-
-}
+};
 
 const attributeExample = () => {
   const exampleInst = client.spawn("StreamExample", "Hector");
@@ -139,7 +139,6 @@ const basicExample = async () => {
   // console.log("SENT");
   //
 
-  await wait(1000);
   subscription.unsubscribe();
 };
 
@@ -212,7 +211,6 @@ const emittedEventsExample = async () => {
   // and from client as well
   orderBook.emit("alphachannel", "asddas");
   orderBook.emit("orders", ["asddas"]);
-
 
   // orderBook.on("orders", (event) => {
   //   console.log("ON CLIENT 1", event);
@@ -369,33 +367,32 @@ const exampleXState = async () => {
   // toggle.data.get();
 };
 
-
 const exampleData = async () => {
   const toggle = client.spawn("GameSession", "AAAA");
   const initial = await toggle.get();
   // console.log('BEFORE', initial);
 
-  await toggle.set([['0', '0', '0'], ['1', '1', '1']]);
+  await toggle.set([
+    ["0", "0", "0"],
+    ["1", "1", "1"],
+  ]);
   const afterSave = await toggle.get();
   // console.log('AFTER', afterSave);
 
-
   // console.log('----------')
-
-}
+};
 
 const exampleBadCall = async () => {
-  const orderBook = client.spawn("OrderBook", "BTC/EUR")
+  const orderBook = client.spawn("OrderBook", "BTC/EUR");
 
   try {
     // @ts-expect-error
     const response = await orderBook.elbaf({ tick: "APPL", qty: 10 });
-    console.log(response)
+    console.log(response);
   } catch (err) {
-    console.log('ERR', err);
+    console.log("ERR", err);
   }
-}
-
+};
 
 const severalClients = async () => {
   const client1 = Spawnkit.Client.from({
@@ -408,24 +405,19 @@ const severalClients = async () => {
     instances: instances,
   });
 
-
   const orderBook = client1.spawn("OrderBook", "BTC/EUR");
   await orderBook.buy({
-    tick: 'AAPL',
+    tick: "AAPL",
     qty: 10,
   });
 
-  await wait(1000)
+  await wait(1000);
   const orderBook2 = client2.spawn("OrderBook", "BTC/EUR");
   await orderBook2.buy({
-    tick: 'GOOG',
+    tick: "GOOG",
     qty: 10,
-  })
-
-
-
-
-}
+  });
+};
 
 const startTime = Date.now();
 console.log("START");

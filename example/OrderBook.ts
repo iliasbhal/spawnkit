@@ -28,7 +28,7 @@ export class OrderBook extends Spawnkit.Instance<
 
   async buy(order: Order) {
     this.logger.log("-----BUYYYYY------");
-    console.log('___BUY___', order);
+    console.log("___BUY___", order);
     // this.data = this.data || ({} as any);
     // this.data!.count = this.data?.count || 0;
     // this.data!.count++;

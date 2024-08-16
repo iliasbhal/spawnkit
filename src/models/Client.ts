@@ -3,7 +3,7 @@ import type {
   InstanceEventChannels,
   InstanceEventStreamMessage,
 } from "./InstanceProxy";
-import { HEALTH_CHECK_INTERVAL } from './InstanceProxy'
+import { HEALTH_CHECK_INTERVAL } from "./InstanceProxy";
 import { ClientStream } from "./ClientStream";
 import { RemoteError } from "./RemoteError";
 import {
@@ -49,31 +49,41 @@ export class Client<CP extends SpawnkitConfig> {
 
       throw new Error("Invalid Adapter, need to extend BaseAdapter");
     });
-  }
+  };
 
   private validateInstancces = () => {
     Object.values(this.instances).forEach((InstanceClass: any) => {
       const inst = new InstanceClass();
       const instanceName = InstanceClass.name;
 
-      const clientInst = this.spawn(instanceName, '__TEST_ID__');
+      const clientInst = this.spawn(instanceName, "__TEST_ID__");
       const clientKeys = new Set(Object.keys(clientInst));
-      const instanceKeys = new Set(Object.getOwnPropertyNames(
-        Object.getPrototypeOf(inst)).concat(Object.keys(inst))
+      const instanceKeys = new Set(
+        Object.getOwnPropertyNames(Object.getPrototypeOf(inst)).concat(
+          Object.keys(inst),
+        ),
       );
 
-      const instanceProtoKeys = new Set(Object.getOwnPropertyNames(
-        Object.getPrototypeOf(Object.getPrototypeOf(inst)))
+      const instanceProtoKeys = new Set(
+        Object.getOwnPropertyNames(
+          Object.getPrototypeOf(Object.getPrototypeOf(inst)),
+        ),
       );
 
-      const intersect = new Set([...Array.from(clientKeys)].filter(i => instanceKeys.has(i)));
-      const cannotUseKeys = new Set([...Array.from(intersect)].filter(i => !instanceProtoKeys.has(i)));
+      const intersect = new Set(
+        [...Array.from(clientKeys)].filter((i) => instanceKeys.has(i)),
+      );
+      const cannotUseKeys = new Set(
+        [...Array.from(intersect)].filter((i) => !instanceProtoKeys.has(i)),
+      );
 
       if (cannotUseKeys.size > 0) {
-        throw new Error(`Cannot use reserved keys: ${Array.from(cannotUseKeys).join(', ')} in instance ${instanceName}`);
+        throw new Error(
+          `Cannot use reserved keys: ${Array.from(cannotUseKeys).join(", ")} in instance ${instanceName}`,
+        );
       }
     });
-  }
+  };
 
   static from<CP extends SpawnkitConfig>(opts: CP) {
     return new Client<CP>(opts);
@@ -126,7 +136,9 @@ export class Client<CP extends SpawnkitConfig> {
     return shouldScheduleInstance;
   }
 
-  private tryWakeInstanceUp<Kind extends Extract<keyof CP["instances"], string>>(kind: Kind, instanceId: InstanceId) {
+  private tryWakeInstanceUp<
+    Kind extends Extract<keyof CP["instances"], string>,
+  >(kind: Kind, instanceId: InstanceId) {
     // In the case that we are sending a lot of events
     // We don't have to try to schedule an instance together with every event we send.
     // Once an instance terminate, it will try again 3 times to check if there are pending events process.
@@ -137,7 +149,7 @@ export class Client<CP extends SpawnkitConfig> {
       this.adapters.instances.schedule({
         id: instanceId,
         kind: kind.toString(),
-      })
+      });
     }
   }
 
@@ -183,7 +195,10 @@ export class Client<CP extends SpawnkitConfig> {
         return {
           id: null as any,
           start: () => {
-            healthTimeout.id = setTimeout(() => abortCtl.abort(), HEALTH_CHECK_INTERVAL);
+            healthTimeout.id = setTimeout(
+              () => abortCtl.abort(),
+              HEALTH_CHECK_INTERVAL,
+            );
           },
           reset: () => {
             healthTimeout.dispose();
@@ -191,28 +206,29 @@ export class Client<CP extends SpawnkitConfig> {
           },
           dispose: () => {
             if (healthTimeout.id) clearTimeout(healthTimeout.id);
-          }
+          },
         };
-      }
+      };
 
       const healthTimeout = createHealthTimeout();
       healthTimeout.start();
-      const subscription = this.adapters.messages.subscribe<InternalMessageData>(
-        instanceIdentifier,
-        Client.getChannelForEventBus("__INTERNAL__", 'health'),
-        (message) => {
-          healthTimeout.reset();
-        },
-      );
+      const subscription =
+        this.adapters.messages.subscribe<InternalMessageData>(
+          instanceIdentifier,
+          Client.getChannelForEventBus("__INTERNAL__", "health"),
+          (message) => {
+            healthTimeout.reset();
+          },
+        );
 
       const onAbortCallbacks: (() => void)[] = [];
       const addAbortCallback = (abortCallback: () => void) => {
         abortCtl.signal.addEventListener("abort", abortCallback);
         onAbortCallbacks.push(abortCallback);
-      }
+      };
 
       addAbortCallback(() => {
-        healthTimeout.dispose()
+        healthTimeout.dispose();
       });
 
       return {
@@ -223,12 +239,12 @@ export class Client<CP extends SpawnkitConfig> {
           subscription.unsubscribe();
           healthTimeout.dispose();
 
-          onAbortCallbacks.forEach(callback => {
+          onAbortCallbacks.forEach((callback) => {
             abortCtl.signal.removeEventListener("abort", callback);
           });
         },
-      }
-    }
+      };
+    };
 
     const data = new ClientData<InstanceData>({
       adapters: this.adapters,
@@ -277,8 +293,8 @@ export class Client<CP extends SpawnkitConfig> {
             mode,
           });
 
-          if (mode === 'skip') return true;
-          if (mode === 'scheduled') return true;
+          if (mode === "skip") return true;
+          if (mode === "scheduled") return true;
 
           if (mode === "normal") {
             return new Promise((resolve, reject) => {
@@ -292,7 +308,7 @@ export class Client<CP extends SpawnkitConfig> {
                 healthCheck.unsunbscribe();
                 internalStream.close();
                 scope.response?.unsubscribe();
-              }
+              };
 
               healthCheck.onAbort(() => {
                 isDoneWaitingForResponse();
@@ -304,7 +320,9 @@ export class Client<CP extends SpawnkitConfig> {
                 isDoneWaitingForResponse();
               });
 
-              const handleStreamMessage = (message: InstanceEventStreamMessage) => {
+              const handleStreamMessage = (
+                message: InstanceEventStreamMessage,
+              ) => {
                 resolve(internalStream);
                 internalStream.forward(message);
               };
@@ -325,18 +343,19 @@ export class Client<CP extends SpawnkitConfig> {
               };
 
               const channel = Client.getChannelForEventResponse(eventId);
-              scope.response = this.adapters.messages.subscribe<InternalMessageData>(
-                instanceIdentifier,
-                channel,
-                (message) => {
-                  if ("stream" in message.data)
-                    return handleStreamMessage(message.data);
-                  if ("response" in message.data)
-                    return handleDefaultMessage(message.data);
-                  if ("error" in message.data)
-                    return handleDefaultMessage(message.data);
-                },
-              );
+              scope.response =
+                this.adapters.messages.subscribe<InternalMessageData>(
+                  instanceIdentifier,
+                  channel,
+                  (message) => {
+                    if ("stream" in message.data)
+                      return handleStreamMessage(message.data);
+                    if ("response" in message.data)
+                      return handleDefaultMessage(message.data);
+                    if ("error" in message.data)
+                      return handleDefaultMessage(message.data);
+                  },
+                );
             });
           }
 
@@ -366,7 +385,9 @@ export class Client<CP extends SpawnkitConfig> {
         callback: (data: InstanceChannels[Channel]) => any,
       ) => {
         const healthCheck = createHealthSignal();
-        const subscribe = this.adapters.messages.subscribe<InstanceChannels[Channel]>(
+        const subscribe = this.adapters.messages.subscribe<
+          InstanceChannels[Channel]
+        >(
           instanceIdentifier,
           Client.getChannelForEventBus("instance", channel.toString()),
           (message) => {
@@ -378,11 +399,11 @@ export class Client<CP extends SpawnkitConfig> {
         const dispose = () => {
           subscribe.unsubscribe();
           healthCheck.unsunbscribe();
-        }
+        };
 
         healthCheck.onAbort(() => {
           dispose();
-        })
+        });
 
         return {
           unsubscribe: () => {
@@ -440,20 +461,20 @@ type ExtractMethods<T> = Pick<T, ExtractMethodNames<T>>;
 
 type MakeRemote<T> = {
   [K in keyof T]: T[K] extends (...args: any[]) => any
-  ? // If the function is sychronouse, we want to cast the return to a Promise
-  // And it it's already a promise, it's gonna stay a promise.
-  (...args: Parameters<T[K]>) => Promise<Awaited<ReturnType<T[K]>>>
-  : never;
+    ? // If the function is sychronouse, we want to cast the return to a Promise
+      // And it it's already a promise, it's gonna stay a promise.
+      (...args: Parameters<T[K]>) => Promise<Awaited<ReturnType<T[K]>>>
+    : never;
 };
 
 type MakeSkippable<T> = {
   [K in keyof T]: T[K] extends (...args: any[]) => any
-  ? (...args: Parameters<T[K]>) => Promise<boolean>
-  : never;
+    ? (...args: Parameters<T[K]>) => Promise<boolean>
+    : never;
 };
 
 type MakeSchedulable<T> = {
   [K in keyof T]: T[K] extends (...args: any[]) => any
-  ? (...args: Parameters<T[K]>) => Promise<ScheduleId>
-  : never;
+    ? (...args: Parameters<T[K]>) => Promise<ScheduleId>
+    : never;
 };

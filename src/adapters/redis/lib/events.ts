@@ -6,7 +6,8 @@ import { nanoid } from "nanoid";
 
 export class EventScheduler
   extends BaseQueue
-  implements Adapters.AdapterEventScheduler {
+  implements Adapters.AdapterEventScheduler
+{
   queue: BullMQ.Queue<Adapters.ScheduleEventConfig, any, string>;
   constructor(redis: Redis) {
     super(redis);
@@ -76,14 +77,14 @@ export class EventScheduler
     const bullJobConfig =
       "delay" in config.schedule
         ? {
-          delay: config.schedule.delay,
-        }
+            delay: config.schedule.delay,
+          }
         : "cron" in config.schedule
           ? {
-            repeat: {
-              pattern: config.schedule.cron,
-            },
-          }
+              repeat: {
+                pattern: config.schedule.cron,
+              },
+            }
           : null;
 
     if (!bullJobConfig) {

@@ -3,7 +3,7 @@ import { Adapters, InstanceId, InstanceKind } from "../adapters";
 import { ControlledPromise } from "@/utils/ControlledPromise";
 import { Logger } from "./Logger";
 
-export class LockError extends Error { }
+export class LockError extends Error {}
 
 export class AcquireLockError extends LockError {
   constructor(resource: string, ownerId: string) {
@@ -58,7 +58,7 @@ export class Lock {
     }
 
     const extendBeforeThreshold =
-      config.extendBeforeThreshold || config.duration * 2 / 3;
+      config.extendBeforeThreshold || (config.duration * 2) / 3;
     const isValidExtension = extendBeforeThreshold > config.duration - 100;
     if (isValidExtension) {
       throw new Error(
@@ -72,7 +72,11 @@ export class Lock {
   }
 
   constructor(
-    config: LockConfig & { adapters: Adapters; ownerId: string; logger: Logger },
+    config: LockConfig & {
+      adapters: Adapters;
+      ownerId: string;
+      logger: Logger;
+    },
   ) {
     this.config = this.getConfig(config);
     this.ownerId = config.ownerId;
@@ -80,7 +84,11 @@ export class Lock {
     this.logger = config.logger;
   }
 
-  createLockTimelineLogger(type: 'acquire' | 'extend' | 'release', resource: string, duration: number) {
+  createLockTimelineLogger(
+    type: "acquire" | "extend" | "release",
+    resource: string,
+    duration: number,
+  ) {
     const lockAttemptId = crypto.randomUUID();
     return {
       start: () => {
@@ -106,8 +114,8 @@ export class Lock {
           resourceId: resource,
           duration: duration,
         });
-      }
-    }
+      },
+    };
   }
 
   acquired = false;
@@ -115,7 +123,7 @@ export class Lock {
     const { resource, duration } = this.config;
     const expireAt = Date.now() + duration;
 
-    const logger = this.createLockTimelineLogger('acquire', resource, duration);
+    const logger = this.createLockTimelineLogger("acquire", resource, duration);
     logger.start();
 
     const acquired = await this.adapters.lock.acquire(
@@ -139,7 +147,7 @@ export class Lock {
     const { resource, duration } = this.config;
     const expireAt = Date.now() + duration;
 
-    const logger = this.createLockTimelineLogger('extend', resource, duration);
+    const logger = this.createLockTimelineLogger("extend", resource, duration);
     logger.start();
 
     const extended = await this.adapters.lock.extend(
@@ -159,13 +167,13 @@ export class Lock {
   async release() {
     const { resource } = this.config;
 
-    const logger = this.createLockTimelineLogger('extend', resource, 0);
+    const logger = this.createLockTimelineLogger("extend", resource, 0);
     logger.start();
 
     const released = await this.adapters.lock.release(resource, this.ownerId);
     if (!released) {
       logger.failed();
-      throw new LockReleaseError(resource, this.ownerId)
+      throw new LockReleaseError(resource, this.ownerId);
     }
 
     logger.success();

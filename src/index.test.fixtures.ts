@@ -48,10 +48,9 @@ export class OrderBook extends Spawnkit.Instance<
   }
 }
 
-
 export class BadExample extends Spawnkit.Instance {
-  __INTERNAL__ = 'this is bad';
-  example() { }
+  __INTERNAL__ = "this is bad";
+  example() {}
 }
 
 export class EmptyResponseInstance extends Spawnkit.Instance {

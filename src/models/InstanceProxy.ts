@@ -36,8 +36,8 @@ export type InstanceEventStreamMessage =
 
 export interface InstanceEventChannels {
   [key: `kind:${string}:id:${string}:event:${string}`]:
-  | InstanceEventRequestMessage
-  | InstanceEventStreamMessage;
+    | InstanceEventRequestMessage
+    | InstanceEventStreamMessage;
 }
 
 type Emit<Channels extends Record<string, any>> = <
@@ -68,7 +68,7 @@ export const HEALTH_CHECK_INTERVAL = 5000;
 export const HEALTH_CHECK_NOTIFY_PER_INTERVAL = 3;
 
 interface MessageContext {
-  event: InstanceMethodCall,
+  event: InstanceMethodCall;
   messageId: EventId;
   metadata: ScheduledCallMetaData;
 }
@@ -85,11 +85,11 @@ export class InstanceProxy<Inst extends Instance> {
   public abortSignal: AbortSignal;
 
   constructor(config: {
-    logger: Logger,
-    instance: Inst,
-    config: InstanceIdentifier,
-    adapters: Adapters,
-    abortSignal: AbortSignal,
+    logger: Logger;
+    instance: Inst;
+    config: InstanceIdentifier;
+    adapters: Adapters;
+    abortSignal: AbortSignal;
   }) {
     this.logger = config.logger;
     this.config = config.config;
@@ -159,7 +159,7 @@ export class InstanceProxy<Inst extends Instance> {
         const method = this.instance[action]?.bind(this.instance);
         const methodExists = typeof method == "function";
         if (!methodExists) throw new Error("Bad Request: Method not found");
-        return method?.(...args)
+        return method?.(...args);
       })
       .then((res) => [null, res])
       .catch((err) => [err, null]);
@@ -185,14 +185,11 @@ export class InstanceProxy<Inst extends Instance> {
           id: messageId,
           result,
         });
-      }
-    }
+      },
+    };
   }
 
-  createResultHandler(
-    messageId: EventId,
-    event: InstanceMethodCall,
-  ) {
+  createResultHandler(messageId: EventId, event: InstanceMethodCall) {
     const startedAt = Date.now();
     const reponseContext: MessageContext = {
       messageId,
@@ -204,11 +201,11 @@ export class InstanceProxy<Inst extends Instance> {
           stream: null,
           data: null,
           error: null,
-        }
+        },
       },
     };
 
-    return async (result: { error: Error, response: any }) => {
+    return async (result: { error: Error; response: any }) => {
       const isStream = result.response instanceof Stream;
       const response = isStream
         ? await this.handleStreamResult(result.response, reponseContext)
@@ -231,7 +228,6 @@ export class InstanceProxy<Inst extends Instance> {
       await this.respond(context, {
         error: serializedError,
       });
-
     } else {
       context.metadata.response.data = result.response;
       await this.respond(context, {
@@ -244,10 +240,7 @@ export class InstanceProxy<Inst extends Instance> {
     return promise.await;
   }
 
-  handleStreamResult(
-    stream: Stream<any>,
-    context: MessageContext,
-  ) {
+  handleStreamResult(stream: Stream<any>, context: MessageContext) {
     const promise = this.keepAlive.addControlled();
     context.metadata.response.stream = [];
     let steamIdx = 0;
@@ -328,8 +321,9 @@ export class InstanceProxy<Inst extends Instance> {
       this.aborted.resolve(true);
     });
 
-    await this.keepAliveUntilNothingHappens()
-      .finally(() => syncAbort.dispose());
+    await this.keepAliveUntilNothingHappens().finally(() =>
+      syncAbort.dispose(),
+    );
   }
 
   public async dispose() {
@@ -376,7 +370,10 @@ export class InstanceProxy<Inst extends Instance> {
     this.healthCheckInterval = ControlledInterval.new({
       interval: HEALTH_CHECK_INTERVAL / HEALTH_CHECK_NOTIFY_PER_INTERVAL,
       execute: (count) => {
-        const channelId = Client.getChannelForEventBus("__INTERNAL__", 'health');
+        const channelId = Client.getChannelForEventBus(
+          "__INTERNAL__",
+          "health",
+        );
         return this.runExternalEffect(async () => {
           return await this.adapters.messages.publish(
             this.instance,
@@ -428,7 +425,7 @@ export class InstanceProxy<Inst extends Instance> {
     // only when mode is normal, we should respond
     // when mode is 'scheduled' or 'skip' we should not respond
     // since there is no client waiting for the response
-    const shouldRespond = context.event.mode === 'normal';
+    const shouldRespond = context.event.mode === "normal";
     if (!shouldRespond) {
       return;
     }
@@ -467,7 +464,10 @@ export class InstanceProxy<Inst extends Instance> {
   // );
 
   public async emit(channel: string, data: any) {
-    const channelID = Client.getChannelForEventBus("instance", channel.toString());
+    const channelID = Client.getChannelForEventBus(
+      "instance",
+      channel.toString(),
+    );
     return this.runExternalEffect(async () => {
       return await this.adapters.messages.publish(
         this.instance,
@@ -487,7 +487,7 @@ export class InstanceProxy<Inst extends Instance> {
     this.aborted.await.finally(() => disposeListener());
 
     return {
-      dispose: disposeListener
+      dispose: disposeListener,
     };
   }
 

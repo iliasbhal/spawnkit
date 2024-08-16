@@ -65,7 +65,9 @@ export class Queue<O extends SpawnkitConfig> {
   ) {
     const Instance = this.instances[instanceConfig.kind];
     if (!Instance) {
-      throw new Error(`Instance Kind Not Implemented (received: ${instanceConfig.kind})`);
+      throw new Error(
+        `Instance Kind Not Implemented (received: ${instanceConfig.kind})`,
+      );
     }
 
     // When instantiating a new instance, we should acquire a lock
@@ -101,7 +103,7 @@ export class Queue<O extends SpawnkitConfig> {
         });
 
         await proxy.start();
-      })
+      });
     } catch (err) {
       const shouldSilenceError =
         err instanceof Lock.AcquireLockError ||
@@ -109,7 +111,7 @@ export class Queue<O extends SpawnkitConfig> {
         err instanceof Lock.ReleaseError;
       if (!shouldSilenceError) {
         console.error(err);
-        throw err;;
+        throw err;
       }
     }
 

@@ -1,11 +1,9 @@
-
 export class RemoteError extends Error {
   static deserialize(serializedError: { message: string; name: string }) {
     const error = new RemoteError();
     Object.assign(error, serializedError);
     return error;
   }
-
 
   static serialize(error: Error) {
     if (!error) {
