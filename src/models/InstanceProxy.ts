@@ -376,7 +376,14 @@ export class InstanceProxy<Inst extends Instance> {
     this.healthCheckInterval = ControlledInterval.new({
       interval: HEALTH_CHECK_INTERVAL / HEALTH_CHECK_NOTIFY_PER_INTERVAL,
       execute: () => {
-        this.emit("health", { status: "ok" })
+        const channelId = Client.getChannelForEventBus("__INTERNAL__", 'health');
+        return this.runExternalEffect(async () => {
+          return await this.adapters.messages.publish(
+            this.instance,
+            channelId,
+            { health: true },
+          );
+        });
       },
     });
   }
@@ -447,6 +454,14 @@ export class InstanceProxy<Inst extends Instance> {
       context.metadata,
     );
   }
+
+  // const subscription = this.adapters.messages.subscribe<InternalMessageData>(
+  //   instanceIdentifier,
+  //   Client.getChannelForEventBus("__INTERNAL__", 'health'),
+  //   (message) => {
+  //     healthTimeout.reset();
+  //   },
+  // );
 
   public async emit(channel: string, data: any) {
     const channelID = Client.getChannelForEventBus("instance", channel.toString());
