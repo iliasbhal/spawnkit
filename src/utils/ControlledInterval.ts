@@ -3,12 +3,12 @@ import { wait } from "./wait";
 
 interface ControlledIntervalConfig {
   interval: number;
-  execute: () => unknown;
+  execute: (count: number) => unknown;
 }
 
 export class ControlledInterval {
   interval: number;
-  execute: () => unknown;
+  execute: (count: number) => unknown;
   promiseCtl = new ControlledPromise<boolean>();
 
   constructor(config: ControlledIntervalConfig) {
@@ -45,7 +45,7 @@ export class ControlledInterval {
           break polling;
         }
 
-        const response = this.execute();
+        const response = this.execute(loopCount);
         if (response instanceof Promise) {
           await response.catch((error) => {
             this.promiseCtl.reject(error);

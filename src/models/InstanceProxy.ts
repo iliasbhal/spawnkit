@@ -375,13 +375,16 @@ export class InstanceProxy<Inst extends Instance> {
   public continouslyEmitHealthCheckSignal() {
     this.healthCheckInterval = ControlledInterval.new({
       interval: HEALTH_CHECK_INTERVAL / HEALTH_CHECK_NOTIFY_PER_INTERVAL,
-      execute: () => {
+      execute: (count) => {
         const channelId = Client.getChannelForEventBus("__INTERNAL__", 'health');
         return this.runExternalEffect(async () => {
           return await this.adapters.messages.publish(
             this.instance,
             channelId,
-            { health: true },
+            {
+              health: true,
+              count,
+            },
           );
         });
       },
