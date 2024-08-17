@@ -3,6 +3,7 @@ import { ControlledPromise } from "@/utils/ControlledPromise";
 import { ControlledTimeout } from "@/utils/ControlledTimeout";
 import { Stream } from "@/models/Stream";
 import { Instance } from "./Instance";
+import { HealthCheckEmitter } from "./HealthCheck";
 import {
   Adapters,
   InstanceIdentifier,
@@ -15,7 +16,6 @@ import { Client } from "./Client";
 import { Data } from "./Data";
 import { Logger } from "./Logger";
 import { RemoteError } from "./RemoteError";
-import { ControlledInterval } from "@/utils/ControlledInterval";
 
 export interface InstanceProps {
   kind: string;
@@ -36,8 +36,8 @@ export type InstanceEventStreamMessage =
 
 export interface InstanceEventChannels {
   [key: `kind:${string}:id:${string}:event:${string}`]:
-    | InstanceEventRequestMessage
-    | InstanceEventStreamMessage;
+  | InstanceEventRequestMessage
+  | InstanceEventStreamMessage;
 }
 
 type Emit<Channels extends Record<string, any>> = <
@@ -63,9 +63,6 @@ export interface InterfaceAPI<
   emit: Emit<InstanceChannels>;
   waitFor: (promise: Promise<any>) => any;
 }
-
-export const HEALTH_CHECK_INTERVAL = 5000;
-export const HEALTH_CHECK_NOTIFY_PER_INTERVAL = 3;
 
 interface MessageContext {
   event: InstanceMethodCall;
@@ -330,7 +327,7 @@ export class InstanceProxy<Inst extends Instance> {
     if (!this.running) return;
     this.running = false;
     this.onEventSubscription?.unsubscribe();
-    this.healthCheckInterval?.dispose();
+    this.healthCheckEmitter?.dispose();
     this.trace({ type: "proxy:dispose" });
 
     // When the instance receives the 'dispose' event
@@ -365,27 +362,10 @@ export class InstanceProxy<Inst extends Instance> {
     await pending.await;
   }
 
-  public healthCheckInterval: ControlledInterval | undefined;
+  public healthCheckEmitter: HealthCheckEmitter | undefined;
   public continouslyEmitHealthCheckSignal() {
-    this.healthCheckInterval = ControlledInterval.new({
-      interval: HEALTH_CHECK_INTERVAL / HEALTH_CHECK_NOTIFY_PER_INTERVAL,
-      execute: (count) => {
-        const channelId = Client.getChannelForEventBus(
-          "__INTERNAL__",
-          "health",
-        );
-        return this.runExternalEffect(async () => {
-          return await this.adapters.messages.publish(
-            this.instance,
-            channelId,
-            {
-              health: true,
-              count,
-            },
-          );
-        });
-      },
-    });
+    this.healthCheckEmitter = new HealthCheckEmitter(this.adapters, this.instance);
+    this.healthCheckEmitter.start();
   }
 
   public onEventSubscription: { unsubscribe: Function } | undefined;

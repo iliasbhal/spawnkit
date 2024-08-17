@@ -3,7 +3,6 @@ import type {
   InstanceEventChannels,
   InstanceEventStreamMessage,
 } from "./InstanceProxy";
-import { HEALTH_CHECK_INTERVAL } from "./InstanceProxy";
 import { ClientStream } from "./ClientStream";
 import { RemoteError } from "./RemoteError";
 import {
@@ -17,6 +16,7 @@ import {
   BaseAdapter,
 } from "../adapters";
 import { ClientData } from "./ClientData";
+import { HealthCheckListener } from './HealthCheck';
 import { Queue } from "./Queue";
 import { nanoid } from "nanoid";
 
@@ -97,13 +97,6 @@ export class Client<CP extends SpawnkitConfig> {
     channel: Channel,
   ) {
     return `broadcast:${type}:${channel}` as const;
-  }
-
-  static getChannelForHealthSignal<Channel extends string>(
-    type: string,
-    channel: Channel,
-  ) {
-    return `broadcast:${type}:${channel}:__INTERNAL__health` as const;
   }
 
   worker: Queue<any> | null = null;
@@ -188,64 +181,6 @@ export class Client<CP extends SpawnkitConfig> {
       return eventId;
     };
 
-    const createHealthSignal = () => {
-      const abortCtl = new AbortController();
-
-      const createHealthTimeout = () => {
-        return {
-          id: null as any,
-          start: () => {
-            healthTimeout.id = setTimeout(
-              () => abortCtl.abort(),
-              HEALTH_CHECK_INTERVAL,
-            );
-          },
-          reset: () => {
-            healthTimeout.dispose();
-            healthTimeout.start();
-          },
-          dispose: () => {
-            if (healthTimeout.id) clearTimeout(healthTimeout.id);
-          },
-        };
-      };
-
-      const healthTimeout = createHealthTimeout();
-      healthTimeout.start();
-      const subscription =
-        this.adapters.messages.subscribe<InternalMessageData>(
-          instanceIdentifier,
-          Client.getChannelForEventBus("__INTERNAL__", "health"),
-          (message) => {
-            healthTimeout.reset();
-          },
-        );
-
-      const onAbortCallbacks: (() => void)[] = [];
-      const addAbortCallback = (abortCallback: () => void) => {
-        abortCtl.signal.addEventListener("abort", abortCallback);
-        onAbortCallbacks.push(abortCallback);
-      };
-
-      addAbortCallback(() => {
-        healthTimeout.dispose();
-      });
-
-      return {
-        signal: abortCtl.signal,
-        onAbort: addAbortCallback,
-        reset: () => healthTimeout.reset(),
-        unsunbscribe: () => {
-          subscription.unsubscribe();
-          healthTimeout.dispose();
-
-          onAbortCallbacks.forEach((callback) => {
-            abortCtl.signal.removeEventListener("abort", callback);
-          });
-        },
-      };
-    };
-
     const data = new ClientData<InstanceData>({
       adapters: this.adapters,
       instance: instanceIdentifier,
@@ -298,19 +233,21 @@ export class Client<CP extends SpawnkitConfig> {
 
           if (mode === "normal") {
             return new Promise((resolve, reject) => {
-              const healthCheck = createHealthSignal();
+              const healthCheck = new HealthCheckListener(this.adapters, instanceIdentifier);
+              healthCheck.start();
+
               const internalStream = new ClientStream();
               const scope = {
                 response: undefined as any,
               };
 
               const isDoneWaitingForResponse = () => {
-                healthCheck.unsunbscribe();
+                healthCheck.dispose();
                 internalStream.close();
                 scope.response?.unsubscribe();
               };
 
-              healthCheck.onAbort(() => {
+              healthCheck.onHealthCheckFailed(() => {
                 isDoneWaitingForResponse();
                 const error = new Error("Spawnkit Instance Timeout");
                 reject(error);
@@ -384,7 +321,9 @@ export class Client<CP extends SpawnkitConfig> {
         channel: Channel,
         callback: (data: InstanceChannels[Channel]) => any,
       ) => {
-        const healthCheck = createHealthSignal();
+        const healthCheck = new HealthCheckListener(this.adapters, instanceIdentifier);
+        healthCheck.start();
+
         const subscribe = this.adapters.messages.subscribe<
           InstanceChannels[Channel]
         >(
@@ -398,16 +337,15 @@ export class Client<CP extends SpawnkitConfig> {
 
         const dispose = () => {
           subscribe.unsubscribe();
-          healthCheck.unsunbscribe();
+          healthCheck.dispose();
         };
 
-        healthCheck.onAbort(() => {
+        healthCheck.onHealthCheckFailed(() => {
           dispose();
         });
 
         return {
           unsubscribe: () => {
-            healthCheck.unsunbscribe();
             dispose();
           },
         };
@@ -461,20 +399,20 @@ type ExtractMethods<T> = Pick<T, ExtractMethodNames<T>>;
 
 type MakeRemote<T> = {
   [K in keyof T]: T[K] extends (...args: any[]) => any
-    ? // If the function is sychronouse, we want to cast the return to a Promise
-      // And it it's already a promise, it's gonna stay a promise.
-      (...args: Parameters<T[K]>) => Promise<Awaited<ReturnType<T[K]>>>
-    : never;
+  ? // If the function is sychronouse, we want to cast the return to a Promise
+  // And it it's already a promise, it's gonna stay a promise.
+  (...args: Parameters<T[K]>) => Promise<Awaited<ReturnType<T[K]>>>
+  : never;
 };
 
 type MakeSkippable<T> = {
   [K in keyof T]: T[K] extends (...args: any[]) => any
-    ? (...args: Parameters<T[K]>) => Promise<boolean>
-    : never;
+  ? (...args: Parameters<T[K]>) => Promise<boolean>
+  : never;
 };
 
 type MakeSchedulable<T> = {
   [K in keyof T]: T[K] extends (...args: any[]) => any
-    ? (...args: Parameters<T[K]>) => Promise<ScheduleId>
-    : never;
+  ? (...args: Parameters<T[K]>) => Promise<ScheduleId>
+  : never;
 };
