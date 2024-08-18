@@ -9,7 +9,7 @@ interface ControlledIntervalConfig {
 export class ControlledInterval {
   interval: number;
   execute: (count: number) => unknown;
-  promiseCtl = new ControlledPromise<boolean>();
+  promiseCtl = new ControlledPromise<number>();
 
   constructor(config: ControlledIntervalConfig) {
     this.interval = config.interval;
@@ -25,7 +25,15 @@ export class ControlledInterval {
   live: boolean = false;
   dispose() {
     this.live = false;
-    this.promiseCtl.resolve(true);
+    this.resolve();
+  }
+
+  private resolve() {
+    this.promiseCtl.resolve(this.count);
+  }
+
+  private reject(error: Error) {
+    this.promiseCtl.reject(error);
   }
 
   get await() {
@@ -36,25 +44,26 @@ export class ControlledInterval {
     this.live = false;
   }
 
+  count = 0;
   start() {
     this.live = true;
     Promise.resolve().then(async () => {
-      let loopCount = 0;
+      this.count = 0;
       polling: while (this.live) {
         if (!this.live) {
           break polling;
         }
 
-        const response = this.execute(loopCount);
+        const response = this.execute(this.count);
         if (response instanceof Promise) {
           await response.catch((error) => {
-            this.promiseCtl.reject(error);
+            this.reject(error);
             this.dispose();
           });
         }
 
         await wait(this.interval);
-        loopCount++;
+        this.count++;
       }
     });
   }
