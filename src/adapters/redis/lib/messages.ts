@@ -1,11 +1,10 @@
+import { nanoid } from "nanoid";
+import SuperJSON from "superjson";
 import { Client } from "@/models/Client";
 import * as Adapters from "../../index";
 import { RedisAdapter } from "./_base";
 import { wait } from "../../../utils/wait";
 import { lerp } from "../../../utils/lerp";
-
-const { nanoid } = require("nanoid");
-const superjson = require("superjson");
 
 interface Message<DataShape> {
   id: Adapters.EventId;
@@ -40,7 +39,7 @@ export class MessageBroker
 
     pubsub.subscribe(clientChannel);
     pubsub.on("message", (clientChannel, message) => {
-      const parsed = superjson.parse(message) as any;
+      const parsed = SuperJSON.parse(message) as any;
 
       const callbacks = this.callbackByChannel.get(parsed.channel);
       if (callbacks) {
@@ -209,7 +208,7 @@ export class MessageBroker
   ) {
     await this.redis.publish(
       `spawnkit:pubsub-clients:${client}`,
-      superjson.stringify({
+      SuperJSON.stringify({
         channel,
         message,
       }),
@@ -299,7 +298,7 @@ export class MessageBroker
       this.redis.hset(
         channel + ":data",
         message.id,
-        superjson.stringify({ message, order }),
+        SuperJSON.stringify({ message, order }),
       ),
     ]);
 
@@ -315,12 +314,17 @@ export class MessageBroker
     Promise.resolve().then(async () => {
       const previousEventsIds = new Set();
       const loop = {
-        emptyRunsCount: 0,
         range: {
           from: 0,
           to: Infinity,
         },
       };
+
+      const waitBeforeNextPoll = this.createPolling({
+        minWaitTime: 0,
+        maxWaitTime: 500,
+        maxEmptyRuns: 25,
+      });
 
       while (!abortCtl.signal.aborted) {
         const timestampBeforeRequest = Date.now();
@@ -328,7 +332,7 @@ export class MessageBroker
         const events = rawEvents
           .map(
             (e) =>
-              superjson.parse(e) as Awaited<ReturnType<typeof this.publishMQ>>,
+              SuperJSON.parse(e) as Awaited<ReturnType<typeof this.publishMQ>>,
           )
           .sort((a, b) => a.order - b.order)
           .map((a) => a.message);
@@ -351,16 +355,7 @@ export class MessageBroker
         });
 
         const isEmptyRun = previousEventsIds.size === 0;
-        loop.emptyRunsCount = isEmptyRun ? loop.emptyRunsCount + 1 : 0;
-
-        const MIN_WAIT_TIME = 0;
-        const MAX_WAIT_TIME = 500;
-        const MAX_EMPTY_RUNS = 5;
-
-        const ratio =
-          Math.min(MAX_EMPTY_RUNS, loop.emptyRunsCount) / MAX_EMPTY_RUNS;
-        const waitTimeMs = lerp(MIN_WAIT_TIME, MAX_WAIT_TIME, ratio);
-        await wait(waitTimeMs);
+        await waitBeforeNextPoll(isEmptyRun);
       }
     });
 
@@ -368,6 +363,31 @@ export class MessageBroker
       unsubscribe: () => {
         abortCtl.abort();
       },
+    };
+  }
+
+  private createPolling(config: {
+    minWaitTime?: number;
+    maxWaitTime?: number;
+    maxEmptyRuns?: number;
+  }) {
+    let emptyRunCount = 0;
+
+    return async (isEmptyRun: boolean) => {
+      if (isEmptyRun) {
+        emptyRunCount++;
+      } else {
+        emptyRunCount = 0;
+      }
+
+      const MIN_WAIT_TIME = config.minWaitTime || 0;
+      const MAX_WAIT_TIME = config.maxWaitTime || 500;
+      const MAX_EMPTY_RUNS = config.maxEmptyRuns || 50;
+
+      const emptyRunCountClamped = Math.min(MAX_EMPTY_RUNS, emptyRunCount);
+      const ratio = emptyRunCountClamped / MAX_EMPTY_RUNS;
+      const waitTimeMs = lerp(MIN_WAIT_TIME, MAX_WAIT_TIME, ratio);
+      await wait(waitTimeMs);
     };
   }
 

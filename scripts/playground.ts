@@ -8,6 +8,8 @@ import * as instances from "../example/_index";
 import { nanoid } from "nanoid";
 import { Logger } from "@/models/Logger";
 import { Lock } from "@/models/Lock";
+import { ControlledInterval } from "@/utils/ControlledInterval";
+import { ControlledPromise } from "@/utils/ControlledPromise";
 
 const createAdapters = () => ({
   lock: new RedisAdapter.Lock(redis),
@@ -39,14 +41,15 @@ const main = async () => {
   await Promise.all([
     // verifyLock(),
     // severalClients(),
-    basicExample(),
-    //     // errorHandlingExample(),
+    // basicExample(),
+    performanceBenchmanrk(),
+    errorHandlingExample(),
     // streamExample(),
-    //     // streamWithErrors(),
+    // streamWithErrors(),
     // scheduleCallExample(),
     // emittedEventsExample(),
-    //     // exampleXState(),
-    //     // exampleData(),
+    // exampleXState(),
+    // exampleData(),
     // exampleBadCall(),
   ]);
 };
@@ -104,6 +107,87 @@ const verifyLock = async () => {
   await wait(3000);
 };
 
+const performanceBenchmanrk = async () => {
+  const orderBook = client.spawn("OrderBook", "BTC/EUR");
+  const waitForAllProcessed: Record<string, ControlledPromise<any>> = {};
+
+  const subscription1 = orderBook.on("orders", (event) => {
+    const [count, i] = event;
+    waitForAllProcessed[`${count}-${i}`]?.resolve?.(null);
+    console.log("ON CLIENT 1", event);
+  });
+
+  // const subscription2 = orderBook.on("orders", (event) => {
+  //   console.log("ON CLIENT 2", event);
+  // });
+
+  const tick = Math.random() > 0.5 ? "GOOG" : "APPL";
+
+  const timeSpentCalling: number[] = [];
+
+  const promiseList: Promise<any>[] = [];
+  const interval = ControlledInterval.new({
+    interval: 1,
+    execute: async (count) => {
+      console.log("COUNT", count);
+      if (count >= 1) {
+        interval.dispose();
+        return;
+      }
+
+      promiseList.push(
+        Promise.all(
+          Array.from({ length: 1 }).map(async (_, i) => {
+            const timerKey = `${count}-${i}`;
+            if (!waitForAllProcessed[timerKey]) {
+              waitForAllProcessed[timerKey] = ControlledPromise.new<any>();
+            }
+
+            const begin = Date.now();
+
+            await orderBook.emit("buyOrders", [count, i]);
+            // await orderBook.emit("buyOrders", [count, i]);
+
+            // orderBook.buy({
+            //   tick: `${count}`,
+            //   qty: i,
+            // });
+
+            const end = Date.now();
+            timeSpentCalling.push(end - begin);
+          }),
+        ),
+      );
+    },
+  });
+
+  const count = await interval.await;
+
+  await Promise.all(promiseList);
+
+  console.log("WAITING FOR ALL PROCESSED");
+  await Promise.all(Object.values(waitForAllProcessed).map((p) => p.await));
+
+  console.log("ALL PROCESSED");
+
+  const timeSpentComputing =
+    Object.values(waitForAllProcessed)
+      .map((p) => p.elasped)
+      .reduce((acc, curr) => acc + curr, 0) /
+    Object.values(waitForAllProcessed).length;
+
+  console.log(
+    "TIME SPENT CALLING",
+    timeSpentCalling.reduce((acc, curr) => acc + curr, 0) /
+      timeSpentCalling.length,
+  );
+  console.log("TIME SPENT COMPUTING", timeSpentComputing);
+  console.log("COUNT", count);
+
+  subscription1.unsubscribe();
+  // subscription2.unsubscribe();
+};
+
 const attributeExample = () => {
   const exampleInst = client.spawn("StreamExample", "Hector");
   console.log(exampleInst.kind, exampleInst.id);
@@ -117,29 +201,34 @@ const attributeExample = () => {
 
 const basicExample = async () => {
   const orderBook = client.spawn("OrderBook", "BTC/EUR");
-  const subscription = orderBook.on("orders", (event) => {
-    console.log("ON CLIENT 1", event);
+  const subscription1 = orderBook.on("orders", (event) => {
+    // console.log("ON CLIENT 1", event);
+  });
+
+  const subscription2 = orderBook.on("orders", (event) => {
+    // console.log("ON CLIENT 2", event);
   });
 
   // Example 1: call methods like the its a real reference.
   const uid = crypto.randomUUID();
   const tick = Math.random() > 0.5 ? "GOOG" : "APPL";
+
   const response = await orderBook.buy({
     tick,
-    qty: 10,
+    qty: 15,
   });
 
-  console.log("response", response);
+  // subscription2.unsubscribe();
+  // subscription1.unsubscribe();
 
-  const response2 = await orderBook.buy({ tick: "APPL", qty: 50 });
-  console.log("response2", response2);
+  // console.log("TIME SPENT", timeSpent.reduce((acc, curr) => acc + curr, 0) / timeSpent.length);
+  // const response2 = await orderBook.buy({ tick: "APPL", qty: 50 });
+  // console.log("response2", response2);
 
   // Example 2: call the methods but don't wait for the response
   // await orderBook.emit.buy({ tick: "APPL" });
   // console.log("SENT");
   //
-
-  subscription.unsubscribe();
 };
 
 const streamExample = async () => {
@@ -240,7 +329,7 @@ const emittedEventsExample = async () => {
   //   console.log("response", response, then - prev);
   // }, 25);
 
-  await wait(10_000);
+  // await wait(10_000);
   // clearInterval(intervalId);
 };
 
@@ -321,6 +410,7 @@ const errorHandlingExample = async () => {
   const errorExample = client.spawn("ErrorExample", "LOL");
 
   try {
+    await wait(0);
     const response = await errorExample.doSomething("aaa");
   } catch (err: any) {
     console.log(

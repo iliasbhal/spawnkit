@@ -1,3 +1,4 @@
+import SuperJSON from "superjson";
 import * as Adapters from "../../index";
 import { RedisAdapter } from "./_base";
 
@@ -15,7 +16,7 @@ export class Logger extends RedisAdapter implements Adapters.AdapterLogger {
     signal: Adapters.InstanceSignal,
   ) {
     const now = Date.now();
-    const serialized = JSON.stringify({
+    const serialized = SuperJSON.stringify({
       ...signal,
       timestamp: now,
     });
@@ -57,7 +58,9 @@ export class Logger extends RedisAdapter implements Adapters.AdapterLogger {
       0,
       -1,
     );
-    const logs = rawLogs.map((raw) => JSON.parse(raw));
+    const logs = rawLogs.map((raw) =>
+      SuperJSON.parse<Adapters.InstanceSignal>(raw),
+    );
     return logs;
   }
 

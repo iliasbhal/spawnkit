@@ -38,7 +38,7 @@ export class ControlledPromise<T> {
   }
 
   value: T | undefined = undefined;
-  _resolve: (value: T) => void = (value: T) => { };
+  _resolve: (value: T) => void = (value: T) => {};
   resolve(value: T) {
     if (this.value || this.error) return;
     if (this.state !== PROMISE_STATE.PENDING) return;
@@ -50,7 +50,7 @@ export class ControlledPromise<T> {
   }
 
   error: Error | undefined = undefined;
-  _reject: (value: typeof this.error) => void = (err) => { };
+  _reject: (value: typeof this.error) => void = (err) => {};
   reject(err: Error) {
     if (this.value || this.error) return;
     if (this.state !== PROMISE_STATE.PENDING) return;

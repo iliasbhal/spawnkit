@@ -16,7 +16,7 @@ import {
   BaseAdapter,
 } from "../adapters";
 import { ClientData } from "./ClientData";
-import { HealthCheckListener } from './HealthCheck';
+import { HealthCheckListener } from "./HealthCheck";
 import { Queue } from "./Queue";
 import { nanoid } from "nanoid";
 
@@ -233,7 +233,10 @@ export class Client<CP extends SpawnkitConfig> {
 
           if (mode === "normal") {
             return new Promise((resolve, reject) => {
-              const healthCheck = new HealthCheckListener(this.adapters, instanceIdentifier);
+              const healthCheck = new HealthCheckListener(
+                this.adapters,
+                instanceIdentifier,
+              );
               healthCheck.start();
 
               const internalStream = new ClientStream();
@@ -321,7 +324,10 @@ export class Client<CP extends SpawnkitConfig> {
         channel: Channel,
         callback: (data: InstanceChannels[Channel]) => any,
       ) => {
-        const healthCheck = new HealthCheckListener(this.adapters, instanceIdentifier);
+        const healthCheck = new HealthCheckListener(
+          this.adapters,
+          instanceIdentifier,
+        );
         healthCheck.start();
 
         const subscribe = this.adapters.messages.subscribe<
@@ -399,20 +405,20 @@ type ExtractMethods<T> = Pick<T, ExtractMethodNames<T>>;
 
 type MakeRemote<T> = {
   [K in keyof T]: T[K] extends (...args: any[]) => any
-  ? // If the function is sychronouse, we want to cast the return to a Promise
-  // And it it's already a promise, it's gonna stay a promise.
-  (...args: Parameters<T[K]>) => Promise<Awaited<ReturnType<T[K]>>>
-  : never;
+    ? // If the function is sychronouse, we want to cast the return to a Promise
+      // And it it's already a promise, it's gonna stay a promise.
+      (...args: Parameters<T[K]>) => Promise<Awaited<ReturnType<T[K]>>>
+    : never;
 };
 
 type MakeSkippable<T> = {
   [K in keyof T]: T[K] extends (...args: any[]) => any
-  ? (...args: Parameters<T[K]>) => Promise<boolean>
-  : never;
+    ? (...args: Parameters<T[K]>) => Promise<boolean>
+    : never;
 };
 
 type MakeSchedulable<T> = {
   [K in keyof T]: T[K] extends (...args: any[]) => any
-  ? (...args: Parameters<T[K]>) => Promise<ScheduleId>
-  : never;
+    ? (...args: Parameters<T[K]>) => Promise<ScheduleId>
+    : never;
 };

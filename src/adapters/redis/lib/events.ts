@@ -3,6 +3,7 @@ import * as BullMQ from "bullmq";
 import * as Adapters from "../../index";
 import { BaseQueue } from "./_base";
 import { nanoid } from "nanoid";
+import SuperJSON from "superjson";
 
 export class EventScheduler
   extends BaseQueue
@@ -140,12 +141,16 @@ export class EventScheduler
     }
 
     const scheduleMetadata: Adapters.ScheduleEventMetadata =
-      JSON.parse(rawScheduleMetadata);
+      SuperJSON.parse(rawScheduleMetadata);
     scheduleMetadata.canceled = true;
 
     await Promise.all([
       this.remove(scheduleId),
-      this.redis.hset(redisKey, scheduleId, JSON.stringify(scheduleMetadata)),
+      this.redis.hset(
+        redisKey,
+        scheduleId,
+        SuperJSON.stringify(scheduleMetadata),
+      ),
     ]);
 
     return true;
@@ -158,7 +163,7 @@ export class EventScheduler
     const redisKey = `spawnkit:scheduled:${kind}:${id}:index`;
     const rawScheduledEvents = await this.redis.hvals(redisKey);
 
-    const scheduledEvents = rawScheduledEvents.map((st) => JSON.parse(st));
+    const scheduledEvents = rawScheduledEvents.map((st) => SuperJSON.parse(st));
     return scheduledEvents as Adapters.ScheduleEventMetadata[];
   }
 
@@ -169,7 +174,7 @@ export class EventScheduler
     data: Data,
   ): Promise<true> {
     const redisKey = `spawnkit:scheduled:${kind}:${id}:status:${scheduleId}`;
-    await this.redis.lpush(redisKey, JSON.stringify(data));
+    await this.redis.lpush(redisKey, SuperJSON.stringify(data));
     return true;
   }
 
@@ -184,7 +189,7 @@ export class EventScheduler
     const fromIncluded = 0;
     const toIncluded = !last ? -1 : last; // -1 = LAST
     const members = await this.redis.lrange(redisKey, fromIncluded, toIncluded);
-    return members.map((m) => JSON.parse(m));
+    return members.map((m) => SuperJSON.parse(m));
   }
 
   private async register(
@@ -199,6 +204,6 @@ export class EventScheduler
     };
     const { kind, id } = config.instance;
     const redisKey = `spawnkit:scheduled:${kind}:${id}:index`;
-    await this.redis.hset(redisKey, scheduleId!, JSON.stringify(metaData));
+    await this.redis.hset(redisKey, scheduleId!, SuperJSON.stringify(metaData));
   }
 }

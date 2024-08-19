@@ -36,8 +36,8 @@ export type InstanceEventStreamMessage =
 
 export interface InstanceEventChannels {
   [key: `kind:${string}:id:${string}:event:${string}`]:
-  | InstanceEventRequestMessage
-  | InstanceEventStreamMessage;
+    | InstanceEventRequestMessage
+    | InstanceEventStreamMessage;
 }
 
 type Emit<Channels extends Record<string, any>> = <
@@ -204,6 +204,7 @@ export class InstanceProxy<Inst extends Instance> {
 
     return async (result: { error: Error; response: any }) => {
       const isStream = result.response instanceof Stream;
+
       const response = isStream
         ? await this.handleStreamResult(result.response, reponseContext)
         : await this.handleBasicResult(result, reponseContext);
@@ -212,8 +213,8 @@ export class InstanceProxy<Inst extends Instance> {
     };
   }
 
-  async handleBasicResult(
-    result: { error: Error; response: any },
+  async handleBasicResult<Response>(
+    result: { error: Error; response: Response },
     context: MessageContext,
   ) {
     const promise = this.keepAlive.addControlled();
@@ -364,7 +365,10 @@ export class InstanceProxy<Inst extends Instance> {
 
   public healthCheckEmitter: HealthCheckEmitter | undefined;
   public continouslyEmitHealthCheckSignal() {
-    this.healthCheckEmitter = new HealthCheckEmitter(this.adapters, this.instance);
+    this.healthCheckEmitter = new HealthCheckEmitter(
+      this.adapters,
+      this.instance,
+    );
     this.healthCheckEmitter.start();
   }
 

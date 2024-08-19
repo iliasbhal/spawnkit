@@ -10,8 +10,8 @@ export class PromiseList extends ControlledPromise<unknown> {
     });
   }
 
-  addControlled(name?: string) {
-    const promiseCtl = ControlledPromise.new(name);
+  addControlled<ResolvedValue>(name?: string) {
+    const promiseCtl = ControlledPromise.new<ResolvedValue>(name);
     this.add(promiseCtl.await);
     return promiseCtl;
   }

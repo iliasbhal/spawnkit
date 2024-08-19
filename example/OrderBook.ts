@@ -6,6 +6,7 @@ interface OrderBookData {
 }
 
 interface OrderBookEvent {
+  buyOrders: any[];
   orders: any[];
   alphachannel: string;
 }
@@ -23,12 +24,17 @@ export class OrderBook extends Spawnkit.Instance<
   OrderBookEvent
 > {
   on<C extends keyof OrderBookEvent>(channel: C, message: OrderBookEvent[C]) {
+    if (channel === "buyOrders") {
+      const mdg = message;
+      this.emit("orders", mdg as any);
+      return;
+    }
     // console.log("ON INSTANCE", this.id, channel, message);
   }
 
   async buy(order: Order) {
-    this.logger.log("-----BUYYYYY------");
-    console.log("___BUY___", order);
+    // this.logger.log("-----BUYYYYY------");
+    // console.log("___BUY___", order);
     // this.data = this.data || ({} as any);
     // this.data!.count = this.data?.count || 0;
     // this.data!.count++;
