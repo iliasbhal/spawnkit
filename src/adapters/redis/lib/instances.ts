@@ -43,7 +43,7 @@ export class InstanceScheduler
       },
       {
         autorun: false,
-        // concurrency: this.config.concurrency,
+        concurrency: 10 ** 9,
         connection: this.redis,
         prefix: this.queue.opts.prefix,
       },
