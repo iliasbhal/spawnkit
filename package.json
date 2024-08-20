@@ -1,6 +1,6 @@
 {
   "name": "spawnkit",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "main": "index.js",
   "author": "ilias.bhal@gmail.com",
   "type": "module",
