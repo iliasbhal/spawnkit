@@ -2,11 +2,11 @@ import { Redis } from "ioredis";
 import * as BullMQ from "bullmq";
 import * as Adapters from "../../index";
 import { BaseQueue } from "./_base";
+import { ControlledInterval } from "@/utils/ControlledInterval";
 
 export class InstanceScheduler
   extends BaseQueue
-  implements Adapters.AdapaterInstanceScheduler
-{
+  implements Adapters.AdapaterInstanceScheduler {
   queue: BullMQ.Queue<Adapters.InstanceIdentifier, any, string>;
   constructor(redis: Redis) {
     super(redis);
@@ -50,8 +50,26 @@ export class InstanceScheduler
     );
 
     worker.run();
+
+    // PAUSE NEW JOB FROM BEEING PROCESSED IF CPU IS GROWING TOO FAST
+    // const cpuCheckInterval = ControlledInterval.new({
+    //   interval: 1000,
+    //   execute: () => {
+    //     const cpuUsage = process.cpuUsage();
+    //     const isTooHigh = cpuUsage.user > 1000;
+    //     if (isTooHigh) {
+    //       if (worker.isRunning()) worker.pause();
+    //     } else {
+    //       if (worker.isPaused()) worker.resume();
+    //     }
+    //   },
+    // });
+
     return {
       unsubscribe() {
+        const DO_NOT_WAIT = true;
+        worker.pause(DO_NOT_WAIT);
+        // cpuCheckInterval.dispose();
         return worker.close();
       },
     };
