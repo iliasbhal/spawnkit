@@ -88,6 +88,32 @@ export class Client<CP extends SpawnkitConfig> {
 	}
 
 	worker: Queue<any> | null = null;
+
+	liveInstances = new Map<string, Set<string>>();
+	async runOnlyOneOfInstance<Callback extends () => Promise<void>>(
+		kind: string,
+		id: string,
+		callback: Callback,
+	) {
+		if (!this.liveInstances.get(kind)) {
+			this.liveInstances.set(kind, new Set<string>());
+		}
+
+		const liveInstances = this.liveInstances.get(kind)!;
+		if (liveInstances.has(id)) return false;
+
+		try {
+			liveInstances.add(id);
+			return await callback();
+		} finally {
+			liveInstances.delete(id);
+		}
+	}
+
+	isInstanceRunning(kind: string, id: string) {
+		return this.liveInstances.get(kind)?.has(id) || false;
+	}
+
 	public start() {
 		const forwardOptions = {
 			adapters: this.adapters,
@@ -128,6 +154,14 @@ export class Client<CP extends SpawnkitConfig> {
 		// This is mainly to avoid adding unnessessary pressure the backend.
 		const canScheduleInstance = this.shouldScheduleInstance(instanceId);
 		if (canScheduleInstance) {
+			const instanceAlreadyRunningOnThisWorker = this.isInstanceRunning(
+				kind.toString(),
+				instanceId,
+			);
+			if (instanceAlreadyRunningOnThisWorker) {
+				return;
+			}
+
 			this.adapters.instances.schedule({
 				id: instanceId,
 				kind: kind.toString(),
