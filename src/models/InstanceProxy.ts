@@ -416,7 +416,6 @@ export class InstanceProxy<Inst extends Instance> {
 
     const channelID = Client.getChannelForEventResponse(context.messageId);
     return this.runExternalEffect(async () => {
-      // console.log("EMIT REQUEST RESPONSE", data);
       return await this.adapters.messages.publish(
         this.instance,
         channelID,
