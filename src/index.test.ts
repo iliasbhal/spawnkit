@@ -5,98 +5,98 @@ import { redis } from "./adapters/redis/client";
 import * as Spawnkit from ".";
 import * as RedisAdapter from "./adapters/redis";
 import {
-  OrderBook,
-  EmptyResponseInstance,
-  BadExample,
-  IntrospectExample,
+	OrderBook,
+	EmptyResponseInstance,
+	BadExample,
+	IntrospectExample,
 } from "./index.test.fixtures";
 import { ControlledPromise } from "./utils/ControlledPromise";
 
 describe.only("Base", () => {
-  const createAdapters = () => ({
-    lock: new RedisAdapter.Lock(redis),
-    data: new RedisAdapter.Data(redis),
-    messages: new RedisAdapter.MessageBroker(redis),
-    events: new RedisAdapter.EventScheduler(redis),
-    instances: new RedisAdapter.InstanceScheduler(redis),
-    logger: new RedisAdapter.Logger(redis),
-  });
+	const createAdapters = () => ({
+		lock: new RedisAdapter.Lock(redis),
+		data: new RedisAdapter.Data(redis),
+		messages: new RedisAdapter.MessageBroker(redis),
+		events: new RedisAdapter.EventScheduler(redis),
+		instances: new RedisAdapter.InstanceScheduler(redis),
+		logger: new RedisAdapter.Logger(redis),
+	});
 
-  const client = Spawnkit.Client.from({
-    adapters: createAdapters(),
-    instances: {
-      OrderBook,
-      EmptyResponseInstance,
-      IntrospectExample,
-    },
-  });
+	const client = Spawnkit.Client.from({
+		adapters: createAdapters(),
+		instances: {
+			OrderBook,
+			EmptyResponseInstance,
+			IntrospectExample,
+		},
+	});
 
-  client.start();
+	client.start();
 
-  it("should not allow usage of reserved keywords", () => {
-    // RESERVED KEYWORDS are the properties that are used internally by the client
-    // And that are not part of the instance prototype
-    // ex: __INTERNAL__ , schedule, scheduled,
+	it("should not allow usage of reserved keywords", () => {
+		// RESERVED KEYWORDS are the properties that are used internally by the client
+		// And that are not part of the instance prototype
+		// ex: __INTERNAL__ , schedule, scheduled,
 
-    const createClient = () =>
-      Spawnkit.Client.from({
-        adapters: createAdapters(),
-        instances: {
-          BadExample,
-        },
-      });
+		const createClient = () =>
+			Spawnkit.Client.from({
+				adapters: createAdapters(),
+				instances: {
+					BadExample,
+				},
+			});
 
-    expect(createClient).toThrow();
-  });
+		expect(createClient).toThrow();
+	});
 
-  it("client can use instance methods", async () => {
-    const orderbook = client.spawn("OrderBook", "BTC/EUR");
+	it("client can use instance methods", async () => {
+		const orderbook = client.spawn("OrderBook", "BTC/EUR");
 
-    const randomNumber = Math.random();
-    const order = await orderbook.buy({ tick: "APPL", qty: randomNumber });
-    expect(order).toEqual({
-      success: true,
-      status: "pending...",
-      order: { tick: "APPL", qty: randomNumber },
-    });
-  });
+		const randomNumber = Math.random();
+		const order = await orderbook.buy({ tick: "APPL", qty: randomNumber });
+		expect(order).toEqual({
+			success: true,
+			status: "pending...",
+			order: { tick: "APPL", qty: randomNumber },
+		});
+	});
 
-  it("client is notified when instance emits event", async () => {
-    const orderbook = client.spawn("OrderBook", "BTC/EUR");
+	it("client is notified when instance emits event", async () => {
+		const orderbook = client.spawn("OrderBook", "BTC/EUR");
 
-    const hasBeenCalled = new ControlledPromise();
-    const ordersStub = jest
-      .fn()
-      .mockResolvedValue(true)
-      .mockImplementation((args) => hasBeenCalled.resolve(args));
+		const hasBeenCalled = new ControlledPromise();
+		const ordersStub = jest
+			.fn()
+			.mockResolvedValue(true)
+			.mockImplementation((args) => hasBeenCalled.resolve(args));
 
-    orderbook.on("orders", ordersStub);
-    orderbook.buy({ tick: "APPL", qty: 10 });
+		orderbook.on("orders", ordersStub);
+		orderbook.buy({ tick: "APPL", qty: 10 });
 
-    orderbook.data.on("count", (data) => {});
+		orderbook.data.on("count", (data) => {});
 
-    await hasBeenCalled.await;
-    await expect(ordersStub).toHaveBeenCalled();
-    await expect(ordersStub).toHaveBeenCalledTimes(1);
-  });
+		await hasBeenCalled.await;
+		await expect(ordersStub).toHaveBeenCalled();
+		await expect(ordersStub).toHaveBeenCalledTimes(1);
+	});
 
-  it("client resolves even if response is undefined", async () => {
-    const emptyInst = client.spawn("EmptyResponseInstance", "lol");
-    const response = await emptyInst.doSomethingAndReturnUndefined();
-    expect(response).toBeUndefined();
-  });
+	it("client resolves even if response is undefined", async () => {
+		const emptyInst = client.spawn("EmptyResponseInstance", "lol");
+		const response = await emptyInst.doSomethingAndReturnUndefined();
+		expect(response).toBeUndefined();
+	});
 
-  it("instances can know which id they are", async () => {
-    const exampleInst = client.spawn("IntrospectExample", "intro-123123132");
+	it("instances can know which id they are", async () => {
+		const exampleInst = client.spawn("IntrospectExample", "intro-123123132");
 
-    const info = await exampleInst.getInfo();
-    expect(info).toEqual({
-      id: "intro-123123132",
-      kind: "IntrospectExample",
-    });
-  });
+		const info = await exampleInst.getInfo();
+		expect(info).toEqual({
+			id: "intro-123123132",
+			kind: "IntrospectExample",
+		});
+	});
 
-  it.todo("can call for instance method and not wait for the resonse");
+	it.todo("can call for instance method and not wait for the resonse");
 });
 
 // describe("Errors", () => {

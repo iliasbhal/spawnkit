@@ -3,157 +3,154 @@ import { ControlledPromise } from "@/utils/ControlledPromise";
 type StreamBuilder<StreamValue> = (stream: Stream<StreamValue>) => any;
 
 interface CallbackByEvent<StreamValue> {
-  start: () => any;
-  data: (data: StreamValue) => any;
-  end: () => any;
-  error: (err: Error) => any;
+	start: () => any;
+	data: (data: StreamValue) => any;
+	end: () => any;
+	error: (err: Error) => any;
 }
 
 export class Stream<StreamValue> {
-  abortCtl = new AbortController();
-  callback: StreamBuilder<StreamValue>;
+	abortCtl = new AbortController();
+	callback: StreamBuilder<StreamValue>;
 
-  constructor(callback: StreamBuilder<StreamValue>) {
-    this.callback = callback;
-  }
+	constructor(callback: StreamBuilder<StreamValue>) {
+		this.callback = callback;
+	}
 
-  eventsHandlers = new Map<
-    keyof CallbackByEvent<StreamValue>,
-    Set<CallbackByEvent<StreamValue>[keyof CallbackByEvent<StreamValue>]>
-  >();
-  on<EV extends keyof CallbackByEvent<any>>(
-    event: EV,
-    callback: CallbackByEvent<StreamValue>[EV],
-  ) {
-    if (!this.eventsHandlers.has(event)) {
-      this.eventsHandlers.set(event, new Set());
-    }
+	eventsHandlers = new Map<
+		keyof CallbackByEvent<StreamValue>,
+		Set<CallbackByEvent<StreamValue>[keyof CallbackByEvent<StreamValue>]>
+	>();
+	on<EV extends keyof CallbackByEvent<any>>(event: EV, callback: CallbackByEvent<StreamValue>[EV]) {
+		if (!this.eventsHandlers.has(event)) {
+			this.eventsHandlers.set(event, new Set());
+		}
 
-    this.eventsHandlers.get(event)!.add(callback);
-  }
+		this.eventsHandlers.get(event)!.add(callback);
+	}
 
-  stored: any[] = [];
-  protected store(event: any, data?: any) {
-    if (this.started) {
-      this.unstore();
-      this.notify(event, data);
-      return;
-    }
+	stored: any[] = [];
+	protected store(event: any, data?: any) {
+		if (this.started) {
+			this.unstore();
+			this.notify(event, data);
+			return;
+		}
 
-    this.stored.push({ event, data });
-  }
+		this.stored.push({ event, data });
+	}
 
-  unstore() {
-    if (this.stored.length) {
-      this.stored.splice(0).forEach(({ event, data }) => {
-        this.notify(event, data);
-      });
-    }
-  }
+	unstore() {
+		if (this.stored.length) {
+			this.stored.splice(0).forEach(({ event, data }) => {
+				this.notify(event, data);
+			});
+		}
+	}
 
-  async map(callback: (data: StreamValue) => any) {
-    console.log("this closed", this.closed);
-    if (this.closed) return Promise.resolve();
+	async map(callback: (data: StreamValue) => any) {
+		console.log("this closed", this.closed);
+		if (this.closed) return Promise.resolve();
 
-    return await new Promise((resolve, reject) => {
-      this.on("end", () => resolve(true));
-      this.on("error", (err) => reject(err));
-      this.on("data", (data) => callback(data));
+		return await new Promise((resolve, reject) => {
+			this.on("end", () => resolve(true));
+			this.on("error", (err) => reject(err));
+			this.on("data", (data) => callback(data));
 
-      this.unstore();
-    });
-  }
+			this.unstore();
+		});
+	}
 
-  createIterator() {
-    const stream = this;
+	createIterator() {
+		const stream = this;
 
-    // The iterator should be able to Buffer the incoming messages
-    // and deliver them in order
-    return async function* () {
-      if (stream.closed) return;
+		// The iterator should be able to Buffer the incoming messages
+		// and deliver them in order
+		return async function* () {
+			if (stream.closed) return;
 
-      const incomingData: StreamValue[] = [];
-      let promiseCtl = new ControlledPromise();
+			const incomingData: StreamValue[] = [];
+			let promiseCtl = new ControlledPromise();
 
-      stream.on("error", (err) => {
-        promiseCtl.reject(err);
-      });
+			stream.on("error", (err) => {
+				promiseCtl.reject(err);
+			});
 
-      stream.on("data", (data) => {
-        incomingData.push(data);
-        promiseCtl.resolve(true);
-        promiseCtl = new ControlledPromise();
-      });
+			stream.on("data", (data) => {
+				incomingData.push(data);
+				promiseCtl.resolve(true);
+				promiseCtl = new ControlledPromise();
+			});
 
-      stream.on("end", () => {
-        promiseCtl.resolve(true);
-      });
+			stream.on("end", () => {
+				promiseCtl.resolve(true);
+			});
 
-      Promise.resolve().then(() => {
-        stream.unstore();
-      });
+			Promise.resolve().then(() => {
+				stream.unstore();
+			});
 
-      while (!stream.closed) {
-        await promiseCtl.await;
-        const dataToYield = incomingData.splice(0);
-        yield* dataToYield;
-      }
-    };
-  }
+			while (!stream.closed) {
+				await promiseCtl.await;
+				const dataToYield = incomingData.splice(0);
+				yield* dataToYield;
+			}
+		};
+	}
 
-  [Symbol.asyncIterator] = this.createIterator();
+	[Symbol.asyncIterator] = this.createIterator();
 
-  notify<EV extends keyof CallbackByEvent<StreamValue>>(
-    event: EV,
-    data?: Parameters<CallbackByEvent<StreamValue>[EV]>[0] extends never
-      ? never
-      : Parameters<CallbackByEvent<StreamValue>[EV]>[0],
-  ) {
-    if (this.closed) return;
-    if (event === "end") this.closed = true;
-    if (event === "start") this.started = true;
+	notify<EV extends keyof CallbackByEvent<StreamValue>>(
+		event: EV,
+		data?: Parameters<CallbackByEvent<StreamValue>[EV]>[0] extends never
+			? never
+			: Parameters<CallbackByEvent<StreamValue>[EV]>[0],
+	) {
+		if (this.closed) return;
+		if (event === "end") this.closed = true;
+		if (event === "start") this.started = true;
 
-    this.eventsHandlers.get(event)?.forEach((callback) => {
-      // @ts-ignore
-      callback(data);
-    });
-  }
+		this.eventsHandlers.get(event)?.forEach((callback) => {
+			// @ts-ignore
+			callback(data);
+		});
+	}
 
-  clear() {
-    this.eventsHandlers.clear();
-  }
+	clear() {
+		this.eventsHandlers.clear();
+	}
 
-  async ensureStarted() {
-    // if (this.started === false) {
-    //   await this.start();
-    // }
-  }
+	async ensureStarted() {
+		// if (this.started === false) {
+		//   await this.start();
+		// }
+	}
 
-  started = false;
-  async start() {
-    try {
-      this.notify("start");
-      await this.callback(this);
-    } catch (err) {
-      if (err instanceof Error) {
-        this.error(err);
-      }
-    } finally {
-      this.close();
-    }
-  }
+	started = false;
+	async start() {
+		try {
+			this.notify("start");
+			await this.callback(this);
+		} catch (err) {
+			if (err instanceof Error) {
+				this.error(err);
+			}
+		} finally {
+			this.close();
+		}
+	}
 
-  emit(data: StreamValue) {
-    this.store("data", data);
-  }
+	emit(data: StreamValue) {
+		this.store("data", data);
+	}
 
-  error(err: Error) {
-    this.store("error", err);
-    this.store("end");
-  }
+	error(err: Error) {
+		this.store("error", err);
+		this.store("end");
+	}
 
-  closed: boolean = false;
-  close() {
-    this.store("end");
-  }
+	closed: boolean = false;
+	close() {
+		this.store("end");
+	}
 }
