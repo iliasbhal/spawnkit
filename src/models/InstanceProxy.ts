@@ -151,12 +151,12 @@ export class InstanceProxy<Inst extends Instance> {
     // We still catch the error if one happens.
     logger.start(event);
     const [error, response] = await Promise.resolve()
-      .then(() => {
+      .then(async () => {
         // @ts-ignore
         const method = this.instance[action]?.bind(this.instance);
         const methodExists = typeof method == "function";
         if (!methodExists) throw new Error("Bad Request: Method not found");
-        return method?.(...args);
+        return await method?.(...args);
       })
       .then((res) => [null, res])
       .catch((err) => [err, null]);
