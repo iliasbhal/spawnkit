@@ -11,7 +11,7 @@ export class RedisAdapter extends BaseAdapter {
     this.redis = redis;
   }
 
-  clone() {
+  getNewRedisClient() {
     const redisConfig = this.redis.options;
     const client = new Redis(redisConfig);
     return client;

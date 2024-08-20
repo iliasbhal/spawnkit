@@ -16,8 +16,7 @@ interface Message<DataShape> {
 
 export class MessageBroker
   extends RedisAdapter
-  implements Adapters.AdapaterMessageBroker
-{
+  implements Adapters.AdapaterMessageBroker {
   link(client: Client<any>): void {
     super.link(client);
     this.initializeGlobalPubSub();
@@ -34,11 +33,11 @@ export class MessageBroker
   }
 
   initializeGlobalPubSub() {
-    const pubsub = this.clone();
+    const redis = this.getNewRedisClient();
     const clientChannel = this.getClientChannel();
 
-    pubsub.subscribe(clientChannel);
-    pubsub.on("message", (clientChannel, message) => {
+    redis.subscribe(clientChannel);
+    redis.on("message", (clientChannel, message) => {
       const parsed = SuperJSON.parse(message) as any;
 
       const callbacks = this.callbackByChannel.get(parsed.channel);
@@ -51,7 +50,7 @@ export class MessageBroker
 
     return {
       unsubscribe() {
-        pubsub.unsubscribe();
+        redis.unsubscribe();
       },
     };
   }
@@ -329,6 +328,8 @@ export class MessageBroker
       while (!abortCtl.signal.aborted) {
         const timestampBeforeRequest = Date.now();
         const rawEvents = await this.getLatestMessagesRaw(channel, loop.range);
+        loop.range.from = timestampBeforeRequest;
+
         const events = rawEvents
           .map(
             (e) =>
@@ -336,8 +337,6 @@ export class MessageBroker
           )
           .sort((a, b) => a.order - b.order)
           .map((a) => a.message);
-
-        loop.range.from = timestampBeforeRequest;
 
         if (events.length) {
           events.forEach((event) => {
