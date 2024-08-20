@@ -17,14 +17,43 @@ export class Queue<O extends SpawnkitConfig> {
     this.client = client;
   }
 
+  currentlyProcessingInstances = new Map<string, Set<string>>();
+  getCurrentlyProcessingInstances(kind: string): Set<string> {
+    if (!this.currentlyProcessingInstances.get(kind)) {
+      this.currentlyProcessingInstances.set(kind, new Set<string>());
+    }
+
+    return this.currentlyProcessingInstances.get(kind)!;
+  }
+
+  ensureOnlyOne(kind: string, id: string) {
+    const liveInstances = this.getCurrentlyProcessingInstances(kind)
+    if (liveInstances.has(id)) {
+      return { alreadyOneRunning: true, instanceIsDoneRunning: () => { } };
+    }
+
+    liveInstances.add(id);
+    return {
+      alreadyOneRunning: false,
+      instanceIsDoneRunning: () => {
+        liveInstances.delete(id);
+      },
+    };
+  }
+
   start() {
     const eventSub = this.adapters.events.subscribe(async (data, context) => {
-      return await this.callInstanceMethod(data, context);
+      return await this.callScheduledInstanceMethod(data, context);
     });
 
     const instancesSub = this.adapters.instances.subscribe(
       async (data, context) => {
-        return await this.tryInstantiateInstance(data);
+        const ctl = this.ensureOnlyOne(data.kind, data.id);
+        if (ctl.alreadyOneRunning) return;
+
+        await this.tryInstantiateInstance(data);
+
+        ctl.instanceIsDoneRunning();
       },
     );
 
@@ -39,7 +68,7 @@ export class Queue<O extends SpawnkitConfig> {
     this.stopCallback?.();
   }
 
-  private async callInstanceMethod(
+  private async callScheduledInstanceMethod(
     scheduleEvent: ScheduleByType["event"],
     context: ScheduleContext,
   ) {
