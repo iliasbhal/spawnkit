@@ -24,7 +24,7 @@ export class ControlledInterval {
 
   live: boolean = false;
   dispose() {
-    this.live = false;
+    this.stop();
     this.resolve();
   }
 
