@@ -3,11 +3,11 @@
   "version": "0.0.8",
   "main": "index.js",
   "author": "ilias.bhal@gmail.com",
-  "type": "module",
   "license": "MIT",
   "scripts": {
     "docker": "docker-compose --env-file .env -f ./docker/compose.yml up --build",
     "playground": "bun run --watch  ./scripts/playground.ts",
+    "benchmark": "bun run --watch  ./scripts/benchmark.ts",
     "lint": "prettier --write \"**/*.{ts,tsx,js,jsx}\"",
     "test": "jest"
   },
@@ -28,6 +28,7 @@
     "redis-memory-server": "^0.10.0",
     "ts-jest": "^29.1.2",
     "ts-node": "^10.9.2",
+    "tsx": "^4.18.0",
     "typescript": "^5.4.3"
   },
   "peerDependencies": {
