@@ -57,7 +57,7 @@ export class Lock {
 			throw new Error("Duration must be an integer value in milliseconds.");
 		}
 
-		const extendBeforeThreshold = config.extendBeforeThreshold || (config.duration * 2) / 3;
+		const extendBeforeThreshold = config.extendBeforeThreshold || config.duration / 2;
 		const isValidExtension = extendBeforeThreshold > config.duration - 100;
 		if (isValidExtension) {
 			throw new Error(

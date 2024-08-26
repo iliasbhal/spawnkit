@@ -69,21 +69,22 @@ export class Queue<O extends SpawnkitConfig> {
 		// When instantiating a new instance, we should acquire a lock
 		// So that only one worker in the cloud is instantiating the instance
 		// This is to prevent from executing side effects twice and race conditions.
-		const executionId = nanoid();
+		const ownerId = nanoid();
 		const logger = new Logger({
 			adapters: this.adapters,
-			groupId: executionId,
+			ownerId: ownerId,
 			instance: instanceConfig,
 		});
 
-		const MIN_LOCK_DURATION = 2_000;
+		const MIN_LOCK_DURATION = 5_000;
 		const RESOURCE_ID = `${instanceConfig.kind}:${instanceConfig.id}`;
 		const lock = new Lock({
 			adapters: this.adapters,
-			ownerId: executionId,
+			ownerId: ownerId,
 			resource: RESOURCE_ID,
 			instance: instanceConfig,
 			duration: MIN_LOCK_DURATION,
+			extendBeforeThreshold: MIN_LOCK_DURATION / 2,
 			logger,
 		});
 

@@ -34,16 +34,17 @@ const main = async () => {
 	console.log("-----");
 	console.log("-----");
 	console.log("-----");
-	await redis.flushall("SYNC");
+	// await redis.flushall("SYNC");
 	client.start();
 
 	//   // attributeExample();
 	await Promise.all([
-		// verifyLock(),
 		// severalClients(),
 		// basicExample(),
-		performanceBenchmanrk(),
-		errorHandlingExample(),
+		// performanceBenchmanrk(),
+		// performanceBenchmanrk(),
+		// performanceBenchmanrk(),
+		// errorHandlingExample(),
 		// streamExample(),
 		// streamWithErrors(),
 		// scheduleCallExample(),
@@ -52,138 +53,6 @@ const main = async () => {
 		// exampleData(),
 		// exampleBadCall(),
 	]);
-};
-
-const verifyLock = async () => {
-	const createLock = async (kind: string, id: string) => {
-		const executionId = nanoid();
-		const instanceConfig = {
-			kind,
-			id,
-		};
-
-		const adapters = createAdapters();
-		const logger = new Logger({
-			adapters: adapters,
-			groupId: executionId,
-			instance: instanceConfig,
-		});
-
-		const MIN_LOCK_DURATION = 2_000;
-		const RESOURCE_ID = `${instanceConfig.kind}:${instanceConfig.id}`;
-		return new Lock({
-			adapters: adapters,
-			ownerId: executionId,
-			resource: RESOURCE_ID,
-			instance: instanceConfig,
-			duration: MIN_LOCK_DURATION,
-			logger,
-		});
-	};
-
-	const lock1 = await createLock("OrderBook", "BTC/USD");
-
-	lock1
-		.using(async () => {
-			await wait(2000);
-		})
-		.catch((err) => {
-			console.log("LOCK 1 ERROR", err);
-		});
-
-	await wait(600);
-
-	Array.from({ length: 1 }).forEach(async () => {
-		const lock2 = await createLock("OrderBook", "BTC/USD");
-		lock2
-			.using(async () => {
-				await wait(2000);
-			})
-			.catch((err) => {
-				console.log("LOCK 2 ERROR", err);
-			});
-	});
-
-	await wait(3000);
-};
-
-const performanceBenchmanrk = async () => {
-	const orderBook = client.spawn("OrderBook", "BTC/EUR");
-	const waitForAllProcessed: Record<string, ControlledPromise<any>> = {};
-
-	const subscription1 = orderBook.on("orders", (event) => {
-		const [count, i] = event;
-		waitForAllProcessed[`${count}-${i}`]?.resolve?.(null);
-		console.log("ON CLIENT 1", event);
-	});
-
-	// const subscription2 = orderBook.on("orders", (event) => {
-	//   console.log("ON CLIENT 2", event);
-	// });
-
-	const tick = Math.random() > 0.5 ? "GOOG" : "APPL";
-
-	const timeSpentCalling: number[] = [];
-
-	const promiseList: Promise<any>[] = [];
-	const interval = ControlledInterval.new({
-		interval: 1,
-		execute: async (count) => {
-			console.log("COUNT", count);
-			if (count >= 1) {
-				interval.dispose();
-				return;
-			}
-
-			promiseList.push(
-				Promise.all(
-					Array.from({ length: 1 }).map(async (_, i) => {
-						const timerKey = `${count}-${i}`;
-						if (!waitForAllProcessed[timerKey]) {
-							waitForAllProcessed[timerKey] = ControlledPromise.new<any>();
-						}
-
-						const begin = Date.now();
-
-						await orderBook.emit("buyOrders", [count, i]);
-						// await orderBook.emit("buyOrders", [count, i]);
-
-						// orderBook.buy({
-						//   tick: `${count}`,
-						//   qty: i,
-						// });
-
-						const end = Date.now();
-						timeSpentCalling.push(end - begin);
-					}),
-				),
-			);
-		},
-	});
-
-	const count = await interval.await;
-
-	await Promise.all(promiseList);
-
-	console.log("WAITING FOR ALL PROCESSED");
-	await Promise.all(Object.values(waitForAllProcessed).map((p) => p.await));
-
-	console.log("ALL PROCESSED");
-
-	const timeSpentComputing =
-		Object.values(waitForAllProcessed)
-			.map((p) => p.elasped)
-			.reduce((acc, curr) => acc + curr, 0) / Object.values(waitForAllProcessed).length;
-
-	console.log(
-		"TIME SPENT CALLING",
-		timeSpentCalling.reduce((acc, curr) => acc + curr, 0) / timeSpentCalling.length,
-	);
-	console.log("TIME SPENT COMPUTING", timeSpentComputing);
-	console.log("COUNT", count);
-
-	subscription1.unsubscribe();
-	// subscription2.unsubscribe();
 };
 
 const attributeExample = () => {

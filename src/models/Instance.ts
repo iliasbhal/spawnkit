@@ -1,7 +1,11 @@
-import { InstanceSignal } from "@/adapters";
+import { InstanceLog } from "@/adapters";
 import type { InterfaceAPI } from "./InstanceProxy";
 
 type AnyRecord = { [key: string]: any };
+
+type Prettify<T> = {
+	[K in keyof T]: T[K];
+} & {};
 
 export class Instance<
 	InstanceData extends AnyRecord = AnyRecord,
@@ -12,7 +16,9 @@ export class Instance<
 		InstanceChannels: InstanceChannels;
 	};
 
-	signal(signal: InstanceSignal) {}
+	signal(signal: Prettify<InstanceLog>) {
+		signal;
+	}
 
 	// TODO: FIX TYPING HERE
 	// For some reason, adding types here break the client types.

@@ -1,7 +1,7 @@
 # Spawnkit lib
 
-- Remove playground in favor of integration test suites
-     remove .data from client, it's redundant. and remove .data.on
+- add methods to logger based on logLevel and channel
+     ( .info .error. ... etc) for infra, per request.
 
 
 - Redis Logger should also make use of an object storage(s3) ??

@@ -133,6 +133,7 @@ export class Machine<
 	childActorDoneByActor = new Map<x.AnyActorRef, ControlledPromise<any>>();
 	private async handleChildActorCreateEvent(event: x.InspectedActorEvent) {
 		const actor = event.actorRef;
+
 		this.actorByActorId.set(actor.id, actor);
 
 		const isAlreadySubscribed = this.subscriptonByActor.has(actor.id);

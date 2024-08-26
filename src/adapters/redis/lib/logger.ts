@@ -9,12 +9,7 @@ import { RedisAdapter } from "./_base";
  * TODO: also output files ( easier to debug with );
  */
 export class Logger extends RedisAdapter implements Adapters.AdapterLogger {
-	async log(
-		kind: Adapters.InstanceKind,
-		id: Adapters.InstanceId,
-		groupId: string,
-		signal: Adapters.InstanceSignal,
-	) {
+	async log(instance: Adapters.InstanceIdentifier, ownerId: string, signal: Adapters.InstanceLog) {
 		const now = Date.now();
 		const serialized = SuperJSON.stringify({
 			...signal,
@@ -22,22 +17,21 @@ export class Logger extends RedisAdapter implements Adapters.AdapterLogger {
 		});
 
 		await Promise.all([
-			this.redis.zadd(`spawnkit:logs:${kind}:${id}:index`, now, groupId),
-			this.redis.lpush(`spawnkit:logs:${kind}:${id}:logs:${groupId}`, serialized),
+			this.redis.zadd(`spawnkit:logs:${instance.kind}:${instance.id}:index`, now, ownerId),
+			this.redis.lpush(`spawnkit:logs:${instance.kind}:${instance.id}:logs:${ownerId}`, serialized),
 		]);
 	}
 
 	/** list log groups for this instance */
 	async list(
-		kind: Adapters.InstanceKind,
-		id: Adapters.InstanceId,
+		instance: Adapters.InstanceIdentifier,
 		range: { from: number; to: number } = {
 			from: 0,
 			to: -1 /* -1 = until the last element */,
 		},
 	): Promise<string[]> {
 		return await this.redis.zrange(
-			`spawnkit:logs:${kind}:${id}:index`,
+			`spawnkit:logs:${instance.kind}:${instance.id}:index`,
 			range.from,
 			range.to,
 			"REV",
@@ -46,16 +40,22 @@ export class Logger extends RedisAdapter implements Adapters.AdapterLogger {
 
 	/* retieve all the logs from a log group */
 	async get(
-		kind: Adapters.InstanceKind,
-		id: Adapters.InstanceId,
-		groupId: string,
-	): Promise<Adapters.InstanceSignal[]> {
-		const rawLogs = await this.redis.lrange(`spawnkit:logs:${kind}:${id}:logs:${groupId}`, 0, -1);
-		const logs = rawLogs.map((raw) => SuperJSON.parse<Adapters.InstanceSignal>(raw));
+		instance: Adapters.InstanceIdentifier,
+		ownerId: string,
+	): Promise<Adapters.InstanceLog[]> {
+		const rawLogs = await this.redis.lrange(
+			`spawnkit:logs:${instance.kind}:${instance.id}:logs:${groupId}`,
+			0,
+			-1,
+		);
+		const logs = rawLogs.map((raw) => SuperJSON.parse<Adapters.InstanceLog>(raw));
 		return logs;
 	}
 
-	async delete(kind: string, id: string, range: { from: number; to: number }): Promise<any> {
+	async delete(
+		instance: Adapters.InstanceIdentifier,
+		range: { from: number; to: number },
+	): Promise<any> {
 		// TODO: add ability to delete logs
 	}
 }

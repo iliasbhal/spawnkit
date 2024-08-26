@@ -3,8 +3,7 @@ import SuperJSON from "superjson";
 import { Client } from "@/models/Client";
 import * as Adapters from "../../index";
 import { RedisAdapter } from "./_base";
-import { wait } from "../../../utils/wait";
-import { lerp } from "../../../utils/lerp";
+import { BackoffController } from "@/utils/BackoffContoller";
 
 interface Message<DataShape> {
 	id: Adapters.EventId;
@@ -283,22 +282,22 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 
 	private listenMQ(channel: string, callback: (event: any) => any) {
 		const abortCtl = new AbortController();
+		const previousEventsIds = new Set();
+		const loop = {
+			range: {
+				from: 0,
+				to: Infinity,
+			},
+		};
+
+		const backoff = BackoffController.new({
+			strategy: BackoffController.LERP,
+			minWaitTime: 0,
+			maxWaitTime: 1000,
+			stepCount: 25,
+		});
 
 		Promise.resolve().then(async () => {
-			const previousEventsIds = new Set();
-			const loop = {
-				range: {
-					from: 0,
-					to: Infinity,
-				},
-			};
-
-			const waitBeforeNextPoll = this.createPolling({
-				minWaitTime: 0,
-				maxWaitTime: 500,
-				maxEmptyRuns: 25,
-			});
-
 			while (!abortCtl.signal.aborted) {
 				const timestampBeforeRequest = Date.now();
 				const rawEvents = await this.getLatestMessagesRaw(channel, loop.range);
@@ -325,7 +324,8 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 				});
 
 				const isEmptyRun = previousEventsIds.size === 0;
-				await waitBeforeNextPoll(isEmptyRun);
+				if (isEmptyRun) backoff.reset();
+				await backoff.waitUntilNextAttempt();
 			}
 		});
 
@@ -333,31 +333,6 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 			unsubscribe: () => {
 				abortCtl.abort();
 			},
-		};
-	}
-
-	private createPolling(config: {
-		minWaitTime?: number;
-		maxWaitTime?: number;
-		maxEmptyRuns?: number;
-	}) {
-		let emptyRunCount = 0;
-
-		return async (isEmptyRun: boolean) => {
-			if (isEmptyRun) {
-				emptyRunCount++;
-			} else {
-				emptyRunCount = 0;
-			}
-
-			const MIN_WAIT_TIME = config.minWaitTime || 0;
-			const MAX_WAIT_TIME = config.maxWaitTime || 500;
-			const MAX_EMPTY_RUNS = config.maxEmptyRuns || 50;
-
-			const emptyRunCountClamped = Math.min(MAX_EMPTY_RUNS, emptyRunCount);
-			const ratio = emptyRunCountClamped / MAX_EMPTY_RUNS;
-			const waitTimeMs = lerp(MIN_WAIT_TIME, MAX_WAIT_TIME, ratio);
-			await wait(waitTimeMs);
 		};
 	}
 

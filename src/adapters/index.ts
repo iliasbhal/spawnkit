@@ -50,7 +50,7 @@ export interface InstanceMethodCall<Action extends string = string, Args extends
 	};
 }
 
-export type InstanceSignal =
+export type InstanceLog =
 	| {
 			type: "log";
 			message: string;
@@ -110,21 +110,16 @@ export class BaseAdapter {
 }
 
 export abstract class AdapterLogger extends BaseAdapter {
-	abstract log(kind: InstanceKind, id: InstanceId, groupId: string, signal: InstanceSignal): any;
+	abstract log(instance: InstanceIdentifier, ownerId: string, log: InstanceLog): any;
 
 	abstract list(
-		kind: InstanceKind,
-		id: InstanceId,
+		instance: InstanceIdentifier,
 		range: { from: number; to: number },
 	): Promise<string[]>;
 
-	abstract get(kind: InstanceKind, id: InstanceId, groupId: string): Promise<InstanceSignal[]>;
+	abstract get(instance: InstanceIdentifier, ownerId: string): Promise<InstanceLog[]>;
 
-	abstract delete(
-		kind: InstanceKind,
-		id: InstanceId,
-		range: { from: number; to: number },
-	): Promise<any>;
+	abstract delete(instance: InstanceIdentifier, range: { from: number; to: number }): Promise<any>;
 }
 
 export abstract class AdapterLock extends BaseAdapter {
