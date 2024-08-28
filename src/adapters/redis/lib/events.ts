@@ -69,14 +69,14 @@ export class EventScheduler extends BaseQueue implements Adapters.AdapterEventSc
 		const bullJobConfig =
 			"delay" in config.schedule
 				? {
-					delay: config.schedule.delay,
-				}
+						delay: config.schedule.delay,
+					}
 				: "cron" in config.schedule
 					? {
-						repeat: {
-							pattern: config.schedule.cron,
-						},
-					}
+							repeat: {
+								pattern: config.schedule.cron,
+							},
+						}
 					: null;
 
 		if (!bullJobConfig) {

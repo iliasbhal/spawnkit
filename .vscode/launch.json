@@ -30,7 +30,7 @@
     "program": "${file}",
 
     /*
-     * Path to tsx binary
+     * Path to tsx binary 
      * Assuming locally installed
      */
     "runtimeExecutable": "tsx",
