@@ -1,8 +1,7 @@
 import { nanoid } from "nanoid";
-import SuperJSON from "superjson";
 import { Client } from "@/models/Client";
 import * as Adapters from "../../index";
-import { RedisAdapter } from "./_base";
+import { RedisAdapter, Serde } from "./_base";
 import { BackoffController } from "@/utils/BackoffContoller";
 
 interface Message<DataShape> {
@@ -32,7 +31,7 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 
 		redis.subscribe(clientChannel);
 		redis.on("message", (clientChannel, message) => {
-			const parsed = SuperJSON.parse(message) as any;
+			const parsed = Serde.deserialize(message) as any;
 
 			const callbacks = this.callbackByChannel.get(parsed.channel);
 			if (callbacks) {
@@ -190,7 +189,7 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 	) {
 		await this.redis.publish(
 			`spawnkit:pubsub-clients:${client}`,
-			SuperJSON.stringify({
+			Serde.serialize({
 				channel,
 				message,
 			}),
@@ -271,7 +270,7 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 		const { timestamp, order } = this.getTimestampAndOrder();
 		await Promise.all([
 			this.redis.zadd(channel, timestamp, message.id),
-			this.redis.hset(channel + ":data", message.id, SuperJSON.stringify({ message, order })),
+			this.redis.hset(channel + ":data", message.id, Serde.serialize({ message, order })),
 		]);
 
 		return {
@@ -304,7 +303,7 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 				loop.range.from = timestampBeforeRequest;
 
 				const events = rawEvents
-					.map((e) => SuperJSON.parse(e) as Awaited<ReturnType<typeof this.publishMQ>>)
+					.map((e) => Serde.deserialize(e) as Awaited<ReturnType<typeof this.publishMQ>>)
 					.sort((a, b) => a.order - b.order)
 					.map((a) => a.message);
 

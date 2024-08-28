@@ -1,6 +1,5 @@
-import SuperJSON from "superjson";
 import * as Adapters from "../../index";
-import { RedisAdapter } from "./_base";
+import { Serde, RedisAdapter } from "./_base";
 
 /**
  * This class is used for internaltools
@@ -10,8 +9,10 @@ import { RedisAdapter } from "./_base";
  */
 export class Logger extends RedisAdapter implements Adapters.AdapterLogger {
 	async log(instance: Adapters.InstanceIdentifier, ownerId: string, signal: Adapters.InstanceLog) {
+		return;
+
 		const now = Date.now();
-		const serialized = SuperJSON.stringify({
+		const serialized = Serde.serialize({
 			...signal,
 			timestamp: now,
 		});
@@ -44,11 +45,11 @@ export class Logger extends RedisAdapter implements Adapters.AdapterLogger {
 		ownerId: string,
 	): Promise<Adapters.InstanceLog[]> {
 		const rawLogs = await this.redis.lrange(
-			`spawnkit:logs:${instance.kind}:${instance.id}:logs:${groupId}`,
+			`spawnkit:logs:${instance.kind}:${instance.id}:logs:${ownerId}`,
 			0,
 			-1,
 		);
-		const logs = rawLogs.map((raw) => SuperJSON.parse<Adapters.InstanceLog>(raw));
+		const logs = rawLogs.map((raw) => Serde.deserialize<Adapters.InstanceLog>(raw));
 		return logs;
 	}
 

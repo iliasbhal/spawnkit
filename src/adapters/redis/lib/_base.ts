@@ -1,4 +1,5 @@
 import { Redis } from "ioredis";
+import SuperJSON from 'superjson';
 import * as BullMQ from "bullmq";
 import { BaseAdapter } from "../../../adapters";
 
@@ -28,5 +29,14 @@ export class BaseQueue extends RedisAdapter {
 				removeOnFail: true,
 			},
 		});
+	}
+}
+
+export class Serde {
+	static serialize(data: any) {
+		return SuperJSON.stringify(data);
+	}
+	static deserialize<Expected = unknown>(data: ReturnType<typeof Serde['serialize']>) {
+		return SuperJSON.parse<Expected>(data);
 	}
 }

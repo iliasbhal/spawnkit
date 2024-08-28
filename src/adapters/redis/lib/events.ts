@@ -1,9 +1,8 @@
 import { Redis } from "ioredis";
 import * as BullMQ from "bullmq";
 import * as Adapters from "../../index";
-import { BaseQueue } from "./_base";
+import { Serde, BaseQueue } from "./_base";
 import { nanoid } from "nanoid";
-import SuperJSON from "superjson";
 
 export class EventScheduler extends BaseQueue implements Adapters.AdapterEventScheduler {
 	queue: BullMQ.Queue<Adapters.ScheduleEventConfig, any, string>;
@@ -70,14 +69,14 @@ export class EventScheduler extends BaseQueue implements Adapters.AdapterEventSc
 		const bullJobConfig =
 			"delay" in config.schedule
 				? {
-						delay: config.schedule.delay,
-					}
+					delay: config.schedule.delay,
+				}
 				: "cron" in config.schedule
 					? {
-							repeat: {
-								pattern: config.schedule.cron,
-							},
-						}
+						repeat: {
+							pattern: config.schedule.cron,
+						},
+					}
 					: null;
 
 		if (!bullJobConfig) {
@@ -127,12 +126,12 @@ export class EventScheduler extends BaseQueue implements Adapters.AdapterEventSc
 			return false;
 		}
 
-		const scheduleMetadata: Adapters.ScheduleEventMetadata = SuperJSON.parse(rawScheduleMetadata);
+		const scheduleMetadata: Adapters.ScheduleEventMetadata = Serde.deserialize(rawScheduleMetadata);
 		scheduleMetadata.canceled = true;
 
 		await Promise.all([
 			this.remove(scheduleId),
-			this.redis.hset(redisKey, scheduleId, SuperJSON.stringify(scheduleMetadata)),
+			this.redis.hset(redisKey, scheduleId, Serde.serialize(scheduleMetadata)),
 		]);
 
 		return true;
@@ -145,13 +144,13 @@ export class EventScheduler extends BaseQueue implements Adapters.AdapterEventSc
 		const redisKey = `spawnkit:scheduled:${kind}:${id}:index`;
 		const rawScheduledEvents = await this.redis.hvals(redisKey);
 
-		const scheduledEvents = rawScheduledEvents.map((st) => SuperJSON.parse(st));
+		const scheduledEvents = rawScheduledEvents.map((st) => Serde.deserialize(st));
 		return scheduledEvents as Adapters.ScheduleEventMetadata[];
 	}
 
 	async store<Data>(kind: string, id: string, scheduleId: string, data: Data): Promise<true> {
 		const redisKey = `spawnkit:scheduled:${kind}:${id}:status:${scheduleId}`;
-		await this.redis.lpush(redisKey, SuperJSON.stringify(data));
+		await this.redis.lpush(redisKey, Serde.serialize(data));
 		return true;
 	}
 
@@ -161,7 +160,7 @@ export class EventScheduler extends BaseQueue implements Adapters.AdapterEventSc
 		const fromIncluded = 0;
 		const toIncluded = !last ? -1 : last; // -1 = LAST
 		const members = await this.redis.lrange(redisKey, fromIncluded, toIncluded);
-		return members.map((m) => SuperJSON.parse(m));
+		return members.map((m) => Serde.deserialize(m));
 	}
 
 	private async register(scheduleId: Adapters.ScheduleId, config: Adapters.ScheduleEventConfig) {
@@ -173,6 +172,6 @@ export class EventScheduler extends BaseQueue implements Adapters.AdapterEventSc
 		};
 		const { kind, id } = config.instance;
 		const redisKey = `spawnkit:scheduled:${kind}:${id}:index`;
-		await this.redis.hset(redisKey, scheduleId!, SuperJSON.stringify(metaData));
+		await this.redis.hset(redisKey, scheduleId!, Serde.serialize(metaData));
 	}
 }
