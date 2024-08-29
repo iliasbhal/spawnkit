@@ -1,25 +1,82 @@
 import "dotenv/config";
 
-import { wait } from "../src/utils/wait";
 import * as Spawnkit from "@/.";
 import * as RedisAdapter from "@/adapters/redis";
 import { redis } from "@/adapters/redis/client";
-import * as instances from "../example/_index";
 import { ControlledInterval } from "@/utils/ControlledInterval";
 import { ControlledPromise } from "@/utils/ControlledPromise";
 
-const createAdapters = () => ({
-	lock: new RedisAdapter.Lock(redis),
-	data: new RedisAdapter.Data(redis),
-	messages: new RedisAdapter.MessageBroker(redis),
-	events: new RedisAdapter.EventScheduler(redis),
-	instances: new RedisAdapter.InstanceScheduler(redis),
-	logger: new RedisAdapter.Logger(redis),
-});
+interface OrderBookData {
+	orderBook: string[];
+	count: number;
+}
+
+interface OrderBookEvent {
+	buyOrders: any[];
+	orders: any[];
+	alphachannel: string;
+}
+
+interface Stock {
+	tick: string;
+}
+
+interface Order extends Pick<Stock, "tick"> {
+	qty: number;
+}
+
+export class OrderBook extends Spawnkit.Instance<OrderBookData, OrderBookEvent> {
+	on<C extends keyof OrderBookEvent>(channel: C, message: OrderBookEvent[C]) {
+		if (channel === "buyOrders") {
+			const mdg = message;
+			this.emit("orders", mdg as any);
+			return;
+		}
+		// console.log("ON INSTANCE", this.id, channel, message);
+	}
+
+	async buy(order: Order) {
+		// this.logger.log("-----BUYYYYY------");
+		// console.log("___BUY___", order);
+		// this.data = this.data || ({} as any);
+		// this.data!.count = this.data?.count || 0;
+		// this.data!.count++;
+
+		// const interval = setInterval(() => {
+		this.emit("orders", [order.tick, order.qty]);
+		// })
+		// setTimeout(() => {
+		//   clearInterval(interval);
+		// }, 400);
+
+		return {
+			success: true,
+			status: "pending...",
+			order,
+		};
+	}
+
+	async multiple(...stocks: Stock[]) {
+		return stocks.length;
+	}
+
+	async sell(stock: Stock): Promise<true> {
+		return true;
+	}
+}
 
 const client = Spawnkit.Client.from({
-	adapters: createAdapters(),
-	instances: instances,
+	adapters: {
+		lock: new RedisAdapter.Lock(redis),
+		data: new RedisAdapter.Data(redis),
+		messages: new RedisAdapter.MessageBroker(redis),
+		events: new RedisAdapter.EventScheduler(redis),
+		instances: new RedisAdapter.InstanceScheduler(redis),
+		logger: new RedisAdapter.Logger(redis),
+	},
+	instances: {
+		OrderBook,
+	},
 });
 
 client.start();
@@ -47,7 +104,7 @@ const main = async () => {
 	const interval = ControlledInterval.new({
 		interval: 14,
 		execute: async (count) => {
-			// console.log("COUNT", count);
+			console.log("COUNT", count);
 			if (count >= 100) {
 				interval.dispose();
 				return;
@@ -55,8 +112,8 @@ const main = async () => {
 
 			promiseList.push(
 				Promise.all(
-					Array.from({ length: 200 }).map(async (_, i) => {
-						await wait(i);
+					Array.from({ length: 1000 }).map(async (_, i) => {
+						// await wait(i);
 						const timerKey = `${count}-${i}`;
 						if (!waitForAllProcessed[timerKey]) {
 							waitForAllProcessed[timerKey] = ControlledPromise.new<any>();
