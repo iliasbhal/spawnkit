@@ -30,8 +30,8 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 		const clientChannel = this.getClientChannel();
 
 		redis.subscribe(clientChannel);
-		redis.on("message", (clientChannel, message) => {
-			const parsed = Serde.deserialize(message) as any;
+		redis.on("message", async (clientChannel, message) => {
+			const parsed = await Serde.deserialize(message) as any;
 
 			const callbacks = this.callbackByChannel.get(parsed.channel);
 			if (callbacks) {
@@ -187,12 +187,15 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 		channel: string,
 		message: Message<EventData>,
 	) {
+
+		const serialized = await Serde.serialize({
+			channel,
+			message,
+		});
+
 		await this.redis.publish(
 			`spawnkit:pubsub-clients:${client}`,
-			Serde.serialize({
-				channel,
-				message,
-			}),
+			serialized
 		);
 	}
 
@@ -268,9 +271,14 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 
 	private async publishMQ<EventData>(channel: string, message: Message<EventData>) {
 		const { timestamp, order } = this.getTimestampAndOrder();
+		const serialized = await Serde.serialize({
+			message,
+			order,
+		});
+
 		await Promise.all([
 			this.redis.zadd(channel, timestamp, message.id),
-			this.redis.hset(channel + ":data", message.id, Serde.serialize({ message, order })),
+			this.redis.hset(channel + ":data", message.id, serialized),
 		]);
 
 		return {
@@ -302,13 +310,17 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 				const rawEvents = await this.getLatestMessagesRaw(channel, loop.range);
 				loop.range.from = timestampBeforeRequest;
 
-				const events = rawEvents
-					.map((e) => Serde.deserialize(e) as Awaited<ReturnType<typeof this.publishMQ>>)
-					.sort((a, b) => a.order - b.order)
+				type PublishedEvent = Awaited<ReturnType<typeof this.publishMQ>>;
+				const events = await Promise.all(
+					rawEvents.map((e) => Serde.deserialize<PublishedEvent>(e))
+				);
+
+				const eventMessages = events.sort((a, b) => a.order - b.order)
 					.map((a) => a.message);
 
-				if (events.length) {
-					events.forEach((event) => {
+
+				if (eventMessages.length) {
+					eventMessages.forEach((event) => {
 						if (abortCtl.signal.aborted) return;
 						if (previousEventsIds.has(event.id)) return;
 						callback(event as any);
@@ -318,7 +330,7 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 				// Reset & update the list of processed events
 				// So that we don't reprocess them when we fetch the next batch
 				previousEventsIds.clear();
-				events.forEach((event) => {
+				eventMessages.forEach((event) => {
 					previousEventsIds.add(event.id);
 				});
 

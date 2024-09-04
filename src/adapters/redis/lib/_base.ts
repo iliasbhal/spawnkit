@@ -1,7 +1,9 @@
 import { Redis } from "ioredis";
-import SuperJSON from "superjson";
 import * as BullMQ from "bullmq";
 import { BaseAdapter } from "../../../adapters";
+
+import SuperJSON from "superjson";
+import * as MsgPack from "@msgpack/msgpack"
 
 export class RedisAdapter extends BaseAdapter {
 	redis: Redis;
@@ -33,10 +35,18 @@ export class BaseQueue extends RedisAdapter {
 }
 
 export class Serde {
-	static serialize(data: any) {
+	static async serialize(data: any) {
 		return SuperJSON.stringify(data);
+
+		const dataAsU8Array = await MsgPack.encode(data, { ignoreUndefined: true })
+		const stringified = SuperJSON.stringify(dataAsU8Array);
+		return stringified;
 	}
-	static deserialize<Expected = unknown>(data: ReturnType<(typeof Serde)["serialize"]>) {
-		return SuperJSON.parse<Expected>(data);
+
+	static async deserialize<Expected = unknown>(raw: Awaited<ReturnType<(typeof Serde)["serialize"]>>) {
+		return SuperJSON.parse(raw)
+
+		const uintArr = SuperJSON.parse(raw) as Uint8Array
+		return await MsgPack.decode(uintArr) as Expected;
 	}
 }

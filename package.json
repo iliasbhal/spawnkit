@@ -12,6 +12,7 @@
     "test": "jest"
   },
   "dependencies": {
+    "@msgpack/msgpack": "^3.0.0-beta2",
     "bullmq": "^5.4.5",
     "nanoid": "^5.0.7",
     "redlock": "^5.0.0-beta.2",

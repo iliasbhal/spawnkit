@@ -12,7 +12,7 @@ export class Logger extends RedisAdapter implements Adapters.AdapterLogger {
 		return;
 
 		const now = Date.now();
-		const serialized = Serde.serialize({
+		const serialized = await Serde.serialize({
 			...signal,
 			timestamp: now,
 		});
@@ -49,8 +49,10 @@ export class Logger extends RedisAdapter implements Adapters.AdapterLogger {
 			0,
 			-1,
 		);
-		const logs = rawLogs.map((raw) => Serde.deserialize<Adapters.InstanceLog>(raw));
-		return logs;
+
+		return await Promise.all(
+			rawLogs.map((raw) => Serde.deserialize<Adapters.InstanceLog>(raw))
+		);
 	}
 
 	async delete(

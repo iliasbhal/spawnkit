@@ -69,14 +69,14 @@ export class EventScheduler extends BaseQueue implements Adapters.AdapterEventSc
 		const bullJobConfig =
 			"delay" in config.schedule
 				? {
-						delay: config.schedule.delay,
-					}
+					delay: config.schedule.delay,
+				}
 				: "cron" in config.schedule
 					? {
-							repeat: {
-								pattern: config.schedule.cron,
-							},
-						}
+						repeat: {
+							pattern: config.schedule.cron,
+						},
+					}
 					: null;
 
 		if (!bullJobConfig) {
@@ -126,12 +126,13 @@ export class EventScheduler extends BaseQueue implements Adapters.AdapterEventSc
 			return false;
 		}
 
-		const scheduleMetadata: Adapters.ScheduleEventMetadata = Serde.deserialize(rawScheduleMetadata);
+		const scheduleMetadata: Adapters.ScheduleEventMetadata = await Serde.deserialize(rawScheduleMetadata);
 		scheduleMetadata.canceled = true;
+		const serialized = await Serde.serialize(scheduleMetadata)
 
 		await Promise.all([
 			this.remove(scheduleId),
-			this.redis.hset(redisKey, scheduleId, Serde.serialize(scheduleMetadata)),
+			this.redis.hset(redisKey, scheduleId, serialized),
 		]);
 
 		return true;
@@ -144,13 +145,18 @@ export class EventScheduler extends BaseQueue implements Adapters.AdapterEventSc
 		const redisKey = `spawnkit:scheduled:${kind}:${id}:index`;
 		const rawScheduledEvents = await this.redis.hvals(redisKey);
 
-		const scheduledEvents = rawScheduledEvents.map((st) => Serde.deserialize(st));
-		return scheduledEvents as Adapters.ScheduleEventMetadata[];
+		const scheduledEvents = await Promise.all(
+			rawScheduledEvents.map(
+				async (st) => await Serde.deserialize<Adapters.ScheduleEventMetadata>(st)
+			)
+		);
+		return scheduledEvents
 	}
 
 	async store<Data>(kind: string, id: string, scheduleId: string, data: Data): Promise<true> {
 		const redisKey = `spawnkit:scheduled:${kind}:${id}:status:${scheduleId}`;
-		await this.redis.lpush(redisKey, Serde.serialize(data));
+		const serialized = await Serde.serialize(data)
+		await this.redis.lpush(redisKey, serialized);
 		return true;
 	}
 
@@ -160,7 +166,9 @@ export class EventScheduler extends BaseQueue implements Adapters.AdapterEventSc
 		const fromIncluded = 0;
 		const toIncluded = !last ? -1 : last; // -1 = LAST
 		const members = await this.redis.lrange(redisKey, fromIncluded, toIncluded);
-		return members.map((m) => Serde.deserialize(m));
+		return await Promise.all(
+			members.map((m) => Serde.deserialize<Data>(m))
+		);
 	}
 
 	private async register(scheduleId: Adapters.ScheduleId, config: Adapters.ScheduleEventConfig) {
@@ -172,6 +180,7 @@ export class EventScheduler extends BaseQueue implements Adapters.AdapterEventSc
 		};
 		const { kind, id } = config.instance;
 		const redisKey = `spawnkit:scheduled:${kind}:${id}:index`;
-		await this.redis.hset(redisKey, scheduleId!, Serde.serialize(metaData));
+		const serialized = await Serde.serialize(metaData);
+		await this.redis.hset(redisKey, scheduleId!, serialized);
 	}
 }

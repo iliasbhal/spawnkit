@@ -10,7 +10,7 @@ export class Data extends RedisAdapter implements Adapters.AdapaterData {
 		// console.log('GET DATA', kind, id, key);
 		const data = await this.redis.get(`spawnkit:data:${kind}:${id}:${key}`);
 		if (!data) return null;
-		return Serde.deserialize(data);
+		return await Serde.deserialize(data);
 	}
 
 	async set<Data>(
@@ -20,7 +20,7 @@ export class Data extends RedisAdapter implements Adapters.AdapaterData {
 		value: Data,
 	): Promise<true> {
 		// console.log('SET DATA', kind, id, key, value);
-		const serialized = Serde.serialize(value);
+		const serialized = await Serde.serialize(value);
 		await this.redis.set(`spawnkit:data:${kind}:${id}:${key}`, serialized);
 		return true;
 	}

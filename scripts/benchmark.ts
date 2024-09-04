@@ -79,8 +79,9 @@ const client = Spawnkit.Client.from({
 	},
 });
 
-client.start();
 
+redis.flushall('SYNC');
+client.start();
 const main = async () => {
 	const orderBook = client.spawn("OrderBook", "BTC/EUR");
 	const waitForAllProcessed: Record<string, ControlledPromise<any>> = {};
