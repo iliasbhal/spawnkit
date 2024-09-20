@@ -1,14 +1,25 @@
 # Spawnkit lib
 
+- Start writing documentation / recipes.
+
+
 - add methods to logger based on logLevel and channel
      ( .info .error. ... etc) for infra, per request.
 
+- add replica support. we should be able to ????
+- add client tolerence + affinity ( like Kubernetes ) ???
 
+
+# Spawnkit Redis Adapter:
 - Redis Logger should also make use of an object storage(s3) ??
 - Redis Events Store should also make use of an object storage(s3) ??
 - Redis Data Store should also make use of an object storage(s3) ??
 
-# Spawnkit cloud
+- make serialize/deserialize faster.
+
+
+# Spawnkit cloud:
+- Every machine is dedicated to their namespace so that the user can safly use and read the file system.
 
 - We need to ensure that clients don't have access to the whole database just by guessing the id. We can use a custom prefix per "workspace".
 
