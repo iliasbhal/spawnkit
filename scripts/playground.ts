@@ -1,15 +1,20 @@
 import "dotenv/config";
 
 import { wait } from "../src/utils/wait";
-import * as Spawnkit from "@/.";
-import * as RedisAdapter from "@/adapters/redis";
-import { redis } from "@/adapters/redis/client";
+
 import * as instances from "../example/_index";
 import { nanoid } from "nanoid";
-import { Logger } from "@/models/Logger";
-import { Lock } from "@/models/Lock";
-import { ControlledInterval } from "@/utils/ControlledInterval";
-import { ControlledPromise } from "@/utils/ControlledPromise";
+import { Logger } from "../src/models/Logger";
+import { Lock } from "../src/models/Lock";
+
+
+import * as Spawnkit from "../";
+import * as RedisAdapter from "../src/adapters/redis";
+import { redis } from "../src/adapters/redis/client";
+import { ControlledInterval } from "../src/utils/ControlledInterval";
+import { ControlledPromise } from "../src/utils/ControlledPromise";
+
+
 
 const createAdapters = () => ({
 	lock: new RedisAdapter.Lock(redis),
@@ -39,6 +44,7 @@ const main = async () => {
 
 	//   // attributeExample();
 	await Promise.all([
+		errorOnLifeCycle(),
 		// severalClients(),
 		// basicExample(),
 		// performanceBenchmanrk(),
@@ -376,11 +382,32 @@ const severalClients = async () => {
 	});
 };
 
+const errorOnLifeCycle = async () => {
+	console.log('errorOnLifeCycle - 1');
+	client.on("error", (err) => {
+		// console.log("CLIENT ERROR", err);
+	})
+
+	const initErrorExample = client.spawn("ErrorInitExample", "BTC/EUR");
+
+
+
+	try {
+
+		const response = await initErrorExample.doSomething('message-AA');
+	} catch (err) {
+		console.log("--------->", err);
+	}
+
+	console.log('errorOnLifeCycle - 2');
+
+}
+
 const startTime = Date.now();
 console.log("START");
 main()
 	.then((result) => console.log("DONE"))
-	.catch((err) => console.error("ERR", err))
+	// .catch((err) => console.error("ERR", err))
 	.finally(() => {
 		const timeSpent = Date.now() - startTime;
 		console.log(timeSpent, "ms");

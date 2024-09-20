@@ -1,6 +1,7 @@
 export { AgentLLM } from "./AgentLLM";
 export { ChatRoom } from "./ChatRoom";
 export { ErrorExample } from "./ErrorExample";
+export { ErrorInitExample } from "./ErrorInitExample";
 export { GameSession } from "./GameSession";
 export { LiveDocument } from "./LiveDocument";
 export { OrderBook } from "./OrderBook";

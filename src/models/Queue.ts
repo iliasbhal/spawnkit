@@ -97,6 +97,7 @@ export class Queue<O extends SpawnkitConfig> {
 					instance,
 					abortSignal,
 					logger,
+					client: this.client,
 				});
 
 				await proxy.start();
@@ -104,10 +105,12 @@ export class Queue<O extends SpawnkitConfig> {
 		} catch (err) {
 			const shouldSilenceError =
 				err instanceof Lock.AcquireLockError ||
-				// err instanceof Lock.ExtendError ||
 				err instanceof Lock.ReleaseError;
+			// we don't want to silence extend error because it's a critical error
+			// that should be handled by the client.
+			// err instanceof Lock.ExtendError || 
 			if (!shouldSilenceError) {
-				console.error(err);
+				this.client.eventListeners.notify("error", err);
 				throw err;
 			}
 		}

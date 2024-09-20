@@ -78,6 +78,7 @@ export class InstanceProxy<Inst extends Instance> {
 	public config: InstanceIdentifier;
 	public adapters: Adapters;
 	public abortSignal: AbortSignal;
+	public client: Client<any>;
 
 	constructor(config: {
 		logger: Logger;
@@ -85,12 +86,14 @@ export class InstanceProxy<Inst extends Instance> {
 		config: InstanceIdentifier;
 		adapters: Adapters;
 		abortSignal: AbortSignal;
+		client: Client<any>;
 	}) {
 		this.logger = config.logger;
 		this.config = config.config;
 		this.adapters = config.adapters;
 		this.instance = config.instance;
 		this.abortSignal = config.abortSignal;
+		this.client = config.client;
 
 		const data = new Data<any>({
 			adapters: this.adapters,
@@ -273,7 +276,7 @@ export class InstanceProxy<Inst extends Instance> {
 		});
 
 		stream.on("end", async () => {
-			syncAbort.dispose();
+			syncAbort.clear();
 
 			context.metadata.ended_at = Date.now();
 			await this.respond(context, {
@@ -301,13 +304,9 @@ export class InstanceProxy<Inst extends Instance> {
 	/** Starts listening to events */
 	public async start() {
 		this.running = true;
-
-		await this.initialize();
-
-		this.subscribeToInstanceEvent();
 		this.continouslyEmitHealthCheckSignal();
 
-		const syncAbort = this.addAbortListener(() => {
+		const syncAbort = this.addAbortListener((reason) => {
 			if (!this.live) return;
 
 			this.keepAlive.clear();
@@ -315,7 +314,11 @@ export class InstanceProxy<Inst extends Instance> {
 			this.aborted.resolve(true);
 		});
 
-		await this.keepAliveUntilNothingHappens().finally(() => syncAbort.dispose());
+		await this.initialize();
+
+		this.subscribeToInstanceEvent();
+		await this.keepAliveUntilNothingHappens()
+			.finally(() => syncAbort.clear());
 	}
 
 	async initialize() {
@@ -325,7 +328,7 @@ export class InstanceProxy<Inst extends Instance> {
 			this.trace({ type: "proxy:initialize:success" });
 		} catch (err) {
 			this.trace({ type: "proxy:initialize:failed" });
-			this.aborted.reject(err);
+			this.client.eventListeners.notify("error", err);
 			throw err;
 		}
 	}
@@ -341,6 +344,7 @@ export class InstanceProxy<Inst extends Instance> {
 			this.trace({ type: "proxy:dispose:success" });
 		} catch (err) {
 			this.trace({ type: "proxy:dispose:failed" });
+			this.client.eventListeners.notify("error", err);
 			throw err;
 		}
 
@@ -468,7 +472,7 @@ export class InstanceProxy<Inst extends Instance> {
 		this.aborted.await.finally(() => disposeListener());
 
 		return {
-			dispose: disposeListener,
+			clear: disposeListener,
 		};
 	}
 

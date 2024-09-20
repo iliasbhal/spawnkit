@@ -7,7 +7,7 @@ type Prettify<T> = {
 	[K in keyof T]: T[K];
 } & {};
 
-export abstract class Instance<
+export class Instance<
 	InstanceData extends AnyRecord = AnyRecord,
 	InstanceChannels extends AnyRecord = AnyRecord,
 > {
@@ -31,8 +31,8 @@ export abstract class Instance<
 		return this.api.kind;
 	}
 
-	abstract initialize()
-	abstract dispose()
+	initialize?()
+	dispose?()
 
 	api!: InterfaceAPI<InstanceData, InstanceChannels>;
 
@@ -55,7 +55,7 @@ export abstract class Instance<
 			this.on?.(channel, message);
 		} catch (err) {
 			// SILENCE ANY ERROR HAPPENING DURING THE EVENT HANDLER
-			console.log(err);
+			// console.log(err);
 		}
 
 		return;

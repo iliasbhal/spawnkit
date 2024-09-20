@@ -2,8 +2,9 @@ import { wait } from "../utils/wait";
 import { Adapters, InstanceId, InstanceKind } from "../adapters";
 import { ControlledPromise } from "@/utils/ControlledPromise";
 import { Logger } from "./Logger";
+import { SpawnkitError } from './Error'
 
-export class LockError extends Error {}
+export class LockError extends SpawnkitError { }
 
 export class AcquireLockError extends LockError {
 	constructor(resource: string, ownerId: string) {
@@ -201,7 +202,7 @@ export class Lock {
 				throw err;
 			});
 
-		return extendAbortCtl.signal;
+		return extendAbortCtl;
 	}
 
 	async using<T>(routine: (singal: AbortSignal) => Promise<T>) {
@@ -210,18 +211,22 @@ export class Lock {
 		// If we are not able to acquire the lock in the first place
 		// there is not point in going through all the code below.
 		const routineAbortCtl = new AbortController();
-		const abortExtSignal = this.autoExtendLockInBackground(routineAbortCtl.signal);
+		const abortExtSignalCtl = this.autoExtendLockInBackground(routineAbortCtl.signal);
 
 		try {
-			const routinePromise = routine(abortExtSignal);
+			const routinePromise = routine(abortExtSignalCtl.signal);
 			const result = await Promise.race([
-				ControlledPromise.wrapSignal(abortExtSignal), // <-- this never resolves, it only throws
+				ControlledPromise.wrapSignal(abortExtSignalCtl.signal), // <-- this never resolves, it only throws
 				routinePromise,
 			]);
 
 			routineAbortCtl.abort();
 
 			return result as Awaited<typeof routinePromise>;
+		} catch (err) {
+			routineAbortCtl.abort(err);
+			abortExtSignalCtl.abort(err);
+			throw err;
 		} finally {
 			this.release().catch((err) => {
 				const routineCompleted = routineAbortCtl.signal.aborted;
