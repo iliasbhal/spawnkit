@@ -7,7 +7,7 @@ type Prettify<T> = {
 	[K in keyof T]: T[K];
 } & {};
 
-export class Instance<
+export abstract class Instance<
 	InstanceData extends AnyRecord = AnyRecord,
 	InstanceChannels extends AnyRecord = AnyRecord,
 > {
@@ -22,7 +22,7 @@ export class Instance<
 
 	// TODO: FIX TYPING HERE
 	// For some reason, adding types here break the client types.
-	on(channel: keyof InstanceChannels, message: InstanceChannels[keyof InstanceChannels]) {}
+	on(channel: keyof InstanceChannels, message: InstanceChannels[keyof InstanceChannels]) { }
 
 	get id() {
 		return this.api.id;
@@ -30,6 +30,9 @@ export class Instance<
 	get kind() {
 		return this.api.kind;
 	}
+
+	abstract initialize()
+	abstract dispose()
 
 	api!: InterfaceAPI<InstanceData, InstanceChannels>;
 

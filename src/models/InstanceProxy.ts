@@ -36,8 +36,8 @@ export type InstanceEventStreamMessage =
 
 export interface InstanceEventChannels {
 	[key: `kind:${string}:id:${string}:event:${string}`]:
-		| InstanceEventRequestMessage
-		| InstanceEventStreamMessage;
+	| InstanceEventRequestMessage
+	| InstanceEventStreamMessage;
 }
 
 type Emit<Channels extends Record<string, any>> = <Channel extends Extract<keyof Channels, string>>(
@@ -301,7 +301,8 @@ export class InstanceProxy<Inst extends Instance> {
 	/** Starts listening to events */
 	public async start() {
 		this.running = true;
-		this.trace({ type: "proxy:start" });
+
+		await this.initialize();
 
 		this.subscribeToInstanceEvent();
 		this.continouslyEmitHealthCheckSignal();
@@ -317,12 +318,33 @@ export class InstanceProxy<Inst extends Instance> {
 		await this.keepAliveUntilNothingHappens().finally(() => syncAbort.dispose());
 	}
 
+	async initialize() {
+		try {
+			this.trace({ type: "proxy:initialize:start" });
+			await this.instance.initialize?.();
+			this.trace({ type: "proxy:initialize:success" });
+		} catch (err) {
+			this.trace({ type: "proxy:initialize:failed" });
+			this.aborted.reject(err);
+			throw err;
+		}
+	}
+
 	public async dispose() {
 		if (!this.running) return;
 		this.running = false;
 		this.onEventSubscription?.unsubscribe();
+
+		try {
+			this.trace({ type: "proxy:dispose:start" });
+			await this.instance.dispose?.()
+			this.trace({ type: "proxy:dispose:success" });
+		} catch (err) {
+			this.trace({ type: "proxy:dispose:failed" });
+			throw err;
+		}
+
 		this.healthCheckEmitter?.dispose();
-		this.trace({ type: "proxy:dispose" });
 
 		// When the instance receives the 'dispose' event
 		// it should immedately schedule a dispose function

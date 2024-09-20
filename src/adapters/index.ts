@@ -52,55 +52,55 @@ export interface InstanceMethodCall<Action extends string = string, Args extends
 
 export type InstanceLog =
 	| {
-			type: "log";
-			message: string;
-	  }
+		type: "log";
+		message: string;
+	}
 	| {
-			type: "lock:acquire:start" | "lock:acquire:failed" | "lock:acquire:success";
-			duration: number;
-			attemptId: string;
-			resourceId: string;
-	  }
+		type: "lock:acquire:start" | "lock:acquire:failed" | "lock:acquire:success";
+		duration: number;
+		attemptId: string;
+		resourceId: string;
+	}
 	| {
-			type: "lock:extend:start" | "lock:extend:failed" | "lock:extend:success";
-			resourceId: string;
-			attemptId: string;
-			duration: number;
-	  }
+		type: "lock:extend:start" | "lock:extend:failed" | "lock:extend:success";
+		resourceId: string;
+		attemptId: string;
+		duration: number;
+	}
 	| {
-			type: "lock:release:start" | "lock:release:failed" | "lock:release:success";
-			resourceId: string;
-			attemptId: string;
-			duration: number;
-	  }
+		type: "lock:release:start" | "lock:release:failed" | "lock:release:success";
+		resourceId: string;
+		attemptId: string;
+		duration: number;
+	}
 	| {
-			type: "lock:abort";
-	  }
+		type: "lock:abort";
+	}
 	| {
-			type: "data:get";
-			key: string;
-	  }
+		type: "data:get";
+		key: string;
+	}
 	| {
-			type: "data:set";
-			key: string;
-			value: any;
-	  }
+		type: "data:set";
+		key: string;
+		value: any;
+	}
 	| {
-			type: "proxy:start";
-	  }
+		type: "proxy:initialize:start" | "proxy:initialize:success" | "proxy:initialize:failed";
+	}
 	| {
-			type: "proxy:dispose";
-	  }
+		type: "proxy:dispose:start" | "proxy:dispose:success" | "proxy:dispose:failed";
+	}
 	| {
-			type: "proxy:call:start";
-			id: string;
-			event: InstanceMethodCall;
-	  }
+		type: "proxy:call:start";
+		id: string;
+		event: InstanceMethodCall;
+	}
 	| {
-			type: "proxy:call:result";
-			id: string;
-			result: any;
-	  };
+		type: "proxy:call:result";
+		id: string;
+		result: any;
+	};
 
 export class BaseAdapter {
 	client!: Client<any>;
