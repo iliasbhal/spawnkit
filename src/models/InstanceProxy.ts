@@ -306,7 +306,7 @@ export class InstanceProxy<Inst extends Instance> {
 		this.running = true;
 		this.continouslyEmitHealthCheckSignal();
 
-		const syncAbort = this.addAbortListener((reason) => {
+		const syncAbort = this.addAbortListener(() => {
 			if (!this.live) return;
 
 			this.keepAlive.clear();
@@ -314,7 +314,11 @@ export class InstanceProxy<Inst extends Instance> {
 			this.aborted.resolve(true);
 		});
 
-		await this.initialize();
+		await this.initialize()
+			.catch(async (err) => {
+				await this.dispose();
+				throw err;
+			});
 
 		this.subscribeToInstanceEvent();
 		await this.keepAliveUntilNothingHappens()
@@ -346,14 +350,14 @@ export class InstanceProxy<Inst extends Instance> {
 			this.trace({ type: "proxy:dispose:failed" });
 			this.client.eventListeners.notify("error", err);
 			throw err;
+		} finally {
+			this.healthCheckEmitter?.dispose();
+
+			// When the instance receives the 'dispose' event
+			// it should immedately schedule a dispose function
+			// using this.waitFor function.
+			this.keepAlive.addWait(0, "wait for dispose scheduling");
 		}
-
-		this.healthCheckEmitter?.dispose();
-
-		// When the instance receives the 'dispose' event
-		// it should immedately schedule a dispose function
-		// using this.waitFor function.
-		this.keepAlive.addWait(0, "wait for dispose scheduling");
 	}
 
 	public get live() {
