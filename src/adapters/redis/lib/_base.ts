@@ -35,7 +35,7 @@ export class BaseQueue extends RedisAdapter {
 }
 
 export class Serde {
-	static async serialize(data: any) {
+	static async serialize(data: any): Promise<string> {
 		return SuperJSON.stringify(data);
 
 		const dataAsU8Array = await MsgPack.encode(data, { ignoreUndefined: true })
@@ -43,7 +43,7 @@ export class Serde {
 		return stringified;
 	}
 
-	static async deserialize<Expected = unknown>(raw: Awaited<ReturnType<(typeof Serde)["serialize"]>>) {
+	static async deserialize<Expected = unknown>(raw: Awaited<ReturnType<(typeof Serde)["serialize"]>>): Promise<Expected> {
 		return SuperJSON.parse(raw)
 
 		const uintArr = SuperJSON.parse(raw) as Uint8Array
