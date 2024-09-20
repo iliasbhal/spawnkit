@@ -16,10 +16,16 @@ import { ClientData } from "./ClientData";
 import { HealthCheckListener } from "./HealthCheck";
 import { Queue } from "./Queue";
 import { nanoid } from "nanoid";
+import { SpawnkitError } from './Error'
+import { EventListener } from "@/utils/EventListenener";
 
 export interface SpawnkitConfig {
 	adapters: Adapters;
 	instances: { [key: string]: typeof Instance<any, any> };
+}
+
+export interface ClientChannel {
+	error: SpawnkitError | Error,
 }
 
 type InternalMessageData = InstanceEventChannels[keyof InstanceEventChannels];
@@ -28,6 +34,11 @@ export class Client<CP extends SpawnkitConfig> {
 	private adapters: CP["adapters"];
 	private instances: CP["instances"];
 	id = nanoid();
+	eventListeners = new EventListener<ClientChannel>();
+
+	on<E extends keyof ClientChannel>(event: E, callback: (data: ClientChannel[E]) => any) {
+		return this.eventListeners.on(event, callback);
+	}
 
 	constructor(opts: CP) {
 		this.adapters = opts.adapters;
@@ -405,20 +416,20 @@ type ExtractMethods<T> = Pick<T, ExtractMethodNames<T>>;
 
 type MakeRemote<T> = {
 	[K in keyof T]: T[K] extends (...args: any[]) => any
-		? // If the function is sychronouse, we want to cast the return to a Promise
-			// And it it's already a promise, it's gonna stay a promise.
-			(...args: Parameters<T[K]>) => Promise<Awaited<ReturnType<T[K]>>>
-		: never;
+	? // If the function is sychronouse, we want to cast the return to a Promise
+	// And it it's already a promise, it's gonna stay a promise.
+	(...args: Parameters<T[K]>) => Promise<Awaited<ReturnType<T[K]>>>
+	: never;
 };
 
 type MakeSkippable<T> = {
 	[K in keyof T]: T[K] extends (...args: any[]) => any
-		? (...args: Parameters<T[K]>) => Promise<boolean>
-		: never;
+	? (...args: Parameters<T[K]>) => Promise<boolean>
+	: never;
 };
 
 type MakeSchedulable<T> = {
 	[K in keyof T]: T[K] extends (...args: any[]) => any
-		? (...args: Parameters<T[K]>) => Promise<ScheduleId>
-		: never;
+	? (...args: Parameters<T[K]>) => Promise<ScheduleId>
+	: never;
 };

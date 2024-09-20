@@ -1,4 +1,5 @@
 import { ControlledPromise } from "@/utils/ControlledPromise";
+import { EventListener } from "@/utils/EventListenener";
 
 type StreamBuilder<StreamValue> = (stream: Stream<StreamValue>) => any;
 
@@ -13,20 +14,14 @@ export class Stream<StreamValue> {
 	abortCtl = new AbortController();
 	callback: StreamBuilder<StreamValue>;
 
+	eventListener = new EventListener<CallbackByEvent<StreamValue>>();
+
 	constructor(callback: StreamBuilder<StreamValue>) {
 		this.callback = callback;
 	}
 
-	eventsHandlers = new Map<
-		keyof CallbackByEvent<StreamValue>,
-		Set<CallbackByEvent<StreamValue>[keyof CallbackByEvent<StreamValue>]>
-	>();
 	on<EV extends keyof CallbackByEvent<any>>(event: EV, callback: CallbackByEvent<StreamValue>[EV]) {
-		if (!this.eventsHandlers.has(event)) {
-			this.eventsHandlers.set(event, new Set());
-		}
-
-		this.eventsHandlers.get(event)!.add(callback);
+		this.eventListener.on(event, callback);
 	}
 
 	stored: any[] = [];
@@ -110,14 +105,12 @@ export class Stream<StreamValue> {
 		if (event === "end") this.closed = true;
 		if (event === "start") this.started = true;
 
-		this.eventsHandlers.get(event)?.forEach((callback) => {
-			// @ts-ignore
-			callback(data);
-		});
+		// @ts-ignore
+		this.eventListener.notify(event, data);
 	}
 
 	clear() {
-		this.eventsHandlers.clear();
+		this.eventListener.clear();
 	}
 
 	async ensureStarted() {
