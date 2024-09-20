@@ -60,9 +60,10 @@ export class HealthCheckListener {
 			this.instance,
 			HealthCheckEmitter.getChannelForHealthSignal(),
 			(message) => this.reset(),
-		);
+		);;
 
-		this.onHealthCheckFailed(() => {
+		this.abortCtl.signal.addEventListener("abort", () => {
+			this.onAbortCallbacks.forEach((callback) => callback());
 			this.dispose();
 		});
 	}
@@ -73,7 +74,9 @@ export class HealthCheckListener {
 	}
 
 	createAbortInterval() {
-		this.currentTimeout = setTimeout(() => this.abortCtl.abort(), HEALTH_CHECK_INTERVAL);
+		this.currentTimeout = setTimeout(() => {
+			this.abortCtl.abort()
+		}, HEALTH_CHECK_INTERVAL);
 	}
 
 	disposeInterval() {
@@ -85,14 +88,10 @@ export class HealthCheckListener {
 	dispose() {
 		this.disposeInterval();
 		this.currentSubscription?.unsubscribe();
-		this.onAbortCallbacks.forEach((callback) => {
-			this.abortCtl.signal.removeEventListener("abort", callback);
-		});
 	}
 
 	onAbortCallbacks: (() => void)[] = [];
 	onHealthCheckFailed(callback: () => void) {
-		this.abortCtl.signal.addEventListener("abort", callback);
 		this.onAbortCallbacks.push(callback);
 	}
 }
