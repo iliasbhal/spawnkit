@@ -34,11 +34,6 @@ export class Client<CP extends SpawnkitConfig> {
 	private adapters: CP["adapters"];
 	private instances: CP["instances"];
 	id = nanoid();
-	eventListeners = new EventListener<ClientChannel>();
-
-	on<E extends keyof ClientChannel>(event: E, callback: (data: ClientChannel[E]) => any) {
-		return this.eventListeners.on(event, callback);
-	}
 
 	constructor(opts: CP) {
 		this.adapters = opts.adapters;

@@ -110,7 +110,6 @@ export class Queue<O extends SpawnkitConfig> {
 			// that should be handled by the client.
 			// err instanceof Lock.ExtendError || 
 			if (!shouldSilenceError) {
-				this.client.eventListeners.notify("error", err);
 				throw err;
 			}
 		}
