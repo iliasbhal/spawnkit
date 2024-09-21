@@ -338,15 +338,9 @@ export class InstanceProxy<Inst extends Instance> {
 	}
 
 	public async dispose() {
-		console.log("DISPOSE INITIATED");
 		if (!this.running) return;
 		this.running = false;
 		this.onEventSubscription?.unsubscribe();
-
-		// TODO WE SHOULD ENSURE THAT WE KEEP THE LOCK
-		// WHILE ITS DISPOSING. WE CAN ONY RELEASE THE LOCK
-		// AFTER THE DISPOSE FUNCTION IS CALLED OR 
-		// WHEN THE DISPOSE FUNCTION FAILED as well.
 
 		try {
 			this.trace({ type: "proxy:dispose:start" });
