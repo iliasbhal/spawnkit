@@ -31,8 +31,8 @@ export class Instance<
 		return this.api.kind;
 	}
 
-	initialize?()
-	dispose?()
+	initialize() { }
+	dispose() { }
 
 	api!: InterfaceAPI<InstanceData, InstanceChannels>;
 

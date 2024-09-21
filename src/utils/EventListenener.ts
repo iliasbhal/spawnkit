@@ -11,6 +11,12 @@ export class EventListener<Channels extends Record<string, any>> {
     this.eventsHandlers.get(event)!.add(callback);
 
     return {
+      notifyAll: (data: Channels[EV]) => {
+        this.notify(event, data);
+      },
+      notify: (data: Channels[EV]) => {
+        callback(data);
+      },
       unsubscribe: () => {
         this.off(event, callback);
       },

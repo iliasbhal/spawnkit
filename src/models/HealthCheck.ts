@@ -1,10 +1,15 @@
 import { Adapters } from "@/adapters";
 import { ControlledInterval } from "@/utils/ControlledInterval";
+import { SpawnkitError } from '@/models/Error';
 
 export const HEALTH_CHECK_INTERVAL = 5000;
 export const HEALTH_CHECK_NOTIFY_PER_INTERVAL = 3;
 
 type HealthCheckMessage = true;
+
+export class InstanceStalledError extends SpawnkitError {
+	name: string = 'InstanceStalledError';
+}
 
 export class HealthCheckEmitter {
 	adapters: Adapters;
@@ -55,6 +60,8 @@ export class HealthCheckListener {
 	currentTimeout = null as any;
 	currentSubscription = null as any;
 	start() {
+		if (this.disposed) return;
+
 		this.createAbortInterval();
 		this.currentSubscription = this.adapters.messages.subscribe<HealthCheckMessage>(
 			this.instance,
@@ -85,7 +92,9 @@ export class HealthCheckListener {
 		}
 	}
 
+	disposed = false;
 	dispose() {
+		this.disposed = true;
 		this.disposeInterval();
 		this.currentSubscription?.unsubscribe();
 	}

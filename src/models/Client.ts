@@ -13,7 +13,7 @@ import {
 	BaseAdapter,
 } from "../adapters";
 import { ClientData } from "./ClientData";
-import { HealthCheckListener } from "./HealthCheck";
+import { HealthCheckListener, InstanceStalledError } from "./HealthCheck";
 import { Queue } from "./Queue";
 import { nanoid } from "nanoid";
 import { SpawnkitError } from './Error'
@@ -24,7 +24,7 @@ export interface SpawnkitConfig {
 	instances: { [key: string]: typeof Instance<any, any> };
 }
 
-export interface ClientChannel {
+export interface BaseChannel {
 	error: SpawnkitError | Error,
 }
 
@@ -55,11 +55,14 @@ export class Client<CP extends SpawnkitConfig> {
 	};
 
 	private validateInstancces = () => {
+		const clientInst = this.spawn('TEST_INST' as any, "__TEST_ID__");
+		clientInst.dispose();
+
 		Object.values(this.instances).forEach((InstanceClass: any) => {
 			const inst = new InstanceClass();
 			const instanceName = InstanceClass.name;
 
-			const clientInst = this.spawn(instanceName, "__TEST_ID__");
+
 			const clientKeys = new Set(Object.keys(clientInst));
 			const instanceKeys = new Set(
 				Object.getOwnPropertyNames(Object.getPrototypeOf(inst)).concat(Object.keys(inst)),
@@ -239,6 +242,11 @@ export class Client<CP extends SpawnkitConfig> {
 			};
 		};
 
+		const healthCheck = new HealthCheckListener(this.adapters, instanceIdentifier);
+		setTimeout(() => {
+			healthCheck.start();
+		})
+
 		const createRemoteMethodHandler = (mode: InstanceMethodCall["mode"]) => {
 			return (action: string) => {
 				return async (...args: any[]) => {
@@ -253,23 +261,20 @@ export class Client<CP extends SpawnkitConfig> {
 
 					if (mode === "normal") {
 						return new Promise((resolve, reject) => {
-							const healthCheck = new HealthCheckListener(this.adapters, instanceIdentifier);
-							healthCheck.start();
-
 							const internalStream = new ClientStream();
 							const scope = {
 								response: undefined as any,
 							};
 
 							const isDoneWaitingForResponse = () => {
-								healthCheck.dispose();
 								internalStream.close();
 								scope.response?.unsubscribe();
 							};
 
 							healthCheck.onHealthCheckFailed(() => {
 								isDoneWaitingForResponse();
-								const error = new Error("Spawnkit Instance Timeout");
+								const error = new InstanceStalledError();
+								internalStream.error(error);
 								reject(error);
 							});
 
@@ -319,6 +324,12 @@ export class Client<CP extends SpawnkitConfig> {
 		const normalRemoteMethodHandler = createRemoteMethodHandler("normal");
 		const skipRemoteMethodHandler = createRemoteMethodHandler("skip");
 
+		const eventListeners = new EventListener();
+
+		healthCheck.onHealthCheckFailed(() => {
+			eventListeners.notify("error", new InstanceStalledError());
+		});
+
 		const instanceClientAPI = {
 			id: instanceId,
 			kind: kind,
@@ -331,30 +342,32 @@ export class Client<CP extends SpawnkitConfig> {
 				return true;
 			},
 
+			dispose: () => {
+				healthCheck.dispose();
+				eventListeners.clear();
+			},
+
 			on: <Channel extends Extract<keyof InstanceChannels, string>>(
 				channel: Channel,
 				callback: (data: InstanceChannels[Channel]) => any,
 			) => {
-				const healthCheck = new HealthCheckListener(this.adapters, instanceIdentifier);
-				healthCheck.start();
+				const callbackEmitter = eventListeners.on(channel, callback);
 
 				const subscribe = this.adapters.messages.subscribe<InstanceChannels[Channel]>(
 					instanceIdentifier,
 					Client.getChannelForEventBus("instance", channel.toString()),
 					(message) => {
 						healthCheck.reset();
-						callback(message.data);
+						callbackEmitter.notify(message.data);
 					},
 				);
 
 				const dispose = () => {
 					subscribe.unsubscribe();
-					healthCheck.dispose();
+					callbackEmitter.unsubscribe();
 				};
 
-				healthCheck.onHealthCheckFailed(() => {
-					dispose();
-				});
+				healthCheck.onHealthCheckFailed(() => dispose());
 
 				return {
 					unsubscribe: () => {
