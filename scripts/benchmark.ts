@@ -1,10 +1,10 @@
 import "dotenv/config";
 
-import * as Spawnkit from "@/.";
-import * as RedisAdapter from "@/adapters/redis";
-import { redis } from "@/adapters/redis/client";
-import { ControlledInterval } from "@/utils/ControlledInterval";
-import { ControlledPromise } from "@/utils/ControlledPromise";
+import * as Spawnkit from "../";
+import * as RedisAdapter from "../src/adapters/redis";
+import { redis } from "../src/adapters/redis/client";
+import { ControlledInterval } from "../src/utils/ControlledInterval";
+import { ControlledPromise } from "../src/utils/ControlledPromise";
 
 interface OrderBookData {
 	orderBook: string[];

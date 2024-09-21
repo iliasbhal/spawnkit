@@ -20,7 +20,8 @@ export class Stream<StreamValue> {
 		this.callback = callback;
 	}
 
-	on<EV extends keyof CallbackByEvent<any>>(event: EV, callback: CallbackByEvent<StreamValue>[EV]) {
+	on<EV extends keyof CallbackByEvent<StreamValue>>(event: EV, callback: CallbackByEvent<StreamValue>[EV]) {
+		// @ts-ignore
 		this.eventListener.on(event, callback);
 	}
 

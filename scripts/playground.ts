@@ -384,19 +384,21 @@ const severalClients = async () => {
 
 const errorOnLifeCycle = async () => {
 	console.log('errorOnLifeCycle - 1');
-	client.on("error", (err) => {
-		// console.log("CLIENT ERROR", err);
-	})
 
 	const initErrorExample = client.spawn("ErrorInitExample", "BTC/EUR");
+
+	initErrorExample.on('error', (err) => {
+		console.log("CLIENT ERROR", err);
+	})
 
 
 
 	try {
 
 		const response = await initErrorExample.doSomething('message-AA');
+		console.log('RESPONSE', response);
 	} catch (err) {
-		console.log("--------->", err);
+		console.log("ERR", err);
 	}
 
 	console.log('errorOnLifeCycle - 2');
