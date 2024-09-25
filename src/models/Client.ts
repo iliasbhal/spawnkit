@@ -22,6 +22,11 @@ import { EventListener } from "@/utils/EventListenener";
 export interface SpawnkitConfig {
 	adapters: Adapters;
 	instances: { [key: string]: typeof Instance<any, any> };
+	config?: {
+		throwOnStalledInstance?: boolean;
+		disconnectOnStalledInstance?: boolean;
+		// taints?: string[];
+	}
 }
 
 export interface BaseChannel {
@@ -33,11 +38,22 @@ type InternalMessageData = InstanceEventChannels[keyof InstanceEventChannels];
 export class Client<CP extends SpawnkitConfig> {
 	private adapters: CP["adapters"];
 	private instances: CP["instances"];
+	private config: ReturnType<typeof Client.createConfig<CP['config']>>;
+
 	id = nanoid();
+
+	static createConfig<Provided extends SpawnkitConfig['config']>(provided: Provided): Required<SpawnkitConfig['config']> {
+		return {
+			throwOnStalledInstance: provided?.throwOnStalledInstance ?? true,
+			disconnectOnStalledInstance: provided?.disconnectOnStalledInstance ?? true,
+			// taints: provided?.taints ?? [],
+		}
+	}
 
 	constructor(opts: CP) {
 		this.adapters = opts.adapters;
 		this.instances = opts.instances;
+		this.config = Client.createConfig(opts.config);
 
 		this.linkAndValidateAdapters();
 		this.validateInstancces();
@@ -273,9 +289,12 @@ export class Client<CP extends SpawnkitConfig> {
 
 							healthCheck.onHealthCheckFailed(() => {
 								isDoneWaitingForResponse();
-								const error = new InstanceStalledError();
-								internalStream.error(error);
-								reject(error);
+
+								if (this.config.throwOnStalledInstance) {
+									const error = new InstanceStalledError();
+									internalStream.error(error);
+									reject(error);
+								}
 							});
 
 							internalStream.on("end", () => {
@@ -367,7 +386,14 @@ export class Client<CP extends SpawnkitConfig> {
 					callbackEmitter.unsubscribe();
 				};
 
-				healthCheck.onHealthCheckFailed(() => dispose());
+				healthCheck.onHealthCheckFailed(() => {
+					callbackEmitter.notify(new InstanceStalledError());
+
+					if (this.config.disconnectOnStalledInstance) {
+						dispose();
+						return;
+					}
+				});
 
 				return {
 					unsubscribe: () => {

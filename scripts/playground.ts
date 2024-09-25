@@ -28,6 +28,10 @@ const createAdapters = () => ({
 const client = Spawnkit.Client.from({
 	adapters: createAdapters(),
 	instances: instances,
+	config: {
+		throwOnStalledInstance: true,
+		disconnectOnStalledInstance: true,
+	}
 });
 
 const main = async () => {

@@ -2,12 +2,28 @@
 
 - Start writing documentation / recipes.
 
+- What should we do for transiant requests when an instance becomes stalled? 
+
+- ✅ Add ability to configure client behaviour.
+- Add ability to configure instance behaviour.
+
+- Add ability to send stream 
+     1. Send event to instance to set up a realtime channel
+     2. emit messages to that channel
+     ( we could do that for instead of scheduling messages?? ).
+
+- Add ability to create instance with certain args??
+
+- each instance proxy should run on its own process, we cannot use Bull worker as it's a separate thread for all instance, we need one worker for each instance! when proxy is done, we should call process.exit(0) ??
 
 - add methods to logger based on logLevel and channel
      ( .info .error. ... etc) for infra, per request.
 
 - add replica support. we should be able to ????
+
 - add client tolerence + affinity ( like Kubernetes ) ???
+     ( this feature can be used to create segregation between clients on Spawnkit cloud, where each machine belongs to a client ).
+
 
 
 # Spawnkit Redis Adapter:
