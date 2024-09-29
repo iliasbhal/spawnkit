@@ -11,10 +11,13 @@ export class ControlledTimeout {
 	}
 
 	running = false;
-	prevRemaining: number | null = null;
+	remainingTime: number | null = null;
 	startedAt: number | null = null;
 	timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+	timeout: number | null = null;
 	start(remaining: number) {
+		this.timeout = remaining;
 		const timeRemainig = remaining;
 		if (!timeRemainig) {
 			throw new Error("Need a Timeout");
@@ -33,29 +36,35 @@ export class ControlledTimeout {
 		if (!this.running) return;
 
 		this.running = false;
-		this.prevRemaining = Date.now() - this.startedAt!;
+		this.remainingTime = Date.now() - this.startedAt!;
 		this.startedAt = null;
 		clearTimeout(this.timeoutId!);
 	}
 
 	resume() {
-		if (!this.prevRemaining) {
+		if (!this.remainingTime) {
 			throw new Error("UH OH");
 		}
 
-		this.timeoutId = setTimeout(() => this.done(), this.prevRemaining);
+		this.timeoutId = setTimeout(() => this.done(), this.remainingTime);
 		this.startedAt = Date.now();
 		this.running = true;
-		this.prevRemaining = null;
+		this.remainingTime = null;
 	}
 
 	reset() {
 		this.stop();
-		this.prevRemaining = null;
+		this.remainingTime = null;
 	}
 
-	restart(timeout: number) {
+	restart(timeout?: number) {
 		this.reset();
-		this.start(timeout);
+
+		const nextTimeout = timeout || this.timeout;
+		if (!nextTimeout) {
+			throw new Error("UH OH");
+		}
+
+		this.start(nextTimeout);
 	}
 }
