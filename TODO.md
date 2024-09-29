@@ -4,8 +4,7 @@
 
 - What should we do for transiant requests when an instance becomes stalled? 
 
-- ✅ Add ability to configure client behaviour.
-- Add ability to configure instance behaviour.
+     - ability to control how many request can be handled at the same time. ( concurrency )
 
 - Add ability to send stream 
      1. Send event to instance to set up a realtime channel
