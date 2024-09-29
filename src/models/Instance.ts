@@ -7,6 +7,10 @@ type Prettify<T> = {
 	[K in keyof T]: T[K];
 } & {};
 
+export interface InstanceConfig {
+	abortRequestOnStall?: boolean;
+}
+
 export class Instance<
 	InstanceData extends AnyRecord = AnyRecord,
 	InstanceChannels extends AnyRecord = AnyRecord,
@@ -14,6 +18,10 @@ export class Instance<
 	__types = {} as {
 		InstanceData: InstanceData;
 		InstanceChannels: InstanceChannels;
+	};
+
+	config: Partial<InstanceConfig> = {
+		abortRequestOnStall: true,
 	};
 
 	signal(signal: Prettify<InstanceLog>) {

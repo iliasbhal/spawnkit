@@ -311,9 +311,14 @@ export class InstanceProxy<Inst extends Instance> {
 	}
 
 	getInstanceConfig() {
-		return {
+		const DEFAULT_CONFIG = {
 			abortRequestOnStall: true,
-		}
+		};
+
+		return {
+			...DEFAULT_CONFIG,
+			...this.instance.config,
+		};
 	}
 
 	trace(...args: Parameters<typeof this.logger.log>) {

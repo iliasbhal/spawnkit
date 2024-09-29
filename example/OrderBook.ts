@@ -1,4 +1,5 @@
 import * as Spawnkit from "../src";
+import { InstanceConfig } from "../src/models/Instance";
 
 interface OrderBookData {
 	orderBook: string[];
@@ -20,6 +21,11 @@ interface Order extends Pick<Stock, "tick"> {
 }
 
 export class OrderBook extends Spawnkit.Instance<OrderBookData, OrderBookEvent> {
+	config: Partial<InstanceConfig> = {
+		abortRequestOnStall: true,
+	};
+
+
 	on<C extends keyof OrderBookEvent>(channel: C, message: OrderBookEvent[C]) {
 		if (channel === "buyOrders") {
 			const mdg = message;
