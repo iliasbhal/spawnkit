@@ -1,9 +1,11 @@
-import { Adapters } from "@/adapters";
+import { Adapters, InstanceMethodCall } from "@/adapters";
 import { ControlledInterval } from "@/utils/ControlledInterval";
 import { SpawnkitError } from '@/models/Error';
+import { EventListener } from "@/utils/EventListenener";
+import { ControlledTimeout } from "@/utils/ControlledTimeout";
 
 export const HEALTH_CHECK_INTERVAL = 5000;
-export const HEALTH_CHECK_NOTIFY_PER_INTERVAL = 3;
+export const HEALTH_CHECK_NOTIFY_PER_INTERVAL = 2;
 
 type HealthCheckMessage = true;
 
@@ -11,7 +13,13 @@ export class InstanceStalledError extends SpawnkitError {
 	name: string = 'InstanceStalledError';
 }
 
+export interface HealthCheckEmitterChannels {
+	stalled: InstanceStalledError;
+}
+
 export class HealthCheckEmitter {
+	eventListener = new EventListener<HealthCheckEmitterChannels>();
+
 	adapters: Adapters;
 	instance: { kind: string; id: string };
 
@@ -24,12 +32,26 @@ export class HealthCheckEmitter {
 		this.instance = instance;
 	}
 
+	checkTimesPerInterval = HEALTH_CHECK_INTERVAL;
+	assertNotStalled(event: InstanceMethodCall) {
+		const now = Date.now();
+		const timeSinceCallStarted = now - event.timestamp;
+		const isStalledEvent = timeSinceCallStarted > HEALTH_CHECK_INTERVAL;
+		if (isStalledEvent) {
+			throw new InstanceStalledError();
+		}
+	}
+
 	emitter = null as ControlledInterval | null;
+	stalled = this.createStalledEmitter();
 	start() {
+		this.stalled.start(HEALTH_CHECK_INTERVAL);
 		this.emitter = ControlledInterval.new({
 			interval: HEALTH_CHECK_INTERVAL / HEALTH_CHECK_NOTIFY_PER_INTERVAL,
 			execute: async (count) => {
-				return await this.adapters.messages.publish<HealthCheckMessage>(
+				this.stalled.restart();
+
+				await this.adapters.messages.publish<HealthCheckMessage>(
 					this.instance,
 					HealthCheckEmitter.getChannelForHealthSignal(),
 					true,
@@ -38,16 +60,28 @@ export class HealthCheckEmitter {
 		});
 	}
 
+	createStalledEmitter() {
+		const timeout = new ControlledTimeout();
+		timeout.await.then(() => {
+			this.eventListener.notify("stalled", new InstanceStalledError());
+		});
+
+		return timeout;
+	}
+
 	dispose() {
-		if (this.emitter) {
-			this.emitter.dispose();
-			this.emitter = null;
-		}
+		this.emitter?.dispose();
+		this.emitter = null;
+		this.stalled.reset();
 	}
 }
 
+interface HealthCheckListenerChannels {
+	abort: any
+}
+
 export class HealthCheckListener {
-	abortCtl = new AbortController();
+	eventListener = new EventListener<HealthCheckListenerChannels>();
 
 	adapters: Adapters;
 	instance: { kind: string; id: string };
@@ -69,7 +103,7 @@ export class HealthCheckListener {
 			(message) => this.reset(),
 		);;
 
-		this.abortCtl.signal.addEventListener("abort", () => {
+		this.eventListener.on("abort", () => {
 			this.onAbortCallbacks.forEach((callback) => callback());
 			this.dispose();
 		});
@@ -82,7 +116,7 @@ export class HealthCheckListener {
 
 	createAbortInterval() {
 		this.currentTimeout = setTimeout(() => {
-			this.abortCtl.abort()
+			this.eventListener.notify("abort", {});
 		}, HEALTH_CHECK_INTERVAL);
 	}
 
@@ -97,6 +131,7 @@ export class HealthCheckListener {
 		this.disposed = true;
 		this.disposeInterval();
 		this.currentSubscription?.unsubscribe();
+		this.eventListener.clear();
 	}
 
 	onAbortCallbacks: (() => void)[] = [];

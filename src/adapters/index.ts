@@ -33,7 +33,7 @@ export type ScheduleConfig = CommonScheduleConfig & (Cron | Delay);
 export interface ScheduleEventConfig {
 	instance: InstanceIdentifier;
 	schedule: ScheduleConfig;
-	event: InstanceMethodCall;
+	event: Omit<InstanceMethodCall, 'timestamp'>;
 }
 
 export interface InstanceIdentifier {
@@ -42,6 +42,7 @@ export interface InstanceIdentifier {
 }
 
 export interface InstanceMethodCall<Action extends string = string, Args extends any[] = any[]> {
+	timestamp: number;
 	action: Action;
 	args: Args;
 	mode: "normal" | "skip" | "scheduled";
@@ -53,6 +54,9 @@ export interface InstanceMethodCall<Action extends string = string, Args extends
 export type InstanceLog =
 	| {
 		type: "log";
+		message: string;
+	} | {
+		type: "error";
 		message: string;
 	}
 	| {

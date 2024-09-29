@@ -31,6 +31,7 @@ export interface SpawnkitConfig {
 
 export interface BaseChannel {
 	error: SpawnkitError | Error,
+	stalled: InstanceStalledError,
 }
 
 type InternalMessageData = InstanceEventChannels[keyof InstanceEventChannels];
@@ -39,6 +40,11 @@ export class Client<CP extends SpawnkitConfig> {
 	private adapters: CP["adapters"];
 	private instances: CP["instances"];
 	private config: ReturnType<typeof Client.createConfig<CP['config']>>;
+
+	eventListeners = new EventListener<BaseChannel>();
+	on<K extends keyof BaseChannel>(event: K, callback: (data: BaseChannel[K]) => any) {
+		return this.eventListeners.on(event, callback);
+	}
 
 	id = nanoid();
 
@@ -267,6 +273,7 @@ export class Client<CP extends SpawnkitConfig> {
 			return (action: string) => {
 				return async (...args: any[]) => {
 					const eventId = await sendEventToInstance({
+						timestamp: Date.now(),
 						action,
 						args,
 						mode,

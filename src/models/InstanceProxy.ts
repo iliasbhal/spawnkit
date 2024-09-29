@@ -75,7 +75,7 @@ export class InstanceProxy<Inst extends Instance> {
 	public keepAlive = new PromiseList();
 	public aborted = new ControlledPromise("Aborted");
 
-	public config: InstanceIdentifier;
+	public indenfier: InstanceIdentifier;
 	public adapters: Adapters;
 	public abortSignal: AbortSignal;
 	public client: Client<any>;
@@ -83,13 +83,13 @@ export class InstanceProxy<Inst extends Instance> {
 	constructor(config: {
 		logger: Logger;
 		instance: Inst;
-		config: InstanceIdentifier;
+		indenfier: InstanceIdentifier;
 		adapters: Adapters;
 		abortSignal: AbortSignal;
 		client: Client<any>;
 	}) {
 		this.logger = config.logger;
-		this.config = config.config;
+		this.indenfier = config.indenfier;
 		this.adapters = config.adapters;
 		this.instance = config.instance;
 		this.abortSignal = config.abortSignal;
@@ -97,13 +97,13 @@ export class InstanceProxy<Inst extends Instance> {
 
 		const data = new Data<any>({
 			adapters: this.adapters,
-			instance: this.config,
+			instance: this.indenfier,
 			logger: this.logger,
 		});
 
 		InstanceProxy.configureInstance(this.instance, {
-			id: config.config.id,
-			kind: config.config.kind,
+			id: config.indenfier.id,
+			kind: config.indenfier.kind,
 			emit: (channel, data) => {
 				return this.emit(channel, data);
 			},
@@ -143,13 +143,18 @@ export class InstanceProxy<Inst extends Instance> {
 		const { action, args } = event;
 
 		const logger = this.createCallLoggerFor(messageId);
-		const handleMethodResponse = this.createResultHandler(messageId, event);
+		const handleRequestResponse = this.createResultHandler(messageId, event);
 
 		// Wrap the method in a Promise. to ensure that if the method is sync
 		// We still catch the error if one happens.
 		logger.start(event);
 		const [error, response] = await Promise.resolve()
 			.then(async () => {
+				const config = this.getInstanceConfig();
+				if (config.abortRequestOnStall) {
+					this.healthCheckEmitter.assertNotStalled(event);
+				}
+
 				// @ts-ignore
 				const method = this.instance[action]?.bind(this.instance);
 				const methodExists = typeof method == "function";
@@ -159,7 +164,7 @@ export class InstanceProxy<Inst extends Instance> {
 			.then((res) => [null, res])
 			.catch((err) => [err, null]);
 
-		await handleMethodResponse({
+		await handleRequestResponse({
 			error,
 			response,
 		});
@@ -275,8 +280,19 @@ export class InstanceProxy<Inst extends Instance> {
 			handleError(new Error("Worker Aborted"));
 		});
 
+
+		const stalledListener = this.healthCheckEmitter.eventListener
+			.on("stalled", (error) => {
+				const config = this.getInstanceConfig();
+				if (config.abortRequestOnStall) {
+					handleError(error)
+				}
+			});
+
+
 		stream.on("end", async () => {
 			syncAbort.clear();
+			stalledListener.unsubscribe();
 
 			context.metadata.ended_at = Date.now();
 			await this.respond(context, {
@@ -292,6 +308,12 @@ export class InstanceProxy<Inst extends Instance> {
 
 		stream.start();
 		return promise.await;
+	}
+
+	getInstanceConfig() {
+		return {
+			abortRequestOnStall: true,
+		}
 	}
 
 	trace(...args: Parameters<typeof this.logger.log>) {
@@ -390,6 +412,14 @@ export class InstanceProxy<Inst extends Instance> {
 	public continouslyEmitHealthCheckSignal() {
 		this.healthCheckEmitter = new HealthCheckEmitter(this.adapters, this.instance);
 		this.healthCheckEmitter.start();
+
+		this.healthCheckEmitter.eventListener.on("stalled", (err) => {
+			const serializedErr = RemoteError.serialize(err);
+			this.instance.signal({
+				type: 'error',
+				message: serializedErr.message,
+			});
+		});
 	}
 
 	public onEventSubscription: { unsubscribe: Function } | undefined;

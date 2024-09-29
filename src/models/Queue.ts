@@ -53,6 +53,7 @@ export class Queue<O extends SpawnkitConfig> {
 		console.log("SENT CONTEXT", context);
 		const remoteInstance = this.client.spawn<any>(kind, id);
 		await remoteInstance.__INTERNAL__.sendEventToInstance({
+			timestamp: Date.now(),
 			args,
 			action,
 			mode: "skip",
@@ -93,7 +94,7 @@ export class Queue<O extends SpawnkitConfig> {
 				const instance = new Instance();
 				const proxy = new InstanceProxy({
 					adapters: this.adapters,
-					config: instanceConfig,
+					indenfier: instanceConfig,
 					instance,
 					abortSignal,
 					logger,
