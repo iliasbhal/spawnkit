@@ -200,6 +200,15 @@ export class Client<CP extends SpawnkitConfig> {
 		}
 	}
 
+	createHealthChecker(inst: { kind: string, id: string }) {
+		const healthCheck = new HealthCheckListener(this.adapters, inst);
+		setTimeout(() => {
+			healthCheck.start();
+		});
+
+		return healthCheck;
+	}
+
 	spawn<Kind extends Extract<keyof CP["instances"], string>>(kind: Kind, instanceId: InstanceId) {
 		type Inst = InstanceType<CP["instances"][Kind]>;
 		type InstanceData = Inst["__types"]["InstanceData"];
@@ -264,10 +273,11 @@ export class Client<CP extends SpawnkitConfig> {
 			};
 		};
 
-		const healthCheck = new HealthCheckListener(this.adapters, instanceIdentifier);
-		setTimeout(() => {
-			healthCheck.start();
-		})
+		const eventListeners = new EventListener();
+		const healthCheck = this.createHealthChecker(instanceIdentifier);
+		healthCheck.onHealthCheckFailed(() => {
+			eventListeners.notify("error", new InstanceStalledError());
+		});
 
 		const createRemoteMethodHandler = (mode: InstanceMethodCall["mode"]) => {
 			return (action: string) => {
@@ -350,12 +360,6 @@ export class Client<CP extends SpawnkitConfig> {
 		const normalRemoteMethodHandler = createRemoteMethodHandler("normal");
 		const skipRemoteMethodHandler = createRemoteMethodHandler("skip");
 
-		const eventListeners = new EventListener();
-
-		healthCheck.onHealthCheckFailed(() => {
-			eventListeners.notify("error", new InstanceStalledError());
-		});
-
 		const instanceClientAPI = {
 			id: instanceId,
 			kind: kind,
@@ -392,15 +396,6 @@ export class Client<CP extends SpawnkitConfig> {
 					subscribe.unsubscribe();
 					callbackEmitter.unsubscribe();
 				};
-
-				healthCheck.onHealthCheckFailed(() => {
-					callbackEmitter.notify(new InstanceStalledError());
-
-					if (this.config.disconnectOnStalledInstance) {
-						dispose();
-						return;
-					}
-				});
 
 				return {
 					unsubscribe: () => {
