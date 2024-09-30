@@ -13,7 +13,7 @@ import {
 	BaseAdapter,
 } from "../adapters";
 import { ClientData } from "./ClientData";
-import { HealthCheckListener, InstanceStalledError } from "./HealthCheck";
+import { HealthCheckEmitter, HealthCheckListener, InstanceStalledError } from "./HealthCheck";
 import { Queue } from "./Queue";
 import { nanoid } from "nanoid";
 import { SpawnkitError } from './Error'
@@ -37,8 +37,8 @@ export interface BaseChannel {
 type InternalMessageData = InstanceEventChannels[keyof InstanceEventChannels];
 
 export class Client<CP extends SpawnkitConfig> {
-	private adapters: CP["adapters"];
-	private instances: CP["instances"];
+	private adapters!: CP["adapters"];
+	private instances!: CP["instances"];
 	private config: ReturnType<typeof Client.createConfig<CP['config']>>;
 
 	eventListeners = new EventListener<BaseChannel>();
@@ -145,7 +145,20 @@ export class Client<CP extends SpawnkitConfig> {
 		return this.liveInstances.get(kind)?.has(id) || false;
 	}
 
+	clientHealthCheck: HealthCheckEmitter;
+
 	public start() {
+		this.clientHealthCheck = new HealthCheckEmitter(this.adapters, {
+			kind: "__internal__client",
+			id: this.id,
+		});
+
+		this.clientHealthCheck.eventListener.on('stalled', (data) => {
+			this.eventListeners.notify('stalled', data);
+		});
+
+		this.clientHealthCheck.start();
+
 		const forwardOptions = {
 			adapters: this.adapters,
 			instances: this.instances,
@@ -156,6 +169,7 @@ export class Client<CP extends SpawnkitConfig> {
 	}
 
 	public stop() {
+		this.clientHealthCheck.dispose();
 		return this.worker?.stop();
 	}
 
