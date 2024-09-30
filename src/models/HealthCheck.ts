@@ -72,7 +72,7 @@ export class HealthCheckEmitter {
 	dispose() {
 		this.emitter?.dispose();
 		this.emitter = null;
-		this.stalled.reset();
+		this.stalled.stop();
 	}
 }
 
