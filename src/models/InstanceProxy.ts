@@ -352,6 +352,7 @@ export class InstanceProxy<Inst extends Instance> {
 			.finally(() => syncAbort.clear());
 	}
 
+	initialized = false;
 	async initialize() {
 		try {
 			this.trace({ type: "proxy:initialize:start" });
@@ -362,6 +363,8 @@ export class InstanceProxy<Inst extends Instance> {
 			this.client.eventListeners.notify("error", err);
 			throw err;
 		}
+
+		this.initialized = true;
 	}
 
 	public async dispose() {
@@ -371,7 +374,9 @@ export class InstanceProxy<Inst extends Instance> {
 
 		try {
 			this.trace({ type: "proxy:dispose:start" });
-			await this.instance.dispose?.()
+			if (this.initialized) {
+				await this.instance.dispose?.()
+			}
 			this.trace({ type: "proxy:dispose:success" });
 		} catch (err) {
 			this.trace({ type: "proxy:dispose:failed" });
