@@ -47,7 +47,7 @@ export class OrderBook extends Spawnkit.Instance<OrderBookData, OrderBookEvent> 
 
 export class BadExample extends Spawnkit.Instance {
 	__INTERNAL__ = "this is bad";
-	example() {}
+	example() { }
 }
 
 export class EmptyResponseInstance extends Spawnkit.Instance {
@@ -62,5 +62,14 @@ export class IntrospectExample extends Spawnkit.Instance {
 			kind: this.kind,
 			id: this.id,
 		};
+	}
+
+	async getUserId() {
+		return this.ctx.userID;
+	}
+
+	async getUserIdWithWaiting(timeout: number) {
+		await wait(timeout);
+		return this.ctx.userID;
 	}
 }

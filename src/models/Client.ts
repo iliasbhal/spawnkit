@@ -21,7 +21,7 @@ import { EventListener } from "@/utils/EventListenener";
 
 export interface SpawnkitConfig {
 	adapters: Adapters;
-	instances: { [key: string]: typeof Instance<any, any> };
+	instances: { [key: string]: typeof Instance<any, any, any> };
 	config?: {
 		throwOnStalledInstance?: boolean;
 		disconnectOnStalledInstance?: boolean;
@@ -35,6 +35,13 @@ export interface BaseChannel {
 }
 
 type InternalMessageData = InstanceEventChannels[keyof InstanceEventChannels];
+
+interface InstType<Config extends SpawnkitConfig, Kind extends keyof Config['instances']> {
+	Inst: InstanceType<Config["instances"][Kind]>,
+	InstanceData: InstType<Config, Kind>['Inst']["__types"]["InstanceData"],
+	InstanceChannels: InstType<Config, Kind>['Inst']["__types"]["InstanceChannels"],
+	InstanceContext: InstType<Config, Kind>['Inst']["__types"]["InstanceContext"],
+}
 
 export class Client<CP extends SpawnkitConfig> {
 	private adapters!: CP["adapters"];
@@ -227,6 +234,8 @@ export class Client<CP extends SpawnkitConfig> {
 		type Inst = InstanceType<CP["instances"][Kind]>;
 		type InstanceData = Inst["__types"]["InstanceData"];
 		type InstanceChannels = Inst["__types"]["InstanceChannels"];
+		type InstanceContext = Inst["__types"]["InstanceContext"];
+
 		type InheritedMethods = Exclude<ExtractMethodNames<Instance>, undefined>;
 		type AvailableMethods = Omit<ExtractMethods<Inst>, InheritedMethods>;
 		type RemoteMethodes = MakeRemote<AvailableMethods>;
@@ -276,7 +285,9 @@ export class Client<CP extends SpawnkitConfig> {
 									action: prop,
 									args,
 									mode: "scheduled",
-									context: {},
+									context: {
+										context: context,
+									},
 								},
 							});
 
@@ -301,6 +312,9 @@ export class Client<CP extends SpawnkitConfig> {
 						action,
 						args,
 						mode,
+						context: {
+							context: context,
+						}
 					});
 
 					if (mode === "skip") return true;

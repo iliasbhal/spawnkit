@@ -73,7 +73,7 @@ describe.only("Base", () => {
 		orderbook.on("orders", ordersStub);
 		orderbook.buy({ tick: "APPL", qty: 10 });
 
-		orderbook.data.on("count", (data) => {});
+		orderbook.data.on("count", (data) => { });
 
 		await hasBeenCalled.await;
 		await expect(ordersStub).toHaveBeenCalled();
@@ -95,6 +95,40 @@ describe.only("Base", () => {
 			kind: "IntrospectExample",
 		});
 	});
+
+
+	it('can access spawn context within instance', async () => {
+		const exampleInst = client.spawn("IntrospectExample", "intro-12312300", {
+			userID: 'ALHA',
+		});
+
+		const userId = await exampleInst.getUserId();
+		expect(userId).toEqual('ALHA');
+	})
+
+	it('can access correct spawn context within instance', async () => {
+		const exampleInst1 = client.spawn("IntrospectExample", "intro-12312300", { userID: 'ALHA-1' });
+		const exampleInst2 = client.spawn("IntrospectExample", "intro-12312300", { userID: 'ALHA-2' });
+		const exampleInst3 = client.spawn("IntrospectExample", "intro-12312300", { userID: 'ALHA-3' });
+
+
+		const resolveOrder = [];
+		const createTrackerForInst = (id: string) => (userId) => {
+			resolveOrder.push(id);
+			return userId;
+		}
+
+		const [userId1, userId2, userId3] = await Promise.all([
+			exampleInst1.getUserIdWithWaiting(1000).then(createTrackerForInst('1')),
+			exampleInst2.getUserIdWithWaiting(0).then(createTrackerForInst('2')),
+			exampleInst3.getUserIdWithWaiting(300).then(createTrackerForInst('3')),
+		])
+
+		expect(resolveOrder).toEqual(['2', '3', '1']);
+		expect(userId1).toEqual('ALHA-1');
+		expect(userId2).toEqual('ALHA-2');
+		expect(userId3).toEqual('ALHA-3');
+	})
 
 	it.todo("can call for instance method and not wait for the resonse");
 });

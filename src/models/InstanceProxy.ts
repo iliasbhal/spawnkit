@@ -155,6 +155,16 @@ export class InstanceProxy<Inst extends Instance> {
 					this.healthCheckEmitter.assertNotStalled(event);
 				}
 
+				const proxiedInst = new Proxy(this.instance, {
+					get: (target, prop, receiver) => {
+						if (prop === "ctx") {
+							return context.context;
+						}
+
+						return Reflect.get(target, prop, receiver);
+					},
+				});
+
 				// @ts-ignore
 				const method = this.instance[action]?.bind(this.instance);
 				const methodExists = typeof method == "function";

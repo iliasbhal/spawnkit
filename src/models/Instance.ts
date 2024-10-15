@@ -32,6 +32,8 @@ export class Instance<
 	// For some reason, adding types here break the client types.
 	on(channel: keyof InstanceChannels, message: InstanceChannels[keyof InstanceChannels]) { }
 
+	ctx: InstanceContext = {} as InstanceContext;
+
 	get id() {
 		return this.api.id;
 	}

@@ -1,3 +1,4 @@
+import { InstanceConext } from "@/models/Instance";
 import type { Client } from "..";
 
 export type InstanceId = string;
@@ -46,8 +47,9 @@ export interface InstanceMethodCall<Action extends string = string, Args extends
 	action: Action;
 	args: Args;
 	mode: "normal" | "skip" | "scheduled";
-	context?: {
+	context: {
 		scheduleId?: string;
+		context: InstanceConext;
 	};
 }
 
