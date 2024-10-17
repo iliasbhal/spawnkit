@@ -16,9 +16,6 @@ export class InstanceScheduler extends BaseQueue implements Adapters.AdapaterIns
 	}
 
 	async schedule(schedule: Adapters.InstanceIdentifier) {
-		// The schedule job is added to the global 'schedule" queue 
-		// To be then routed to the a compatible worker queue.
-
 		const job = this.getScheduleInstanceJobId(schedule, {});
 		await this.instanceQueue.add("schedule", job.data, {
 			jobId: job.id,
@@ -31,7 +28,6 @@ export class InstanceScheduler extends BaseQueue implements Adapters.AdapaterIns
 		const worker = new BullMQ.Worker<JobData>(
 			this.instanceQueue.name,
 			async (job) => {
-				console.log('INCOMING WORKER JOB', job.data)
 				await callback(job.data, {});
 			},
 			{

@@ -8,6 +8,8 @@
 
 - ability to control how many request can be handled at the same time. ( concurrency )
 
+- use .emitInternal to handle remote eviction? 
+
 - Add ability to send stream 
      1. Send event to instance to set up a realtime channel
      2. emit messages to that channel

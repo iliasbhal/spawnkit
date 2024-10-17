@@ -356,8 +356,6 @@ export class InstanceProxy<Inst extends Instance> {
 
 	/** Starts listening to events */
 	public async start() {
-		console.log('$$$$$ STARTING INSTANCE $$$$$');
-
 		this.running = true;
 		this.continouslyEmitHealthCheckSignal();
 
@@ -380,8 +378,6 @@ export class InstanceProxy<Inst extends Instance> {
 
 		await this.keepAliveUntilNothingHappens()
 			.finally(() => syncAbort.clear());
-
-		console.log('$$$$$ FINISH INSTANCE $$$$$');
 	}
 
 	public async stop() {
@@ -501,8 +497,8 @@ export class InstanceProxy<Inst extends Instance> {
 	public subscribeToInternalEvent() {
 		const channelID = Client.getChannelForEventBus("internal", 'all');
 		this.emittedEventSubscription = this.adapters.messages.subscribe(this.instance, channelID, (message) => {
-
-			console.log('$$$$$ INTERNAL MESSAGE $$$$$', message);
+			// CAN BE USED TO HANDLE INTERNAL EVENTS
+			// LIKE REMOTE EVICTION
 		});
 	}
 
@@ -513,7 +509,6 @@ export class InstanceProxy<Inst extends Instance> {
 
 	public async emitInternal(message: any) {
 		const channelID = Client.getChannelForEventBus("internal", 'all');
-		console.log('$$$$$ EMITTING INTERNAL MESSAGE $$$$$', message);
 		await this.adapters.messages.publish(this.instance, channelID, message);
 	}
 

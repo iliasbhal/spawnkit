@@ -195,7 +195,6 @@ export class Scheduler<O extends SpawnkitConfig> {
 			client: this.client,
 		});
 
-		console.log('TRY INSTANTIATE', instanceConfig.kind, instanceConfig.id);
 		try {
 			await lock.using(async (abortSignal) => {
 				this.registerInstance(exeuctionId, proxy);
@@ -203,8 +202,6 @@ export class Scheduler<O extends SpawnkitConfig> {
 				await proxy.start();
 			});
 		} catch (err) {
-			console.log('ERR INSTANTIATE', err)
-
 			const shouldSilenceError =
 				err instanceof Lock.AcquireLockError ||
 				err instanceof Lock.ReleaseError;
@@ -217,8 +214,6 @@ export class Scheduler<O extends SpawnkitConfig> {
 		} finally {
 			this.unregisterInstanceByOwnerId(exeuctionId);
 		}
-
-		console.log('DONE INSTANTIATE', instanceConfig.kind, instanceConfig.id);
 
 		// // In order to make sure that we didn't miss any event and to avoid any race conditions
 		// // we'll check if there any event left to process. But we do it outside of the lock.
