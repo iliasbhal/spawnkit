@@ -1,5 +1,4 @@
 import * as Spawnkit from "../src";
-import { InstanceConfig } from "../src/models/Instance";
 
 interface OrderBookData {
 	orderBook: string[];
@@ -12,19 +11,31 @@ interface OrderBookEvent {
 	alphachannel: string;
 }
 
+interface OrderBookContext {
+	userID: string;
+}
+
 interface Stock {
 	tick: string;
 }
+
+
 
 interface Order extends Pick<Stock, "tick"> {
 	qty: number;
 }
 
-export class OrderBook extends Spawnkit.Instance<OrderBookData, OrderBookEvent> {
-	config: Partial<InstanceConfig> = {
-		abortRequestOnStall: true,
-	};
+export class OrderBook extends Spawnkit.Instance<OrderBookContext, OrderBookData, OrderBookEvent> {
+	// config: Partial<InstanceConfig> = {
+	// 	clientAffinity: [
+	// 		{ key: 'location', valueIn: ['france'], type: 'required' },
+	// 		{ key: 'secure', valueIn: ['true'], type: 'prefer' },
+	// 	],
+	// };
 
+	initialize(): void {
+
+	}
 
 	on<C extends keyof OrderBookEvent>(channel: C, message: OrderBookEvent[C]) {
 		if (channel === "buyOrders") {
@@ -35,7 +46,14 @@ export class OrderBook extends Spawnkit.Instance<OrderBookData, OrderBookEvent> 
 		// console.log("ON INSTANCE", this.id, channel, message);
 	}
 
+	async ensureAffinities() {
+		await this.internals.setAffinities([
+			{ key: 'location', value: 'france', type: 'required' },
+		]);
+	}
+
 	async buy(order: Order) {
+		this.ctx.userID
 		// this.logger.log("-----BUYYYYY------");
 		// console.log("___BUY___", order);
 		// this.data = this.data || ({} as any);

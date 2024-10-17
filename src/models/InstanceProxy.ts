@@ -12,15 +12,19 @@ import {
 	ScheduleId,
 	ScheduledCallMetaData,
 } from "../adapters";
+import { SpawnkitError } from "./Error";
 import { Client } from "./Client";
 import { Data } from "./Data";
 import { Logger } from "./Logger";
 import { RemoteError } from "./RemoteError";
+import { Affinity, Toleration } from "./Toleration";
 
 export interface InstanceProps {
 	kind: string;
 	id: string;
 }
+
+const InstanceAbortedError = new SpawnkitError("Instance Aborted");
 
 export interface InstanceDataChannels {
 	[key: `kind:${string}:id:${string}:data`]: { data: any };
@@ -55,6 +59,12 @@ export interface InterfaceAPI<
 		get: Data<InstanceData>["get"];
 		set: Data<InstanceData>["set"];
 	};
+
+	internals: {
+		getAffinities: () => Promise<Affinity[]>;
+		setAffinities: (affinities: Affinity[]) => Promise<boolean>;
+	};
+
 	logger: {
 		log: (message: string) => void;
 	};
@@ -69,44 +79,80 @@ interface MessageContext {
 }
 
 export class InstanceProxy<Inst extends Instance> {
-	public logger: Logger;
-	public instance: Inst;
+	public logger?: Logger;
+	public abortSignal?: AbortSignal;
+
+	public instance: Instance;
 	public running: boolean = false;
 	public keepAlive = new PromiseList();
 	public aborted = new ControlledPromise("Aborted");
 
 	public indenfier: InstanceIdentifier;
 	public adapters: Adapters;
-	public abortSignal: AbortSignal;
 	public client: Client<any>;
 
+	public data: Data<Inst['__types']['InstanceData']>;
+
 	constructor(config: {
-		logger: Logger;
-		instance: Inst;
 		indenfier: InstanceIdentifier;
 		adapters: Adapters;
-		abortSignal: AbortSignal;
 		client: Client<any>;
+		ownerId: string;
 	}) {
-		this.logger = config.logger;
+
 		this.indenfier = config.indenfier;
 		this.adapters = config.adapters;
-		this.instance = config.instance;
-		this.abortSignal = config.abortSignal;
 		this.client = config.client;
 
-		const data = new Data<any>({
+		const Instance = this.client.instances[config.indenfier.kind];
+		if (!Instance) {
+			throw new Error(`Instance Kind Not Implemented (received: ${config.indenfier.kind})`);
+		}
+
+		this.logger = new Logger({
+			adapters: this.adapters,
+			ownerId: config.ownerId,
+			instance: config.indenfier,
+		});
+
+		this.data = new Data<Inst['__types']['InstanceData']>({
 			adapters: this.adapters,
 			instance: this.indenfier,
 			logger: this.logger,
 		});
 
-		InstanceProxy.configureInstance(this.instance, {
-			id: config.indenfier.id,
-			kind: config.indenfier.kind,
+		this.instance = new Instance();
+		this.configureInstance();
+	}
+
+	public syncWithAbortSignal(abortSignal: AbortSignal) {
+		this.abortSignal = abortSignal;
+	}
+
+
+
+	configureInstance() {
+		const affinityAPI = Toleration.createAffinityAPI(this.data);
+		const instanceInternal = {
+			getAffinities: async () => {
+				return await affinityAPI.getAffinities()
+			},
+			setAffinities: async (affinities: any) => {
+				const hasChanged = await affinityAPI.setAffinities(affinities);
+				if (hasChanged) this.client.onInstanceAffinityChanged(this.indenfier);
+				return hasChanged;
+			},
+		}
+
+		const configuredAPI = {
+			id: this.indenfier.id,
+			kind: this.indenfier.kind,
+			internals: instanceInternal,
+
 			emit: (channel, data) => {
 				return this.emit(channel, data);
 			},
+
 			waitFor: (promise: Promise<any>) => {
 				return this.keepAlive.add(promise);
 			},
@@ -119,28 +165,25 @@ export class InstanceProxy<Inst extends Instance> {
 				},
 			},
 			data: {
-				get: (...args: Parameters<(typeof data)["get"]>) => data.get(...args),
-				set: (...args: Parameters<(typeof data)["set"]>) => {
+				get: (...args: Parameters<(typeof this.data)["get"]>) => {
+					return this.data.get(...args);
+				},
+				set: (...args: Parameters<(typeof this.data)["set"]>) => {
 					return this.runExternalEffect(async () => {
-						return await data.set(...args);
+						return await this.data.set(...args);
 					});
 				},
 			},
-		});
-	}
+		}
 
-	static configureInstance(
-		instance: Instance,
-		api: InterfaceAPI<Instance["__types"]["InstanceData"], Instance["__types"]["InstanceChannels"]>,
-	) {
-		instance.api = api;
+		this.instance.api = configuredAPI;
 	}
 
 	public async callMethodDefinedInEvent(
 		messageId: EventId,
 		event: InstanceMethodCall,
 	): Promise<any> {
-		const { action, args } = event;
+		const { action, args, context } = event;
 
 		const logger = this.createCallLoggerFor(messageId);
 		const handleRequestResponse = this.createResultHandler(messageId, event);
@@ -150,10 +193,7 @@ export class InstanceProxy<Inst extends Instance> {
 		logger.start(event);
 		const [error, response] = await Promise.resolve()
 			.then(async () => {
-				const config = this.getInstanceConfig();
-				if (config.abortRequestOnStall) {
-					this.healthCheckEmitter.assertNotStalled(event);
-				}
+				this.healthCheckEmitter.assertNotStalled(event);
 
 				const proxiedInst = new Proxy(this.instance, {
 					get: (target, prop, receiver) => {
@@ -166,10 +206,17 @@ export class InstanceProxy<Inst extends Instance> {
 				});
 
 				// @ts-ignore
-				const method = this.instance[action]?.bind(this.instance);
+				const method = this.instance[action]?.bind(proxiedInst);
 				const methodExists = typeof method == "function";
 				if (!methodExists) throw new Error("Bad Request: Method not found");
-				return await method?.(...args);
+
+				// Abort the request if the instance is aborted
+				// This is to prevent the instance from doing any side effects
+				// when it is already disposed.
+				return await Promise.race([
+					method?.(...args),
+					this.aborted.await.then(() => { throw InstanceAbortedError }),
+				]);
 			})
 			.then((res) => [null, res])
 			.catch((err) => [err, null]);
@@ -290,19 +337,15 @@ export class InstanceProxy<Inst extends Instance> {
 			handleError(new Error("Worker Aborted"));
 		});
 
-
-		const stalledListener = this.healthCheckEmitter.eventListener
-			.on("stalled", (error) => {
-				const config = this.getInstanceConfig();
-				if (config.abortRequestOnStall) {
-					handleError(error)
-				}
-			});
+		// const stalledListener = this.healthCheckEmitter.eventListener
+		// 	.on("stalled", (error) => {
+		// 			handleError(error)
+		// 	});
 
 
 		stream.on("end", async () => {
 			syncAbort.clear();
-			stalledListener.unsubscribe();
+			// stalledListener.unsubscribe();
 
 			context.metadata.ended_at = Date.now();
 			await this.respond(context, {
@@ -318,17 +361,6 @@ export class InstanceProxy<Inst extends Instance> {
 
 		stream.start();
 		return promise.await;
-	}
-
-	getInstanceConfig() {
-		const DEFAULT_CONFIG = {
-			abortRequestOnStall: true,
-		};
-
-		return {
-			...DEFAULT_CONFIG,
-			...this.instance.config,
-		};
 	}
 
 	trace(...args: Parameters<typeof this.logger.log>) {
@@ -362,6 +394,12 @@ export class InstanceProxy<Inst extends Instance> {
 			.finally(() => syncAbort.clear());
 	}
 
+	public async stop() {
+		this.unsubscribeFromInstanceEvent();
+		this.aborted.resolve(true);
+		this.dispose();
+	}
+
 	initialized = false;
 	async initialize() {
 		try {
@@ -380,7 +418,8 @@ export class InstanceProxy<Inst extends Instance> {
 	public async dispose() {
 		if (!this.running) return;
 		this.running = false;
-		this.onEventSubscription?.unsubscribe();
+		this.unsubscribeFromInstanceEvent();
+		this.data.dispose();
 
 		try {
 			this.trace({ type: "proxy:dispose:start" });
@@ -464,6 +503,10 @@ export class InstanceProxy<Inst extends Instance> {
 		);
 
 		this.keepAlive.add(timer.await);
+	}
+
+	public unsubscribeFromInstanceEvent() {
+		this.onEventSubscription?.unsubscribe();
 	}
 
 	/** this function is used to emit message to one client,

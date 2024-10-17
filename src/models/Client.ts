@@ -11,13 +11,15 @@ import {
 	EventId,
 	InstanceMethodCall,
 	BaseAdapter,
+	InstanceIdentifier,
 } from "../adapters";
 import { ClientData } from "./ClientData";
 import { HealthCheckEmitter, HealthCheckListener, InstanceStalledError } from "./HealthCheck";
-import { Queue } from "./Queue";
+import { Scheduler } from "./Scheduler";
 import { nanoid } from "nanoid";
 import { SpawnkitError } from './Error'
 import { EventListener } from "@/utils/EventListenener";
+import { Toleration, Trait } from './Toleration'
 
 export interface SpawnkitConfig {
 	adapters: Adapters;
@@ -25,13 +27,14 @@ export interface SpawnkitConfig {
 	config?: {
 		throwOnStalledInstance?: boolean;
 		disconnectOnStalledInstance?: boolean;
-		// taints?: string[];
+		traits?: Trait[];
 	}
 }
 
 export interface BaseChannel {
 	error: SpawnkitError | Error,
 	stalled: InstanceStalledError,
+	changed: Client<any>['config'],
 }
 
 type InternalMessageData = InstanceEventChannels[keyof InstanceEventChannels];
@@ -45,8 +48,8 @@ interface InstType<Config extends SpawnkitConfig, Kind extends keyof Config['ins
 
 export class Client<CP extends SpawnkitConfig> {
 	private adapters!: CP["adapters"];
-	private instances!: CP["instances"];
 	private config: ReturnType<typeof Client.createConfig<CP['config']>>;
+	instances!: CP["instances"];
 
 	eventListeners = new EventListener<BaseChannel>();
 	on<K extends keyof BaseChannel>(event: K, callback: (data: BaseChannel[K]) => any) {
@@ -54,22 +57,41 @@ export class Client<CP extends SpawnkitConfig> {
 	}
 
 	id = nanoid();
+	scheduler: Scheduler<any>;
 
 	static createConfig<Provided extends SpawnkitConfig['config']>(provided: Provided): Required<SpawnkitConfig['config']> {
 		return {
 			throwOnStalledInstance: provided?.throwOnStalledInstance ?? true,
 			disconnectOnStalledInstance: provided?.disconnectOnStalledInstance ?? true,
-			// taints: provided?.taints ?? [],
+			traits: provided?.traits ?? [],
 		}
 	}
 
 	constructor(opts: CP) {
 		this.adapters = opts.adapters;
 		this.instances = opts.instances;
-		this.config = Client.createConfig(opts.config);
 
+		this.scheduler = Scheduler.from(opts, this);
+		this.config = Client.createConfig(opts.config);
 		this.linkAndValidateAdapters();
-		this.validateInstancces();
+		// this.validateInstancces();
+	}
+
+	getConfig() {
+		return this.config;
+	}
+
+	setConfig(config: Partial<SpawnkitConfig['config']>) {
+		const nextConfig = Client.createConfig(config);
+		const hasChanged = JSON.stringify(this.config) !== JSON.stringify(nextConfig);
+		if (!hasChanged) return;
+
+		this.config = nextConfig;
+		this.eventListeners.notify('changed', this.config);
+	}
+
+	onInstanceAffinityChanged(identifier: InstanceIdentifier) {
+		this.scheduler.revalidateInstanceAffinity(identifier);
 	}
 
 	private linkAndValidateAdapters = () => {
@@ -84,7 +106,7 @@ export class Client<CP extends SpawnkitConfig> {
 	};
 
 	private validateInstancces = () => {
-		const clientInst = this.spawn('TEST_INST' as any, "__TEST_ID__");
+		const clientInst = this.spawn('TEST_INST' as any, "__TEST_ID__", {});
 		clientInst.dispose();
 
 		Object.values(this.instances).forEach((InstanceClass: any) => {
@@ -125,33 +147,6 @@ export class Client<CP extends SpawnkitConfig> {
 		return `broadcast:${type}:${channel}` as const;
 	}
 
-	worker: Queue<any> | null = null;
-
-	liveInstances = new Map<string, Set<string>>();
-	async runOnlyOneOfInstance<Callback extends () => Promise<void>>(
-		kind: string,
-		id: string,
-		callback: Callback,
-	) {
-		if (!this.liveInstances.get(kind)) {
-			this.liveInstances.set(kind, new Set<string>());
-		}
-
-		const liveInstances = this.liveInstances.get(kind)!;
-		if (liveInstances.has(id)) return false;
-
-		try {
-			liveInstances.add(id);
-			return await callback();
-		} finally {
-			liveInstances.delete(id);
-		}
-	}
-
-	isInstanceRunning(kind: string, id: string) {
-		return this.liveInstances.get(kind)?.has(id) || false;
-	}
-
 	clientHealthCheck: HealthCheckEmitter;
 
 	public start() {
@@ -165,60 +160,16 @@ export class Client<CP extends SpawnkitConfig> {
 		});
 
 		this.clientHealthCheck.start();
+		this.scheduler.start();
 
-		const forwardOptions = {
-			adapters: this.adapters,
-			instances: this.instances,
-		} as any;
-
-		const workerQueue = Queue.from(forwardOptions, this);
-		return workerQueue.start();
+		return {
+			stop: () => this.stop(),
+		}
 	}
 
 	public stop() {
 		this.clientHealthCheck.dispose();
-		return this.worker?.stop();
-	}
-
-	timestampByInstance = new Map<InstanceId, number>();
-	private shouldScheduleInstance(instanceId: InstanceId) {
-		const now = Date.now();
-		const lastSentEventTimesamp = this.timestampByInstance.get(instanceId);
-		this.timestampByInstance.set(instanceId, now);
-
-		if (!lastSentEventTimesamp) {
-			return true;
-		}
-
-		const timeSinceLastEventSent = now - lastSentEventTimesamp;
-		const shouldScheduleInstance = timeSinceLastEventSent > 1000;
-		return shouldScheduleInstance;
-	}
-
-	private tryWakeInstanceUp<Kind extends Extract<keyof CP["instances"], string>>(
-		kind: Kind,
-		instanceId: InstanceId,
-	) {
-		// In the case that we are sending a lot of events
-		// We don't have to try to schedule an instance together with every event we send.
-		// Once an instance terminate, it will try again 3 times to check if there are pending events process.
-		// We can rely on this fact to only schedule an instance if it has been a long time since last event push.
-		// This is mainly to avoid adding unnessessary pressure the backend.
-		const canScheduleInstance = this.shouldScheduleInstance(instanceId);
-		if (canScheduleInstance) {
-			const instanceAlreadyRunningOnThisWorker = this.isInstanceRunning(
-				kind.toString(),
-				instanceId,
-			);
-			if (instanceAlreadyRunningOnThisWorker) {
-				return;
-			}
-
-			this.adapters.instances.schedule({
-				id: instanceId,
-				kind: kind.toString(),
-			});
-		}
+		return this.scheduler?.stop();
 	}
 
 	createHealthChecker(inst: { kind: string, id: string }) {
@@ -230,7 +181,7 @@ export class Client<CP extends SpawnkitConfig> {
 		return healthCheck;
 	}
 
-	spawn<Kind extends Extract<keyof CP["instances"], string>>(kind: Kind, instanceId: InstanceId) {
+	spawn<Kind extends Extract<keyof CP["instances"], string>, SpawnContext extends InstType<CP, Kind>['InstanceContext']>(kind: Kind, instanceId: InstanceId, context: SpawnContext = {} as any) {
 		type Inst = InstanceType<CP["instances"][Kind]>;
 		type InstanceData = Inst["__types"]["InstanceData"];
 		type InstanceChannels = Inst["__types"]["InstanceChannels"];
@@ -251,7 +202,7 @@ export class Client<CP extends SpawnkitConfig> {
 			const [_, eventId] = await Promise.all([
 				// when sending an event, we shall always try to spawn an instance
 				// to ensure that the event will be processed
-				this.tryWakeInstanceUp(kind, instanceId),
+				this.scheduler.tryWakeInstanceUp(kind, instanceId),
 				this.adapters.messages.publish(instanceIdentifier, `rpc`, methodCallConfig),
 			]);
 
@@ -388,6 +339,36 @@ export class Client<CP extends SpawnkitConfig> {
 		const normalRemoteMethodHandler = createRemoteMethodHandler("normal");
 		const skipRemoteMethodHandler = createRemoteMethodHandler("skip");
 
+
+		const internalProxy = this.scheduler.createInternalProxy(kind, instanceId);
+
+		const createEventHandler = <Channel extends Extract<keyof InstanceChannels, string>>(
+			channel: Channel,
+			callback: (data: InstanceChannels[Channel]) => any,
+		) => {
+			const callbackEmitter = eventListeners.on(channel, callback);
+
+			const subscribe = this.adapters.messages.subscribe<InstanceChannels[Channel]>(
+				instanceIdentifier,
+				Client.getChannelForEventBus("instance", channel.toString()),
+				(message) => {
+					healthCheck.reset();
+					callbackEmitter.notify(message.data);
+				},
+			);
+
+			const dispose = () => {
+				subscribe.unsubscribe();
+				callbackEmitter.unsubscribe();
+			};
+
+			return {
+				unsubscribe: () => {
+					dispose();
+				},
+			};
+		}
+
 		const instanceClientAPI = {
 			id: instanceId,
 			kind: kind,
@@ -405,38 +386,17 @@ export class Client<CP extends SpawnkitConfig> {
 				eventListeners.clear();
 			},
 
-			on: <Channel extends Extract<keyof InstanceChannels, string>>(
-				channel: Channel,
-				callback: (data: InstanceChannels[Channel]) => any,
-			) => {
-				const callbackEmitter = eventListeners.on(channel, callback);
-
-				const subscribe = this.adapters.messages.subscribe<InstanceChannels[Channel]>(
-					instanceIdentifier,
-					Client.getChannelForEventBus("instance", channel.toString()),
-					(message) => {
-						healthCheck.reset();
-						callbackEmitter.notify(message.data);
-					},
-				);
-
-				const dispose = () => {
-					subscribe.unsubscribe();
-					callbackEmitter.unsubscribe();
-				};
-
-				return {
-					unsubscribe: () => {
-						dispose();
-					},
-				};
-			},
+			on: createEventHandler,
 
 			data: data,
+			context: context as typeof context,
 
-			__INTERNAL__: {
+			internals: {
 				sendEventToInstance,
-				wakeUpInstance: () => this.tryWakeInstanceUp(kind, instanceId),
+				wakeUpInstance: () => this.scheduler.tryWakeInstanceUp(kind, instanceId),
+				ensureLive: () => { },
+				getAffinities: internalProxy.instance.internals.getAffinities,
+				setAffinities: internalProxy.instance.internals.setAffinities,
 			},
 
 			schedule: scheduleRemoteMethodHandler,

@@ -1,27 +1,28 @@
 import { InstanceLog } from "@/adapters";
 import type { InterfaceAPI } from "./InstanceProxy";
+import { Affinity } from './Toleration';
 
-type AnyRecord = { [key: string]: any };
+export type AnyRecord = { [key: string]: any };
+export type Context = AnyRecord;
 
 type Prettify<T> = {
 	[K in keyof T]: T[K];
 } & {};
 
+
 export interface InstanceConfig {
-	abortRequestOnStall?: boolean;
+	clientAffinity?: Affinity[];
 }
 
 export class Instance<
+	InstanceContext extends Context = Context,
 	InstanceData extends AnyRecord = AnyRecord,
 	InstanceChannels extends AnyRecord = AnyRecord,
 > {
 	__types = {} as {
+		InstanceContext: InstanceContext;
 		InstanceData: InstanceData;
 		InstanceChannels: InstanceChannels;
-	};
-
-	config: Partial<InstanceConfig> = {
-		abortRequestOnStall: true,
 	};
 
 	signal(signal: Prettify<InstanceLog>) {
@@ -41,8 +42,13 @@ export class Instance<
 		return this.api.kind;
 	}
 
+	get internals() {
+		return this.api.internals;
+	}
+
 	initialize() { }
 	dispose() { }
+
 
 	api!: InterfaceAPI<InstanceData, InstanceChannels>;
 

@@ -1,5 +1,6 @@
-import { InstanceConext } from "@/models/Instance";
+import { Context } from "@/models/Instance";
 import type { Client } from "..";
+import { Affinity, Trait } from "@/models/Toleration";
 
 export type InstanceId = string;
 export type InstanceKind = string;
@@ -49,7 +50,7 @@ export interface InstanceMethodCall<Action extends string = string, Args extends
 	mode: "normal" | "skip" | "scheduled";
 	context: {
 		scheduleId?: string;
-		context: InstanceConext;
+		context: Context;
 	};
 }
 
@@ -236,9 +237,8 @@ export abstract class AdapterEventScheduler extends BaseAdapter {
 }
 
 export abstract class AdapaterInstanceScheduler extends BaseAdapter {
-	abstract schedule(schedule: InstanceIdentifier): Promise<ScheduleId>;
-
-	abstract subscribe(callback: (data: InstanceIdentifier, context: ScheduleContext) => any): {
+	abstract schedule(scheduleConfig: { affinities: Affinity[] }, schedule: InstanceIdentifier): Promise<ScheduleId>;
+	abstract subscribe(scheduleConfig: { traits: Trait[] }, callback: (data: InstanceIdentifier, context: ScheduleContext) => any): {
 		unsubscribe: Function;
 	};
 }

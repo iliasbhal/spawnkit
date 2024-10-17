@@ -1,5 +1,5 @@
 import { wait } from "../utils/wait";
-import { Adapters, InstanceId, InstanceKind } from "../adapters";
+import { Adapters, InstanceId, InstanceIdentifier, InstanceKind } from "../adapters";
 import { ControlledPromise } from "@/utils/ControlledPromise";
 import { Logger } from "./Logger";
 import { SpawnkitError } from './Error'
@@ -25,7 +25,6 @@ export class LockExtendError extends LockError {
 }
 
 interface LockConfig {
-	resource: string;
 	duration: number;
 	extendBeforeThreshold?: number;
 	instance: {
@@ -66,22 +65,29 @@ export class Lock {
 			);
 		}
 
+		const RESOURCE_ID = `${config.instance.kind}:${config.instance.id}`;
 		return Object.assign({}, config, {
+			resource: RESOURCE_ID,
 			extendBeforeThreshold,
 		});
 	}
 
 	constructor(
 		config: LockConfig & {
-			adapters: Adapters;
 			ownerId: string;
-			logger: Logger;
+			adapters: Adapters;
 		},
 	) {
+
 		this.config = this.getConfig(config);
 		this.ownerId = config.ownerId;
 		this.adapters = config.adapters;
-		this.logger = config.logger;
+
+		this.logger = new Logger({
+			adapters: this.adapters,
+			ownerId: this.ownerId,
+			instance: config.instance,
+		});
 	}
 
 	createLockTimelineLogger(

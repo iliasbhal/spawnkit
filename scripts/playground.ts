@@ -23,14 +23,15 @@ const createAdapters = () => ({
 	events: new RedisAdapter.EventScheduler(redis),
 	instances: new RedisAdapter.InstanceScheduler(redis),
 	logger: new RedisAdapter.Logger(redis),
-});
+} as const);
 
 const client = Spawnkit.Client.from({
 	adapters: createAdapters(),
 	instances: instances,
 	config: {
-		throwOnStalledInstance: true,
-		disconnectOnStalledInstance: true,
+		taints: {
+			location: "france",
+		}
 	}
 });
 
@@ -45,6 +46,10 @@ const main = async () => {
 	console.log("-----");
 	// await redis.flushall("SYNC");
 	client.start();
+
+	client.on('stalled', (err) => {
+
+	})
 
 	//   // attributeExample();
 	await Promise.all([
@@ -66,7 +71,9 @@ const main = async () => {
 };
 
 const attributeExample = () => {
-	const exampleInst = client.spawn("StreamExample", "Hector");
+	const exampleInst = client.spawn("StreamExample", "Hector", {
+
+	});
 	console.log(exampleInst.kind, exampleInst.id);
 };
 
@@ -77,7 +84,9 @@ const attributeExample = () => {
 // const orderBook = OrderBuuk.spawn("BTC/EUR");
 
 const basicExample = async () => {
-	const orderBook = client.spawn("OrderBook", "BTC/EUR");
+	const orderBook = client.spawn("OrderBook", "BTC/EUR", {
+
+	});
 	const subscription1 = orderBook.on("orders", (event) => {
 		// console.log("ON CLIENT 1", event);
 	});
@@ -109,12 +118,20 @@ const basicExample = async () => {
 };
 
 const streamExample = async () => {
-	const exampleInst = client.spawn("StreamExample", "Hector");
-	console.log(exampleInst.kind, exampleInst.id);
+	const streamCtl = client.spawn("StreamExample", "Hector", {
+	});
+
+
+
+	console.log(streamCtl.kind, streamCtl.id);
+
+	streamCtl.withContext({
+		uid: nanoid(),
+	});
 
 	// Example 1:  consume stream using .map
 	// which returns a Promise that is resolved when the stream ends
-	const stream = await exampleInst.startStream({ count: 4 });
+	const stream = await streamCtl.startStream({ count: 4 });
 	await stream.map((data) => {
 		console.log("RECEIVED ->", data);
 	});
@@ -134,7 +151,8 @@ const streamExample = async () => {
 };
 
 const streamWithErrors = async () => {
-	const exampleInst = client.spawn("StreamExample", "Hector");
+	const exampleInst = client.spawn("StreamExample", "Hector", {
+	});
 	console.log(exampleInst.kind, exampleInst.id);
 
 	const erroredStream = await exampleInst.startFaultyStreamStart();
@@ -170,8 +188,12 @@ const streamWithErrors = async () => {
 };
 
 const emittedEventsExample = async () => {
-	const orderBook = client.spawn("OrderBook", "BTC/USD");
-	const orderBook2 = client.spawn("OrderBook", "ETH/USD");
+	const orderBook = client.spawn("OrderBook", "BTC/USD", {
+
+	});
+	const orderBook2 = client.spawn("OrderBook", "ETH/USD", {
+
+	});
 
 	// Example 1: can emit from client and handle from instance
 	// and from client as well
@@ -211,80 +233,86 @@ const emittedEventsExample = async () => {
 };
 
 const scheduleCallExample = async () => {
-	// const streamExample = client.spawn("StreamExample", "BTC/ETH");
-	// const scheduleId = await streamExample
-	//   .schedule({
-	//     name: "Buy AAPL Regularly",
-	//     delay: 2000,
-	//     // cron: "* * * * *",
-	//   })
-	//   .startFaultyStreamDuring();
+	// const streamExample = client.spawn("StreamExample", "BTC/ETH", {
+});
+// const scheduleId = await streamExample
+//   .schedule({
+//     name: "Buy AAPL Regularly",
+//     delay: 2000,
+//     // cron: "* * * * *",
+//   })
+//   .startFaultyStreamDuring();
 
-	// setInterval(async () => {
-	//   const scheduled = await streamExample.scheduled.list();
-	//   console.log("LIST", scheduled);
-	//   const data = await streamExample.scheduled.get(scheduleId);
-	//   console.log("DATA", data);
-	// }, 10_000);
+// setInterval(async () => {
+//   const scheduled = await streamExample.scheduled.list();
+//   console.log("LIST", scheduled);
+//   const data = await streamExample.scheduled.get(scheduleId);
+//   console.log("DATA", data);
+// }, 10_000);
 
-	const orderBook = client.spawn("OrderBook", "BTC/ETH");
+const orderBook = client.spawn("OrderBook", "BTC/ETH", {
+
+});
 
 	// orderBook.emit("orders", ["asddsa"]);
 
-	// const orderBook2 = client.spawn("OrderBook", "BTC/USD");
-	// orderBook2.on("orders", (event) => {
-	//   console.log("stream: ", event);
-	// });
+	// const orderBook2 = client.spawn("OrderBook", "BTC/USD", {
+	});
+// orderBook2.on("orders", (event) => {
+//   console.log("stream: ", event);
+// });
 
-	// const scheduleId = await orderBook2
-	//   .schedule({
-	//     name: "Buy AAPL Regularly",
-	//     delay: 2000,
-	//     // cron: "* * * * *",
-	//   })
-	//   .buy({
-	//     tick: "AAPL",
-	//   });
+// const scheduleId = await orderBook2
+//   .schedule({
+//     name: "Buy AAPL Regularly",
+//     delay: 2000,
+//     // cron: "* * * * *",
+//   })
+//   .buy({
+//     tick: "AAPL",
+//   });
 
-	// const scheduled2 = await orderBook2.scheduled.list();
-	// console.log("scheduled2", scheduled2);
+// const scheduled2 = await orderBook2.scheduled.list();
+// console.log("scheduled2", scheduled2);
 
-	// const before = await orderBook.scheduled.list();
-	// console.log("before", before);
-	// await orderBook.scheduled.cancel(scheduleId);
-	// const after = await orderBook.scheduled.list();
-	// console.log("after", after);
-	// await orderBook.scheduled.delete(scheduleId);
-	// const after2 = await orderBook.scheduled.list();
-	// console.log("after2", after2);
+// const before = await orderBook.scheduled.list();
+// console.log("before", before);
+// await orderBook.scheduled.cancel(scheduleId);
+// const after = await orderBook.scheduled.list();
+// console.log("after", after);
+// await orderBook.scheduled.delete(scheduleId);
+// const after2 = await orderBook.scheduled.list();
+// console.log("after2", after2);
 
-	// const scheduleId2 = await orderBook.schedule({ delay: 3000 }).buy({
-	//   tick: "AAPL",
-	//   qty: 4,
-	// });
+// const scheduleId2 = await orderBook.schedule({ delay: 3000 }).buy({
+//   tick: "AAPL",
+//   qty: 4,
+// });
 
-	// const before2 = await orderBook.scheduled.list();
-	// console.log("before", before2.length);
-	// await orderBook.scheduled.cancel(scheduleId2);
-	// const after2 = await orderBook.scheduled.list();
-	// console.log("after", after2.length);
+// const before2 = await orderBook.scheduled.list();
+// console.log("before", before2.length);
+// await orderBook.scheduled.cancel(scheduleId2);
+// const after2 = await orderBook.scheduled.list();
+// console.log("after", after2.length);
 
-	// await orderBook.schedule({ cron: "* * * * *" }).buy({
-	//   tick: "AAPL",
-	// });
+// await orderBook.schedule({ cron: "* * * * *" }).buy({
+//   tick: "AAPL",
+// });
 
-	// await orderBook.schedule({ delay: 3000 }).buy({
-	//   tick: "AAPL",
-	// });
+// await orderBook.schedule({ delay: 3000 }).buy({
+//   tick: "AAPL",
+// });
 
-	// const list = await orderBook.scheduled.list();
-	// console.log("allscheduled", list);
+// const list = await orderBook.scheduled.list();
+// console.log("allscheduled", list);
 
-	await wait(5000);
+await wait(5000);
 };
 
 const errorHandlingExample = async () => {
-	const errorExample = client.spawn("ErrorExample", "LOL");
+	const errorExample = client.spawn("ErrorExample", "LOL", {
+
+	});
 
 	try {
 		await wait(0);
@@ -300,7 +328,9 @@ const errorHandlingExample = async () => {
 };
 
 const exampleXState = async () => {
-	const toggle = client.spawn("ToggleMachine", "AAAA");
+	const toggle = client.spawn("ToggleMachine", "AAAA", {
+
+	});
 	toggle.data.on("snapshot", (next) => {
 		console.log("SUBSCRIBE", "KEY", "snapshot", next);
 	});
@@ -335,7 +365,9 @@ const exampleXState = async () => {
 };
 
 const exampleData = async () => {
-	const toggle = client.spawn("GameSession", "AAAA");
+	const toggle = client.spawn("GameSession", "AAAA", {
+
+	});
 	const initial = await toggle.get();
 	// console.log('BEFORE', initial);
 
@@ -350,7 +382,9 @@ const exampleData = async () => {
 };
 
 const exampleBadCall = async () => {
-	const orderBook = client.spawn("OrderBook", "BTC/EUR");
+	const orderBook = client.spawn("OrderBook", "BTC/EUR", {
+
+	});
 
 	try {
 		// @ts-expect-error
@@ -389,7 +423,9 @@ const severalClients = async () => {
 const errorOnLifeCycle = async () => {
 	console.log('errorOnLifeCycle - 1');
 
-	const initErrorExample = client.spawn("ErrorInitExample", "BTC/EUR");
+	const initErrorExample = client.spawn("ErrorInitExample", "BTC/EUR", {
+
+	});
 
 	initErrorExample.on('error', (err) => {
 		console.log("CLIENT ERROR", err);

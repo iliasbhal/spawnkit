@@ -1,10 +1,19 @@
 # Spawnkit lib
 
+
+- add client tolerence + affinity ( like Kubernetes ) ???
+     ( this feature can be used to create segregation between clients on Spawnkit cloud, where each machine belongs to a client ).
+     // We should be able to set the affinity of an instance from the client.
+     // When we change the affinity from the client, if the instance is online, it should behave as expected
+     // the online instance client should trigger client.onAffinityChanged
+
+- Move client validation within .spawn and check if process.env === 'developement'
+
 - Start writing documentation / recipes.
 
-- What should we do for transiant requests when an instance becomes stalled? 
+- Client should wait for a response/ if reponse take too long, then client will timeout, unless a signal is sent to the client to tall that the message is still processing and everything is fine.
 
-     - ability to control how many request can be handled at the same time. ( concurrency )
+- ability to control how many request can be handled at the same time. ( concurrency )
 
 - Add ability to send stream 
      1. Send event to instance to set up a realtime channel
@@ -19,11 +28,6 @@
      ( .info .error. ... etc) for infra, per request.
 
 - add replica support. we should be able to ????
-
-- add client tolerence + affinity ( like Kubernetes ) ???
-     ( this feature can be used to create segregation between clients on Spawnkit cloud, where each machine belongs to a client ).
-
-
 
 # Spawnkit Redis Adapter:
 - Redis Logger should also make use of an object storage(s3) ??

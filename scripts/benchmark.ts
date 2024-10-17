@@ -5,6 +5,11 @@ import * as RedisAdapter from "../src/adapters/redis";
 import { redis } from "../src/adapters/redis/client";
 import { ControlledInterval } from "../src/utils/ControlledInterval";
 import { ControlledPromise } from "../src/utils/ControlledPromise";
+import { wait } from "../src/utils/wait";
+
+interface OrderBookContext {
+	userID: string;
+}
 
 interface OrderBookData {
 	orderBook: string[];
@@ -13,7 +18,7 @@ interface OrderBookData {
 
 interface OrderBookEvent {
 	buyOrders: any[];
-	orders: any[];
+	orders: [string, number];
 	alphachannel: string;
 }
 
@@ -25,7 +30,7 @@ interface Order extends Pick<Stock, "tick"> {
 	qty: number;
 }
 
-export class OrderBook extends Spawnkit.Instance<OrderBookData, OrderBookEvent> {
+export class OrderBook extends Spawnkit.Instance<OrderBookContext, OrderBookData, OrderBookEvent> {
 	on<C extends keyof OrderBookEvent>(channel: C, message: OrderBookEvent[C]) {
 		if (channel === "buyOrders") {
 			const mdg = message;
@@ -33,6 +38,12 @@ export class OrderBook extends Spawnkit.Instance<OrderBookData, OrderBookEvent> 
 			return;
 		}
 		// console.log("ON INSTANCE", this.id, channel, message);
+	}
+
+	async ensureAffinities() {
+		await this.internals.setAffinities([
+			{ key: 'location', value: 'france', type: 'required' },
+		]);
 	}
 
 	async buy(order: Order) {
@@ -77,13 +88,49 @@ const client = Spawnkit.Client.from({
 	instances: {
 		OrderBook,
 	},
+	config: {
+		traits: [
+			{
+				key: "location",
+				value: "spain",
+				type: "required",
+			},
+			{
+				key: "secure",
+				value: "true",
+				type: "soft",
+			},
+		]
+	}
 });
 
 
 redis.flushall('SYNC');
 client.start();
 const main = async () => {
-	const orderBook = client.spawn("OrderBook", "BTC/EUR");
+	const orderBook = client.spawn("OrderBook", "BTC/EUR", {
+		userID: 'ALHA',
+	});
+
+	wait(200).then(() => {
+		client.setConfig({
+			traits: [
+				{
+					key: "location",
+					value: "france",
+					type: "required",
+				},
+				{
+					key: "secure",
+					value: "true",
+					type: "soft",
+				},
+			]
+		})
+	});
+
+	await orderBook.ensureAffinities();
+
 	const waitForAllProcessed: Record<string, ControlledPromise<any>> = {};
 
 	const subscription1 = orderBook.on("orders", (event) => {
@@ -103,17 +150,17 @@ const main = async () => {
 	const promiseList: Promise<any>[] = [];
 
 	const interval = ControlledInterval.new({
-		interval: 14,
+		interval: 6,
 		execute: async (count) => {
 			console.log("COUNT", count);
-			if (count >= 100) {
+			if (count >= 10) {
 				interval.dispose();
 				return;
 			}
 
 			promiseList.push(
 				Promise.all(
-					Array.from({ length: 1000 }).map(async (_, i) => {
+					Array.from({ length: 10 }).map(async (_, i) => {
 						// await wait(i);
 						const timerKey = `${count}-${i}`;
 						if (!waitForAllProcessed[timerKey]) {
@@ -168,7 +215,9 @@ console.log("START");
 console.profile();
 main()
 	.then((result) => console.log("DONE"))
-	.catch((err) => console.error("ERR", err))
+	.catch((err) => {
+		console.error("SCRIPT ERR", err)
+	})
 	.finally(() => {
 		const timeSpent = Date.now() - startTime;
 		console.log(timeSpent, "ms");
