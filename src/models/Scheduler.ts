@@ -3,9 +3,7 @@ import { Lock } from "./Lock";
 import { InstanceId, InstanceIdentifier, InstanceKind, ScheduleByType, ScheduleContext } from "../adapters";
 import type { Client, SpawnkitConfig } from "./Client";
 import { InstanceProxy } from "./InstanceProxy";
-import { Logger } from "./Logger";
 import { nanoid } from "nanoid";
-import { Toleration } from "./Toleration";
 
 export class Scheduler<O extends SpawnkitConfig> {
 	instances: O["instances"];
@@ -34,56 +32,36 @@ export class Scheduler<O extends SpawnkitConfig> {
 
 	startInstanceScheduler() {
 
-		const handleInstanceSchedule = async (data, context) => {
-			await this.runOnlyOneOfInstance(data.kind, data.id, async () => {
-				const exeuctionId = nanoid();
-				await this.tryInstantiateInstance(exeuctionId, data);
-			});
-		};
-
-		let current = null;
-		const init = () => {
-			const clientconfig = this.client.getConfig();
-			current = this.adapters.instances.subscribe(clientconfig, handleInstanceSchedule);
-			this.subscriptions.add(current);
-		}
-
-		init();
-
 		this.subscriptions.add(
-			this.client.on('changed', (config) => {
-				console.log('changed', config);
-				this.onClientConfigChanged();
-				current.unsubscribe();
-				init();
+			this.adapters.instances.subscribe(async (data, context) => {
+				await this.runOnlyOneOfInstance(data.kind, data.id, async () => {
+					const exeuctionId = nanoid();
+					await this.tryInstantiateInstance(exeuctionId, data);
+				});
 			})
-		)
+		);
 	}
 
-	async tryWakeInstanceUp(kind: InstanceKind, instanceId: InstanceId) {
+	async tryWakeInstanceUp(kind: InstanceKind, id: InstanceId) {
 		// In the case that we are sending a lot of events
 		// We don't have to try to schedule an instance together with every event we send.
 		// Once an instance terminate, it will try again 3 times to check if there are pending events process.
 		// We can rely on this fact to only schedule an instance if it has been a long time since last event push.
 		// This is mainly to avoid adding unnessessary pressure the backend.
-		const canScheduleInstance = this.shouldScheduleInstance(instanceId);
+		const canScheduleInstance = this.shouldScheduleInstance(id);
 		if (!canScheduleInstance) {
 			return;
 		}
 
 		const instanceAlreadyRunningOnThisWorker = this.isInstanceRunning(
 			kind.toString(),
-			instanceId,
+			id,
 		);
 		if (instanceAlreadyRunningOnThisWorker) {
 			return;
 		}
 
-		const proxy = this.createInternalProxy(kind, instanceId);
-		const affinities = await proxy.instance.internals.getAffinities();
-		const scheduleConfig = { affinities };
-		const instanceIdentifier = { kind, id: instanceId };
-		this.adapters.instances.schedule(scheduleConfig, instanceIdentifier);
+		this.adapters.instances.schedule({ kind, id });
 	}
 
 	/**
@@ -139,30 +117,6 @@ export class Scheduler<O extends SpawnkitConfig> {
 
 	isInstanceRunning(kind: string, id: string) {
 		return this.liveInstances.get(kind)?.has(id) || false;
-	}
-
-	onClientConfigChanged = () => {
-		this.revalidateAllInstanceAffinity();
-	}
-
-	revalidateAllInstanceAffinity = async () => {
-		await Promise.all(
-			Array.from(this.runningInstancesByOwnerId).map(async ([ownerId, proxy]) => {
-				return this.revalidateInstanceAffinity(proxy.indenfier);
-			})
-		);
-	}
-
-	revalidateInstanceAffinity = async (identifier: InstanceIdentifier) => {
-		const ressourceID = this.getInstanceRessourceId(identifier);
-		const instanceProxy = this.runningInstancesByRessourceId.get(ressourceID);
-
-		const clienConfig = this.client.getConfig();
-		const affinities = await instanceProxy.instance.internals.getAffinities();
-		const score = await Toleration.getCompatibilityScore(clienConfig.traits, affinities);
-		if (score === 0) {
-			this.evictInstance(instanceProxy.indenfier);
-		}
 	}
 
 	evictInstance = async (identifier: InstanceIdentifier) => {
@@ -241,6 +195,7 @@ export class Scheduler<O extends SpawnkitConfig> {
 			client: this.client,
 		});
 
+		console.log('TRY INSTANTIATE', instanceConfig.kind, instanceConfig.id);
 		try {
 			await lock.using(async (abortSignal) => {
 				this.registerInstance(exeuctionId, proxy);
@@ -248,6 +203,8 @@ export class Scheduler<O extends SpawnkitConfig> {
 				await proxy.start();
 			});
 		} catch (err) {
+			console.log('ERR INSTANTIATE', err)
+
 			const shouldSilenceError =
 				err instanceof Lock.AcquireLockError ||
 				err instanceof Lock.ReleaseError;
@@ -260,6 +217,8 @@ export class Scheduler<O extends SpawnkitConfig> {
 		} finally {
 			this.unregisterInstanceByOwnerId(exeuctionId);
 		}
+
+		console.log('DONE INSTANTIATE', instanceConfig.kind, instanceConfig.id);
 
 		// // In order to make sure that we didn't miss any event and to avoid any race conditions
 		// // we'll check if there any event left to process. But we do it outside of the lock.

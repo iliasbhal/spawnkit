@@ -1,12 +1,5 @@
 # Spawnkit lib
 
-
-- add client tolerence + affinity ( like Kubernetes ) ???
-     ( this feature can be used to create segregation between clients on Spawnkit cloud, where each machine belongs to a client ).
-     // We should be able to set the affinity of an instance from the client.
-     // When we change the affinity from the client, if the instance is online, it should behave as expected
-     // the online instance client should trigger client.onAffinityChanged
-
 - Move client validation within .spawn and check if process.env === 'developement'
 
 - Start writing documentation / recipes.

@@ -19,7 +19,6 @@ import { Scheduler } from "./Scheduler";
 import { nanoid } from "nanoid";
 import { SpawnkitError } from './Error'
 import { EventListener } from "@/utils/EventListenener";
-import { Toleration, Trait } from './Toleration'
 
 export interface SpawnkitConfig {
 	adapters: Adapters;
@@ -27,7 +26,6 @@ export interface SpawnkitConfig {
 	config?: {
 		throwOnStalledInstance?: boolean;
 		disconnectOnStalledInstance?: boolean;
-		traits?: Trait[];
 	}
 }
 
@@ -63,7 +61,6 @@ export class Client<CP extends SpawnkitConfig> {
 		return {
 			throwOnStalledInstance: provided?.throwOnStalledInstance ?? true,
 			disconnectOnStalledInstance: provided?.disconnectOnStalledInstance ?? true,
-			traits: provided?.traits ?? [],
 		}
 	}
 
@@ -88,10 +85,6 @@ export class Client<CP extends SpawnkitConfig> {
 
 		this.config = nextConfig;
 		this.eventListeners.notify('changed', this.config);
-	}
-
-	onInstanceAffinityChanged(identifier: InstanceIdentifier) {
-		this.scheduler.revalidateInstanceAffinity(identifier);
 	}
 
 	private linkAndValidateAdapters = () => {
@@ -395,8 +388,6 @@ export class Client<CP extends SpawnkitConfig> {
 				sendEventToInstance,
 				wakeUpInstance: () => this.scheduler.tryWakeInstanceUp(kind, instanceId),
 				ensureLive: () => { },
-				getAffinities: internalProxy.instance.internals.getAffinities,
-				setAffinities: internalProxy.instance.internals.setAffinities,
 			},
 
 			schedule: scheduleRemoteMethodHandler,

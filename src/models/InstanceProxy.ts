@@ -17,7 +17,6 @@ import { Client } from "./Client";
 import { Data } from "./Data";
 import { Logger } from "./Logger";
 import { RemoteError } from "./RemoteError";
-import { Affinity, Toleration } from "./Toleration";
 
 export interface InstanceProps {
 	kind: string;
@@ -44,6 +43,10 @@ export interface InstanceEventChannels {
 	| InstanceEventStreamMessage;
 }
 
+export interface InstanceInternalChannels {
+
+}
+
 type Emit<Channels extends Record<string, any>> = <Channel extends Extract<keyof Channels, string>>(
 	channel: Channel,
 	data: Channels[Channel],
@@ -58,11 +61,6 @@ export interface InterfaceAPI<
 	data: {
 		get: Data<InstanceData>["get"];
 		set: Data<InstanceData>["set"];
-	};
-
-	internals: {
-		getAffinities: () => Promise<Affinity[]>;
-		setAffinities: (affinities: Affinity[]) => Promise<boolean>;
 	};
 
 	logger: {
@@ -129,25 +127,11 @@ export class InstanceProxy<Inst extends Instance> {
 		this.abortSignal = abortSignal;
 	}
 
-
-
 	configureInstance() {
-		const affinityAPI = Toleration.createAffinityAPI(this.data);
-		const instanceInternal = {
-			getAffinities: async () => {
-				return await affinityAPI.getAffinities()
-			},
-			setAffinities: async (affinities: any) => {
-				const hasChanged = await affinityAPI.setAffinities(affinities);
-				if (hasChanged) this.client.onInstanceAffinityChanged(this.indenfier);
-				return hasChanged;
-			},
-		}
 
 		const configuredAPI = {
 			id: this.indenfier.id,
 			kind: this.indenfier.kind,
-			internals: instanceInternal,
 
 			emit: (channel, data) => {
 				return this.emit(channel, data);
@@ -372,6 +356,8 @@ export class InstanceProxy<Inst extends Instance> {
 
 	/** Starts listening to events */
 	public async start() {
+		console.log('$$$$$ STARTING INSTANCE $$$$$');
+
 		this.running = true;
 		this.continouslyEmitHealthCheckSignal();
 
@@ -390,8 +376,12 @@ export class InstanceProxy<Inst extends Instance> {
 			});
 
 		this.subscribeToInstanceEvent();
+		this.subscribeToInternalEvent();
+
 		await this.keepAliveUntilNothingHappens()
 			.finally(() => syncAbort.clear());
+
+		console.log('$$$$$ FINISH INSTANCE $$$$$');
 	}
 
 	public async stop() {
@@ -481,11 +471,13 @@ export class InstanceProxy<Inst extends Instance> {
 		});
 	}
 
+
 	public onEventSubscription: { unsubscribe: Function } | undefined;
 	public subscribeToInstanceEvent() {
 		const NO_EVENT_TIMEOUT = 3000;
 		const timer = new ControlledTimeout();
 		timer.start(NO_EVENT_TIMEOUT);
+
 
 		this.onEventSubscription = this.adapters.messages.subscribe<InstanceMethodCall>(
 			this.instance,
@@ -505,8 +497,31 @@ export class InstanceProxy<Inst extends Instance> {
 		this.keepAlive.add(timer.await);
 	}
 
+	public emittedEventSubscription: { unsubscribe: Function } | undefined;
+	public subscribeToInternalEvent() {
+		const channelID = Client.getChannelForEventBus("internal", 'all');
+		this.emittedEventSubscription = this.adapters.messages.subscribe(this.instance, channelID, (message) => {
+
+			console.log('$$$$$ INTERNAL MESSAGE $$$$$', message);
+		});
+	}
+
 	public unsubscribeFromInstanceEvent() {
 		this.onEventSubscription?.unsubscribe();
+		this.emittedEventSubscription?.unsubscribe();
+	}
+
+	public async emitInternal(message: any) {
+		const channelID = Client.getChannelForEventBus("internal", 'all');
+		console.log('$$$$$ EMITTING INTERNAL MESSAGE $$$$$', message);
+		await this.adapters.messages.publish(this.instance, channelID, message);
+	}
+
+	public async emit(channel: string, data: any) {
+		const channelID = Client.getChannelForEventBus("instance", channel.toString());
+		return this.runExternalEffect(async () => {
+			return await this.adapters.messages.publish(this.instance, channelID, data);
+		});
 	}
 
 	/** this function is used to emit message to one client,
@@ -542,21 +557,6 @@ export class InstanceProxy<Inst extends Instance> {
 			scheduleId,
 			context.metadata,
 		);
-	}
-
-	// const subscription = this.adapters.messages.subscribe<InternalMessageData>(
-	//   instanceIdentifier,
-	//   Client.getChannelForEventBus("__INTERNAL__", 'health'),
-	//   (message) => {
-	//     healthTimeout.reset();
-	//   },
-	// );
-
-	public async emit(channel: string, data: any) {
-		const channelID = Client.getChannelForEventBus("instance", channel.toString());
-		return this.runExternalEffect(async () => {
-			return await this.adapters.messages.publish(this.instance, channelID, data);
-		});
 	}
 
 	private addAbortListener(callback: () => any) {

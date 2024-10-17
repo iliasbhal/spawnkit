@@ -40,12 +40,6 @@ export class OrderBook extends Spawnkit.Instance<OrderBookContext, OrderBookData
 		// console.log("ON INSTANCE", this.id, channel, message);
 	}
 
-	async ensureAffinities() {
-		await this.internals.setAffinities([
-			{ key: 'location', value: 'france', type: 'required' },
-		]);
-	}
-
 	async buy(order: Order) {
 		// this.logger.log("-----BUYYYYY------");
 		// console.log("___BUY___", order);
@@ -89,54 +83,27 @@ const client = Spawnkit.Client.from({
 		OrderBook,
 	},
 	config: {
-		traits: [
-			{
-				key: "location",
-				value: "spain",
-				type: "required",
-			},
-			{
-				key: "secure",
-				value: "true",
-				type: "soft",
-			},
-		]
+
 	}
 });
 
 
 redis.flushall('SYNC');
 client.start();
-const main = async () => {
+
+
+export const main = async () => {
 	const orderBook = client.spawn("OrderBook", "BTC/EUR", {
 		userID: 'ALHA',
 	});
 
-	wait(200).then(() => {
-		client.setConfig({
-			traits: [
-				{
-					key: "location",
-					value: "france",
-					type: "required",
-				},
-				{
-					key: "secure",
-					value: "true",
-					type: "soft",
-				},
-			]
-		})
-	});
-
-	await orderBook.ensureAffinities();
-
 	const waitForAllProcessed: Record<string, ControlledPromise<any>> = {};
 
+	let incomingEvents = 0;
 	const subscription1 = orderBook.on("orders", (event) => {
+		incomingEvents++
 		const [count, i] = event;
 		waitForAllProcessed[`${count}-${i}`]?.resolve?.(null);
-		// console.log("ON CLIENT 1", event);
 	});
 
 	// const subscription2 = orderBook.on("orders", (event) => {
@@ -205,21 +172,8 @@ const main = async () => {
 	);
 	console.log("TIME SPENT COMPUTING", timeSpentComputing);
 	console.log("COUNT", count);
+	console.log("INCOMING EVENTS", incomingEvents);
 
 	subscription1.unsubscribe();
 	// subscription2.unsubscribe();
 };
-
-const startTime = Date.now();
-console.log("START");
-console.profile();
-main()
-	.then((result) => console.log("DONE"))
-	.catch((err) => {
-		console.error("SCRIPT ERR", err)
-	})
-	.finally(() => {
-		const timeSpent = Date.now() - startTime;
-		console.log(timeSpent, "ms");
-		console.profileEnd();
-	});

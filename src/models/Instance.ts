@@ -1,6 +1,5 @@
 import { InstanceLog } from "@/adapters";
 import type { InterfaceAPI } from "./InstanceProxy";
-import { Affinity } from './Toleration';
 
 export type AnyRecord = { [key: string]: any };
 export type Context = AnyRecord;
@@ -8,11 +7,6 @@ export type Context = AnyRecord;
 type Prettify<T> = {
 	[K in keyof T]: T[K];
 } & {};
-
-
-export interface InstanceConfig {
-	clientAffinity?: Affinity[];
-}
 
 export class Instance<
 	InstanceContext extends Context = Context,
@@ -40,10 +34,6 @@ export class Instance<
 	}
 	get kind() {
 		return this.api.kind;
-	}
-
-	get internals() {
-		return this.api.internals;
 	}
 
 	initialize() { }

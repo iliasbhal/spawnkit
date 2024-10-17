@@ -6,7 +6,7 @@
   "license": "MIT",
   "scripts": {
     "docker": "docker-compose --env-file .env -f ./docker/compose.yml up --build",
-    "playground": "bun run --watch  ./scripts/playground.ts",
+    "scripts": "bun run --watch  ./scripts/_runner.ts",
     "benchmark": "bun run --watch  ./scripts/benchmark.ts",
     "lint": "prettier --write \"**/*.{ts,tsx,js,jsx}\"",
     "test": "jest"

@@ -22,7 +22,7 @@ export class RedisAdapter extends BaseAdapter {
 }
 
 export class BaseQueue extends RedisAdapter {
-	createQueue(name: string) {
+		createQueue(name: string) {
 		return new BullMQ.Queue(name, {
 			connection: this.redis,
 			prefix: "spawnkit:queues",

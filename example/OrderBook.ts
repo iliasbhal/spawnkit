@@ -26,13 +26,6 @@ interface Order extends Pick<Stock, "tick"> {
 }
 
 export class OrderBook extends Spawnkit.Instance<OrderBookContext, OrderBookData, OrderBookEvent> {
-	// config: Partial<InstanceConfig> = {
-	// 	clientAffinity: [
-	// 		{ key: 'location', valueIn: ['france'], type: 'required' },
-	// 		{ key: 'secure', valueIn: ['true'], type: 'prefer' },
-	// 	],
-	// };
-
 	initialize(): void {
 
 	}
@@ -44,12 +37,6 @@ export class OrderBook extends Spawnkit.Instance<OrderBookContext, OrderBookData
 			return;
 		}
 		// console.log("ON INSTANCE", this.id, channel, message);
-	}
-
-	async ensureAffinities() {
-		await this.internals.setAffinities([
-			{ key: 'location', value: 'france', type: 'required' },
-		]);
 	}
 
 	async buy(order: Order) {
