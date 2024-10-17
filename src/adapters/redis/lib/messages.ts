@@ -8,24 +8,29 @@ interface Message<DataShape> {
 	id: Adapters.EventId;
 	data: DataShape;
 	meta: {
-		client: string;
+		origin: string;
 	};
 }
 
 export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMessageBroker {
-	link(client: Client<any>): void {
-		super.link(client);
-		this.initializeGlobalPubSub();
-	}
+	messageBrokerId = nanoid();
 
 	private callbackByChannel = new Map<string, Set<Parameters<typeof this.subscribe>[2]>>();
 
 	getClientChannel() {
-		const channel = `spawnkit:pubsub-clients:${this.client.id}`;
+		return this.getOriginChannel(this.messageBrokerId);
+	}
+
+	getOriginChannel(originId: string) {
+		const channel = `spawnkit:pubsub-clients:${originId}`;
 		return channel;
 	}
 
-	initializeGlobalPubSub() {
+	isInitialized = false;
+	ensureInitializedGlobalPubSub() {
+		if (this.isInitialized) return;
+		this.isInitialized = true;
+
 		const redis = this.getNewRedisClient();
 		const clientChannel = this.getClientChannel();
 
@@ -63,7 +68,7 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 			id: eventId,
 			data: event,
 			meta: {
-				client: this.client.id,
+				origin: this.messageBrokerId,
 			},
 		};
 
@@ -92,19 +97,22 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 		throw new Error("Unhandled channel type");
 	}
 
+
 	rpcOriginByMessageId = new Map<string, string>();
 	subscribe<E>(
 		instance: Adapters.InstanceIdentifier,
 		channel: string,
 		callback: (event: E) => any,
 	): { unsubscribe: Function } {
+		this.ensureInitializedGlobalPubSub();
+
 		const messageChannel = this.getChannel(instance, channel);
 		const isRpcCall = channel.startsWith("rpc");
 		if (isRpcCall) {
 			const subscription = this.listenMQ(messageChannel, (event) => {
-				const replyToClient = event.meta.client;
+				const replyToClient = event.meta.origin;
 				if (replyToClient) {
-					this.rpcOriginByMessageId.set(event.id, event.meta.client);
+					this.rpcOriginByMessageId.set(event.id, event.meta.origin);
 				}
 
 				return callback(event);
@@ -147,10 +155,10 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 	}
 
 	listenBroadcast<Data>(channel: string, callback: (data: Data) => any) {
-		this.redis.zadd(channel, Date.now(), this.client.id);
+		this.redis.zadd(channel, Date.now(), this.messageBrokerId);
 
 		const intervalID = setInterval(() => {
-			this.redis.zadd(channel, Date.now(), this.client.id);
+			this.redis.zadd(channel, Date.now(), this.messageBrokerId);
 		}, 4000);
 
 		const subscription = this.listenClientPubSub(channel, callback);
@@ -161,7 +169,7 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 				clearInterval(intervalID);
 				const isStillListening = this.isClientListeningToChannel(channel);
 				if (!isStillListening) {
-					this.redis.zrem(channel, this.client.id);
+					this.redis.zrem(channel, this.messageBrokerId);
 				}
 			},
 		};
@@ -178,12 +186,12 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 
 		// 2. publish to their channel
 		await Promise.all(
-			members.map((clientId) => this.publishClientPubSub(clientId, channel, message)),
+			members.map((originId) => this.publishClientPubSub(originId, channel, message)),
 		);
 	}
 
 	async publishClientPubSub<EventData>(
-		client: string,
+		originId: string,
 		channel: string,
 		message: Message<EventData>,
 	) {
@@ -193,10 +201,8 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 			message,
 		});
 
-		await this.redis.publish(
-			`spawnkit:pubsub-clients:${client}`,
-			serialized
-		);
+		const originChannel = this.getOriginChannel(originId);
+		await this.redis.publish(originChannel, serialized);
 	}
 
 	listenClientPubSub<Data>(channel: string, callback: (data: Data) => any) {
