@@ -1,5 +1,5 @@
 import type { Instance } from "./Instance";
-import type { InstanceEventChannels, InstanceEventStreamMessage } from "./InstanceProxy";
+import type { InstanceEventChannels, InstanceEventStreamMessage, InternalInstanceEvent } from "./InstanceProxy";
 import { ClientStream } from "./ClientStream";
 import { RemoteError } from "./RemoteError";
 import {
@@ -70,7 +70,7 @@ export class Client<CP extends SpawnkitConfig> {
 
 		this.scheduler = Scheduler.from(opts, this);
 		this.config = Client.createConfig(opts.config);
-		this.linkAndValidateAdapters();
+		// this.linkAndValidateAdapters();
 		// this.validateInstancces();
 	}
 
@@ -89,12 +89,10 @@ export class Client<CP extends SpawnkitConfig> {
 
 	private linkAndValidateAdapters = () => {
 		Object.values(this.adapters).forEach((adapter) => {
-			if (adapter instanceof BaseAdapter) {
-				adapter.link(this);
-				return;
-			}
-
-			throw new Error("Invalid Adapter, need to extend BaseAdapter");
+			const isBaseAdapter = adapter instanceof BaseAdapter;
+			if (!isBaseAdapter) {
+				throw new Error("Invalid Adapter, need to extend BaseAdapter");
+			};
 		});
 	};
 
@@ -242,10 +240,73 @@ export class Client<CP extends SpawnkitConfig> {
 			};
 		};
 
-		const eventListeners = new EventListener();
+		const instantEventListener = new EventListener();
 		const healthCheck = this.createHealthChecker(instanceIdentifier);
 		healthCheck.onHealthCheckFailed(() => {
-			eventListeners.notify("error", new InstanceStalledError());
+			instantEventListener.notify("error", new InstanceStalledError());
+		});
+
+		const createEventHandler = <Channel extends Extract<keyof InstanceChannels, string>, Message extends InstanceChannels[Channel]>(
+			channel: Channel,
+			callback: (data: Message) => any,
+		) => {
+			const channelId = Client.getChannelForEventBus("instance", channel.toString())
+			const callbackEmitter = instantEventListener.on(channelId, callback);
+
+			const subscribe = this.adapters.messages.subscribe<Message>(
+				instanceIdentifier,
+				channelId,
+				(message) => {
+					healthCheck.reset();
+					callbackEmitter.notify(message.data);
+				},
+			);
+
+			const dispose = () => {
+				subscribe.unsubscribe();
+				callbackEmitter.unsubscribe();
+			};
+
+			return {
+				unsubscribe: () => {
+					dispose();
+				},
+			};
+		}
+
+		const createInternalEventHandler = <Channel extends Extract<keyof InternalInstanceEvent, string>, Message extends InternalInstanceEvent[Channel]>(
+			channel: Channel,
+			callback: (data: Message) => any,
+		) => {
+			const channelID = Client.getChannelForEventBus("internal", channel);
+			const callbackEmitter = instantEventListener.on(channelID, callback);
+			const subscribe = this.adapters.messages.subscribe<Message>(
+				instanceIdentifier,
+				channelID,
+				(message) => {
+					callbackEmitter.notify(message.data);
+				},
+			);
+
+			const dispose = () => {
+				subscribe.unsubscribe();
+				callbackEmitter.unsubscribe();
+			};
+
+			return {
+				unsubscribe: () => {
+					dispose();
+				},
+			};
+		}
+
+
+		// Simply forward all internal messages to the instantEventListener
+		// We'll then be able to handle the message approriatly
+		// in the createRemoteMethodHandler
+
+		createInternalEventHandler("__INTERNAL__", (message) => {
+			instantEventListener.notify("__INTERNAL__", message);
 		});
 
 		const createRemoteMethodHandler = (mode: InstanceMethodCall["mode"]) => {
@@ -266,23 +327,37 @@ export class Client<CP extends SpawnkitConfig> {
 
 					if (mode === "normal") {
 						return new Promise((resolve, reject) => {
+
+
 							const internalStream = new ClientStream();
 							const scope = {
 								response: undefined as any,
 							};
 
+							const internalSubsciption = instantEventListener.on('__INTERNAL__', (message) => {
+								if (message.error && message.lifecycle === 'initialize') {
+									isDoneWaitingForResponse();
+									const error = new InstanceStalledError('Instance failed to initialize');
+									rejectWithError(error);
+								}
+							})
+
 							const isDoneWaitingForResponse = () => {
 								internalStream.close();
 								scope.response?.unsubscribe();
+								internalSubsciption.unsubscribe()
 							};
 
-							healthCheck.onHealthCheckFailed(() => {
+							const rejectWithError = (error: Error) => {
 								isDoneWaitingForResponse();
+								internalStream.error(error);
+								reject(error);
+							}
 
+							healthCheck.onHealthCheckFailed(() => {
 								if (this.config.throwOnStalledInstance) {
 									const error = new InstanceStalledError();
-									internalStream.error(error);
-									reject(error);
+									rejectWithError(error);
 								}
 							});
 
@@ -335,32 +410,7 @@ export class Client<CP extends SpawnkitConfig> {
 
 		const internalProxy = this.scheduler.createInternalProxy(kind, instanceId);
 
-		const createEventHandler = <Channel extends Extract<keyof InstanceChannels, string>>(
-			channel: Channel,
-			callback: (data: InstanceChannels[Channel]) => any,
-		) => {
-			const callbackEmitter = eventListeners.on(channel, callback);
 
-			const subscribe = this.adapters.messages.subscribe<InstanceChannels[Channel]>(
-				instanceIdentifier,
-				Client.getChannelForEventBus("instance", channel.toString()),
-				(message) => {
-					healthCheck.reset();
-					callbackEmitter.notify(message.data);
-				},
-			);
-
-			const dispose = () => {
-				subscribe.unsubscribe();
-				callbackEmitter.unsubscribe();
-			};
-
-			return {
-				unsubscribe: () => {
-					dispose();
-				},
-			};
-		}
 
 		const instanceClientAPI = {
 			id: instanceId,
@@ -376,7 +426,7 @@ export class Client<CP extends SpawnkitConfig> {
 
 			dispose: () => {
 				healthCheck.dispose();
-				eventListeners.clear();
+				instantEventListener.clear();
 			},
 
 			on: createEventHandler,

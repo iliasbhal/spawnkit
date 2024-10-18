@@ -40,11 +40,15 @@ export type InstanceEventStreamMessage =
 export interface InstanceEventChannels {
 	[key: `kind:${string}:id:${string}:event:${string}`]:
 	| InstanceEventRequestMessage
-	| InstanceEventStreamMessage;
+	| InstanceEventStreamMessage
 }
 
-export interface InstanceInternalChannels {
-
+export interface InternalInstanceEvent {
+	__INTERNAL__: {
+		initiator: 'instance' | `client:${string}`
+		lifecycle: string,
+		error: any;
+	};
 }
 
 type Emit<Channels extends Record<string, any>> = <Channel extends Extract<keyof Channels, string>>(
@@ -394,6 +398,13 @@ export class InstanceProxy<Inst extends Instance> {
 			this.trace({ type: "proxy:initialize:success" });
 		} catch (err) {
 			this.trace({ type: "proxy:initialize:failed" });
+
+			this.emitInternal("__INTERNAL__", {
+				initiator: 'instance',
+				lifecycle: 'initialize',
+				error: RemoteError.serialize(err),
+			});
+
 			this.client.eventListeners.notify("error", err);
 			throw err;
 		}
@@ -495,11 +506,11 @@ export class InstanceProxy<Inst extends Instance> {
 
 	public emittedEventSubscription: { unsubscribe: Function } | undefined;
 	public subscribeToInternalEvent() {
-		const channelID = Client.getChannelForEventBus("internal", 'all');
-		this.emittedEventSubscription = this.adapters.messages.subscribe(this.instance, channelID, (message) => {
-			// CAN BE USED TO HANDLE INTERNAL EVENTS
-			// LIKE REMOTE EVICTION
-		});
+		// const channelID = Client.getChannelForEventBus("internal", 'all');
+		// this.emittedEventSubscription = this.adapters.messages.subscribe(this.instance, channelID, (message) => {
+		// 	// CAN BE USED TO HANDLE INTERNAL EVENTS
+		// 	// LIKE REMOTE EVICTION
+		// });
 	}
 
 	public unsubscribeFromInstanceEvent() {
@@ -507,8 +518,8 @@ export class InstanceProxy<Inst extends Instance> {
 		this.emittedEventSubscription?.unsubscribe();
 	}
 
-	public async emitInternal(message: any) {
-		const channelID = Client.getChannelForEventBus("internal", 'all');
+	public async emitInternal<Channel extends keyof InternalInstanceEvent>(channel: Channel, message: InternalInstanceEvent[Channel]) {
+		const channelID = Client.getChannelForEventBus("internal", channel);
 		await this.adapters.messages.publish(this.instance, channelID, message);
 	}
 
