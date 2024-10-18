@@ -56,7 +56,7 @@ describe("Errors", () => {
 
   client.start();
 
-  it('notify client when instance fails to initialize', async () => {
+  it('client calls should fail when instance fails to initialize', async () => {
     const instance = client.spawn('ErrorInitExample', '1');
 
     await Promise.all([
@@ -65,7 +65,22 @@ describe("Errors", () => {
     ])
   })
 
+  it('notify client when instance fails to initialize', async () => {
+    const instance = client.spawn('ErrorInitExample', '2');
+    const onInstanceError = jest.fn()
+
+    instance.internals.on('error', () => onInstanceError())
+
+    try {
+      await instance.doSomething('hello')
+    } catch (error) { }
+
+    expect(onInstanceError).toHaveBeenCalled();
+
+  })
+
   it.todo('notify client when instance fails to dispose')
   it.todo('should only dispose if it successfully initialized')
+
 
 });

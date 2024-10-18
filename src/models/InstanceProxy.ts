@@ -43,11 +43,12 @@ export interface InstanceEventChannels {
 	| InstanceEventStreamMessage
 }
 
+type InternalErrorType = 'initialize_error' | 'dispose_error' | 'health_check_error';
+
 export interface InternalInstanceEvent {
-	__INTERNAL__: {
-		initiator: 'instance' | `client:${string}`
-		lifecycle: string,
-		error: any;
+	error: {
+		type: InternalErrorType;
+		error: Error;
 	};
 }
 
@@ -177,6 +178,7 @@ export class InstanceProxy<Inst extends Instance> {
 
 		const logger = this.createCallLoggerFor(messageId);
 		const handleRequestResponse = this.createResultHandler(messageId, event);
+
 
 		// Wrap the method in a Promise. to ensure that if the method is sync
 		// We still catch the error if one happens.
@@ -408,12 +410,12 @@ export class InstanceProxy<Inst extends Instance> {
 			this.trace({ type: "proxy:initialize:start" });
 			await this.instance.initialize?.();
 			this.trace({ type: "proxy:initialize:success" });
+
 		} catch (err) {
 			this.trace({ type: "proxy:initialize:failed" });
 
-			this.emitInternal("__INTERNAL__", {
-				initiator: 'instance',
-				lifecycle: 'initialize',
+			this.emitInternal("error", {
+				type: "initialize_error",
 				error: RemoteError.serialize(err),
 			});
 
@@ -552,7 +554,7 @@ export class InstanceProxy<Inst extends Instance> {
 		// only when mode is normal, we should respond
 		// when mode is 'scheduled' or 'skip' we should not respond
 		// since there is no client waiting for the response
-		const shouldRespond = context.event.mode === "normal";
+		const shouldRespond = context.event.mode === "normal"
 		if (!shouldRespond) {
 			return;
 		}

@@ -244,9 +244,13 @@ export class Client<CP extends SpawnkitConfig> {
 		};
 
 		const instantEventListener = new EventListener();
+		const internalEventListener = new EventListener<InternalInstanceEvent>();
 		const healthCheck = this.createHealthChecker(instanceIdentifier);
 		healthCheck.onHealthCheckFailed(() => {
-			instantEventListener.notify("error", new InstanceStalledError());
+			internalEventListener.notify("error", {
+				type: "health_check_error",
+				error: new InstanceStalledError(),
+			});
 		});
 
 		const createEventHandler = <Channel extends Extract<keyof InstanceChannels, string>, Message extends InstanceChannels[Channel]>(
@@ -254,7 +258,7 @@ export class Client<CP extends SpawnkitConfig> {
 			callback: (data: Message) => any,
 		) => {
 			const channelId = Client.getChannelForEventBus("instance", channel.toString())
-			const callbackEmitter = instantEventListener.on(channelId, callback);
+			const callbackEmitter = instantEventListener.on(channel, callback);
 
 			const subscribe = this.adapters.messages.subscribe<Message>(
 				instanceIdentifier,
@@ -265,14 +269,10 @@ export class Client<CP extends SpawnkitConfig> {
 				},
 			);
 
-			const dispose = () => {
-				subscribe.unsubscribe();
-				callbackEmitter.unsubscribe();
-			};
-
 			return {
 				unsubscribe: () => {
-					dispose();
+					subscribe.unsubscribe();
+					callbackEmitter.unsubscribe();
 				},
 			};
 		}
@@ -282,7 +282,7 @@ export class Client<CP extends SpawnkitConfig> {
 			callback: (data: Message) => any,
 		) => {
 			const channelID = Client.getChannelForEventBus("internal", channel);
-			const callbackEmitter = instantEventListener.on(channelID, callback);
+			const callbackEmitter = internalEventListener.on(channel, callback);
 			const subscribe = this.adapters.messages.subscribe<Message>(
 				instanceIdentifier,
 				channelID,
@@ -291,26 +291,13 @@ export class Client<CP extends SpawnkitConfig> {
 				},
 			);
 
-			const dispose = () => {
-				subscribe.unsubscribe();
-				callbackEmitter.unsubscribe();
-			};
-
 			return {
 				unsubscribe: () => {
-					dispose();
+					subscribe.unsubscribe();
+					callbackEmitter.unsubscribe();
 				},
 			};
-		}
-
-
-		// Simply forward all internal messages to the instantEventListener
-		// We'll then be able to handle the message approriatly
-		// in the createRemoteMethodHandler
-
-		createInternalEventHandler("__INTERNAL__", (message) => {
-			instantEventListener.notify("__INTERNAL__", message);
-		});
+		};
 
 		const createRemoteMethodHandler = (mode: InstanceMethodCall["mode"]) => {
 			return (action: string) => {
@@ -337,13 +324,13 @@ export class Client<CP extends SpawnkitConfig> {
 								response: undefined as any,
 							};
 
-							const internalSubsciption = instantEventListener.on('__INTERNAL__', (message) => {
-								if (message.error && message.lifecycle === 'initialize') {
+							const internalSubsciption = createInternalEventHandler("error", (message) => {
+								if (message.type === 'initialize_error') {
 									isDoneWaitingForResponse();
 									const error = new InstanceStalledError('Instance failed to initialize');
 									rejectWithError(error);
 								}
-							})
+							});
 
 							const isDoneWaitingForResponse = () => {
 								internalStream.close();
