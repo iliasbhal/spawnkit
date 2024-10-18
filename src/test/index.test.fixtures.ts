@@ -69,11 +69,11 @@ export class IntrospectExample extends Spawnkit.Instance {
 	}
 
 	async getUserId() {
-		return this.ctx.userID;
+		return this.context.userID;
 	}
 
 	async getUserIdWithWaiting(timeout: number) {
 		await wait(timeout);
-		return this.ctx.userID;
+		return this.context.userID;
 	}
 }

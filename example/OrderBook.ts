@@ -40,7 +40,7 @@ export class OrderBook extends Spawnkit.Instance<OrderBookContext, OrderBookData
 	}
 
 	async buy(order: Order) {
-		this.ctx.userID
+		this.context.userID
 		// this.logger.log("-----BUYYYYY------");
 		// console.log("___BUY___", order);
 		// this.data = this.data || ({} as any);

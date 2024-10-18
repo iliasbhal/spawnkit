@@ -6,7 +6,7 @@ import * as Spawnkit from "..";
 import * as RedisAdapter from "../adapters/redis";
 import { wait } from "../utils/wait";
 
-describe("Internals", () => {
+describe("Utils", () => {
   class Example extends Spawnkit.Instance<{}, {}, {}> {
     async initialize() {
       await wait(1000);
@@ -36,14 +36,16 @@ describe("Internals", () => {
   client.start();
 
   it('can ensure if instance is live', async () => {
-    const orderbook = client.spawn("Example", "1");
+    const orderbook = client.spawn("Example", "1", {
+      aaaaaaa: 'aaaaaa',
+    });
 
     const now = Date.now();
-    const isLive = await orderbook.internals.ensureLive();
+    const isLive = await orderbook.utils.ensureLive();
     const timeSpent = Date.now() - now;
 
     const now2 = Date.now();
-    const isLive2 = await orderbook.internals.ensureLive();
+    const isLive2 = await orderbook.utils.ensureLive();
     const timeSpent2 = Date.now() - now2;
 
     expect(isLive).toBe(true);
@@ -51,6 +53,17 @@ describe("Internals", () => {
 
     expect(timeSpent).toBeGreaterThan(1000);
     expect(timeSpent2).toBeLessThan(timeSpent);
+  })
+
+  it('can get instance latency numbers', async () => {
+    const orderbook = client.spawn("Example", "1", {
+      aaaaaaa: 'bbbbbb',
+    });
+    const latency = await orderbook.utils.getLatency();
+    expect(latency.up).toBeGreaterThan(0);
+    expect(latency.down).toBeGreaterThanOrEqual(0);
+    expect(latency.total).toBeGreaterThan(0);
+    expect(latency.total).toEqual(latency.up + latency.down);
   })
 
 

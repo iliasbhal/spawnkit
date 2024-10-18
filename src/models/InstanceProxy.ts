@@ -2,7 +2,7 @@ import { PromiseList } from "@/utils/PromiseList";
 import { ControlledPromise } from "@/utils/ControlledPromise";
 import { ControlledTimeout } from "@/utils/ControlledTimeout";
 import { Stream } from "@/models/Stream";
-import { Instance } from "./Instance";
+import { BaseRemoteEntity, Instance } from "./Instance";
 import { HealthCheckEmitter } from "./HealthCheck";
 import {
 	Adapters,
@@ -175,47 +175,27 @@ export class InstanceProxy<Inst extends Instance> {
 		messageId: EventId,
 		event: InstanceMethodCall,
 	): Promise<any> {
-		const { action, args, context } = event;
+		const { action, args } = event;
 
-		const logger = this.createCallLoggerFor(messageId);
 		const handleRequestResponse = this.createResultHandler(messageId, event);
 
+		this.trace({
+			type: "proxy:call:start",
+			id: messageId,
+			event,
+		});
 
 		// Wrap the method in a Promise. to ensure that if the method is sync
 		// We still catch the error if one happens.
-		logger.start(event);
 		const [error, response] = await Promise.resolve()
 			.then(async () => {
 				this.healthCheckEmitter.assertNotStalled(event);
 
-				const proxiedInst = new Proxy(this.instance, {
-					get: (target, prop, receiver) => {
-						if (prop === "ctx") {
-							return context.context;
-						}
-
-						return Reflect.get(target, prop, receiver);
-					},
-				});
-
-				const isClientInternalCall = action.startsWith("utils.");
-				if (isClientInternalCall) {
-					const methodName = action.slice("utils.".length);
-					const method = this.utils[methodName]?.bind(proxiedInst);
-					return await Promise.race([
-						method?.(...args),
-						this.aborted.await.then(() => { throw InstanceAbortedError }),
-					]);
-
-				}
-
-				const method = this.instance[action]?.bind(proxiedInst);
+				const method = this.createMethodForRequest(event);
 				const methodExists = typeof method == "function";
-				if (!methodExists) throw new Error("Bad Request: Method not found");
+				if (!methodExists) throw new Error(`Bad Request: Method not found (received: ${action})`);
 
-				// Abort the request if the instance is aborted
-				// This is to prevent the instance from doing any side effects
-				// when it is already disposed.
+				// Abort the request response when the instance is aborted
 				return await Promise.race([
 					method?.(...args),
 					this.aborted.await.then(() => { throw InstanceAbortedError }),
@@ -230,23 +210,33 @@ export class InstanceProxy<Inst extends Instance> {
 		});
 	}
 
-	createCallLoggerFor(messageId: EventId) {
-		return {
-			start: (event: InstanceMethodCall) => {
-				this.trace({
-					type: "proxy:call:start",
-					id: messageId,
-					event,
-				});
+	createProxyInstanceForRequest(target: BaseRemoteEntity, event: InstanceMethodCall,) {
+		return new Proxy(target, {
+			get: (base, prop, receiver) => {
+				if (prop === "context") {
+
+					return event.context.context;
+				}
+
+				return Reflect.get(base, prop, receiver);
 			},
-			result: (result: any) => {
-				this.trace({
-					type: "proxy:call:result",
-					id: messageId,
-					result,
-				});
-			},
-		};
+		})
+	}
+
+	createMethodForRequest(event: InstanceMethodCall) {
+		const { action } = event;
+
+		const isClientInternalCall = action.startsWith("utils.");
+		if (isClientInternalCall) {
+			const methodName = action.slice("utils.".length);
+			const proxiedUtils = this.createProxyInstanceForRequest(this.utils, event)
+			const method = this.utils[methodName]?.bind?.(proxiedUtils);
+			return method;
+		}
+
+		const proxiedInst = this.createProxyInstanceForRequest(this.instance, event)
+		const method = this.instance[action]?.bind?.(proxiedInst);
+		return method;
 	}
 
 	createResultHandler(messageId: EventId, event: InstanceMethodCall) {
@@ -548,9 +538,12 @@ export class InstanceProxy<Inst extends Instance> {
 	/** this function is used to emit message to one client,
 	 * also for type safety, so that so that it doesn't show on client.on channel name autocomplete
 	 **/
-	public async respond(context: MessageContext, data: any) {
-		const logger = this.createCallLoggerFor(context.messageId);
-		logger.result(data);
+	public async respond(context: MessageContext, result: any) {
+		this.trace({
+			type: "proxy:call:result",
+			id: context.messageId,
+			result,
+		});
 
 		// only when mode is normal, we should respond
 		// when mode is 'scheduled' or 'skip' we should not respond
@@ -562,7 +555,7 @@ export class InstanceProxy<Inst extends Instance> {
 
 		const channelID = Client.getChannelForEventResponse(context.messageId);
 		return this.runExternalEffect(async () => {
-			return await this.adapters.messages.publish(this.instance, channelID, data);
+			return await this.adapters.messages.publish(this.instance, channelID, result);
 		});
 	}
 

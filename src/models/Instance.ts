@@ -8,11 +8,15 @@ type Prettify<T> = {
 	[K in keyof T]: T[K];
 } & {};
 
+export class BaseRemoteEntity<InstanceContext extends Context = Context> {
+	context: InstanceContext = {} as InstanceContext;
+}
+
 export class Instance<
 	InstanceContext extends Context = Context,
 	InstanceData extends AnyRecord = AnyRecord,
 	InstanceChannels extends AnyRecord = AnyRecord,
-> {
+> extends BaseRemoteEntity<InstanceContext> {
 	__types = {} as {
 		InstanceContext: InstanceContext;
 		InstanceData: InstanceData;
@@ -27,8 +31,6 @@ export class Instance<
 	// For some reason, adding types here break the client types.
 	on(channel: keyof InstanceChannels, message: InstanceChannels[keyof InstanceChannels]) { }
 
-	ctx: InstanceContext = {} as InstanceContext;
-
 	get id() {
 		return this.api.id;
 	}
@@ -38,7 +40,6 @@ export class Instance<
 
 	initialize() { }
 	dispose() { }
-
 
 	api!: InterfaceAPI<InstanceData, InstanceChannels>;
 
@@ -71,3 +72,4 @@ export class Instance<
 		return this.api.waitFor(promise);
 	}
 }
+

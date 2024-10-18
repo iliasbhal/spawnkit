@@ -1,5 +1,6 @@
 import type { Instance } from "./Instance";
-import type { InstanceEventChannels, InstanceEventStreamMessage, InstanceProxy, InternalInstanceEvent, RemoteProxyUtils } from "./InstanceProxy";
+import type { InstanceEventChannels, InstanceEventStreamMessage, InternalInstanceEvent } from "./InstanceProxy";
+import type { InstanceUtils } from "./InstanceUtils";
 import { ClientStream } from "./ClientStream";
 import { RemoteError } from "./RemoteError";
 import {
@@ -184,7 +185,7 @@ export class Client<CP extends SpawnkitConfig> {
 		type SkipRemoteMethods = MakeSkippable<AvailableMethods>;
 		type ScheduleRemoteMethods = MakeSchedulable<AvailableMethods>;
 
-		type AvailableProxyMethods = ExtractMethods<RemoteProxyUtils>
+		type AvailableProxyMethods = ExtractMethods<InstanceUtils>
 		type RemoteProxyMethodes = MakeRemote<AvailableProxyMethods>;
 
 		const instanceIdentifier = {
@@ -405,6 +406,30 @@ export class Client<CP extends SpawnkitConfig> {
 			},
 		}) as RemoteProxyMethodes;
 
+		const utils = {
+			sendEventToInstance,
+			on: createInternalEventHandler,
+			ensureLive: async () => {
+				const response = await remoteUtils.ping();
+				return response === 'pong';
+			},
+
+			getLatency: async () => {
+				await utils.ensureLive();
+
+				const before = Date.now();
+				const remoteTime = await remoteUtils.getLocalTimeUnix();
+				const after = Date.now();
+				const timeSpent = after - before;
+
+				return {
+					up: remoteTime - before,
+					down: after - remoteTime,
+					total: timeSpent,
+				}
+			},
+		};
+
 		const instanceClientAPI = {
 			id: instanceId,
 			kind: kind,
@@ -427,14 +452,7 @@ export class Client<CP extends SpawnkitConfig> {
 			data: data,
 			context: context as typeof context,
 
-			internals: {
-				sendEventToInstance,
-				on: createInternalEventHandler,
-				ensureLive: async () => {
-					const response = await remoteUtils.ping();
-					return response === 'pong';
-				},
-			},
+			utils: utils,
 
 			schedule: scheduleRemoteMethodHandler,
 			scheduled: {

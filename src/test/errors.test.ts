@@ -69,7 +69,7 @@ describe("Errors", () => {
     const instance = client.spawn('ErrorInitExample', '2');
     const onInstanceError = jest.fn()
 
-    instance.internals.on('error', () => onInstanceError())
+    instance.utils.on('error', () => onInstanceError())
 
     try {
       await instance.doSomething('hello')

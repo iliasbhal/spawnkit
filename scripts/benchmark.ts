@@ -97,6 +97,8 @@ export const main = async () => {
 		userID: 'ALHA',
 	});
 
+	orderBook.utils.ensureLive()
+
 	const waitForAllProcessed: Record<string, ControlledPromise<any>> = {};
 
 	let incomingEvents = 0;
