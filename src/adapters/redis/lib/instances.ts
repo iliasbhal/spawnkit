@@ -54,7 +54,6 @@ export class InstanceScheduler extends BaseQueue implements Adapters.AdapaterIns
 
 		return {
 			async unsubscribe() {
-				console.log('UNSUBSCRIBE <<<<<<<<<')
 				// cpuCheckInterval.dispose();
 				const DO_NOT_WAIT = true;
 				await Promise.all([
