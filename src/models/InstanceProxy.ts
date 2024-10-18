@@ -17,6 +17,7 @@ import { Client } from "./Client";
 import { Data } from "./Data";
 import { Logger } from "./Logger";
 import { RemoteError } from "./RemoteError";
+import { InstanceUtils } from "./InstanceUtils";
 
 export interface InstanceProps {
 	kind: string;
@@ -96,7 +97,7 @@ export class InstanceProxy<Inst extends Instance> {
 
 	public data: Data<Inst['__types']['InstanceData']>;
 
-	private utils = new RemoteProxyUtils(this);
+	private utils = new InstanceUtils(this);
 
 	constructor(config: {
 		indenfier: InstanceIdentifier;
@@ -605,18 +606,4 @@ export class InstanceProxy<Inst extends Instance> {
 	}
 
 
-}
-
-/** These methods can be called from client */
-export class RemoteProxyUtils {
-	proxy: InstanceProxy<any>;
-
-	constructor(proxy: InstanceProxy<any>) {
-		this.proxy = proxy;
-	}
-
-
-	async ping() {
-		return 'pong';
-	}
 }
