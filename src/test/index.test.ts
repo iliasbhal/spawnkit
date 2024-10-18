@@ -12,6 +12,7 @@ import {
 } from "./index.test.fixtures";
 import { ControlledPromise } from "../utils/ControlledPromise";
 import { wait } from "../utils/wait";
+import { nanoid } from "nanoid";
 
 describe.only("Base", () => {
 	const createAdapters = () => ({
@@ -99,18 +100,19 @@ describe.only("Base", () => {
 
 
 	it('can access spawn context within instance', async () => {
+		const userId = nanoid();
 		const exampleInst = client.spawn("IntrospectExample", "intro-12312300", {
-			userID: 'ALHA',
+			userID: userId,
 		});
 
-		const userId = await exampleInst.getUserId();
-		expect(userId).toEqual('ALHA');
+		const response = await exampleInst.getUserId();
+		expect(response).toEqual(userId);
 	})
 
 	it('can access correct spawn context within instance', async () => {
-		const exampleInst1 = client.spawn("IntrospectExample", "intro-12312300", { userID: 'ALHA-1' });
-		const exampleInst2 = client.spawn("IntrospectExample", "intro-12312300", { userID: 'ALHA-2' });
-		const exampleInst3 = client.spawn("IntrospectExample", "intro-12312300", { userID: 'ALHA-3' });
+		const exampleInst1 = client.spawn("IntrospectExample", "intro-12312300", { userID: nanoid() });
+		const exampleInst2 = client.spawn("IntrospectExample", "intro-12312300", { userID: nanoid() });
+		const exampleInst3 = client.spawn("IntrospectExample", "intro-12312300", { userID: nanoid() });
 
 		const resolveOrder = [];
 		const createTrackerForInst = (id: string) => (userId) => {
@@ -125,31 +127,9 @@ describe.only("Base", () => {
 		])
 
 		expect(resolveOrder).toEqual(['2', '3', '1']);
-		expect(userId1).toEqual('ALHA-1');
-		expect(userId2).toEqual('ALHA-2');
-		expect(userId3).toEqual('ALHA-3');
-	})
-
-	it('can handle when instance fails to initialize', async () => {
-		class ErrorInitExample extends Spawnkit.Instance {
-			async initialize() {
-				await wait(1000);
-				throw new Error("INSTANCE FAILED TO INITIALIZE");
-			}
-
-			async dispose() {
-				await wait(1000);
-			}
-
-			doSomething(msg: string) {
-				return true;
-			}
-		}
-
-
-
-
-
+		expect(userId1).toEqual(exampleInst1.context.userID);
+		expect(userId2).toEqual(exampleInst2.context.userID);
+		expect(userId3).toEqual(exampleInst3.context.userID);
 	})
 
 	it.todo("can call for instance method and not wait for the resonse");
