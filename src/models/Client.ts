@@ -401,7 +401,7 @@ export class Client<CP extends SpawnkitConfig> {
 			get(target, prop, receiver) {
 				if (prop in target) return Reflect.get(target, prop, receiver);
 				if (typeof prop !== "string") return;
-				return normalRemoteMethodHandler("__CALL__UTILS__" + prop);
+				return normalRemoteMethodHandler(`utils.${prop}`);
 			},
 		}) as RemoteProxyMethodes;
 

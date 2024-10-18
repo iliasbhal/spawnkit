@@ -96,7 +96,7 @@ export class InstanceProxy<Inst extends Instance> {
 
 	public data: Data<Inst['__types']['InstanceData']>;
 
-	private internal = new RemoteProxyUtils(this);
+	private utils = new RemoteProxyUtils(this);
 
 	constructor(config: {
 		indenfier: InstanceIdentifier;
@@ -197,10 +197,10 @@ export class InstanceProxy<Inst extends Instance> {
 					},
 				});
 
-				const isClientInternalCall = action.startsWith("__CALL__UTILS__");
+				const isClientInternalCall = action.startsWith("utils.");
 				if (isClientInternalCall) {
-					const methodName = action.slice("__CALL__UTILS__".length);
-					const method = this.internal[methodName]?.bind(proxiedInst);
+					const methodName = action.slice("utils.".length);
+					const method = this.utils[methodName]?.bind(proxiedInst);
 					return await Promise.race([
 						method?.(...args),
 						this.aborted.await.then(() => { throw InstanceAbortedError }),
