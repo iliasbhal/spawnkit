@@ -1,5 +1,7 @@
 import * as Spawnkit from "../src";
 
+interface GameSessionContext { }
+
 interface GameSessionData {
 	board: string[][];
 }
@@ -8,7 +10,7 @@ interface GameSessionEvent {
 	round: number;
 }
 
-export class GameSession extends Spawnkit.Instance<GameSessionData, GameSessionEvent> {
+export class GameSession extends Spawnkit.Instance<GameSessionContext, GameSessionData, GameSessionEvent> {
 	async get() {
 		const world = await this.data.get("board");
 		return world;
@@ -19,6 +21,6 @@ export class GameSession extends Spawnkit.Instance<GameSessionData, GameSessionE
 		return response;
 	}
 
-	move(x: number, y: number) {}
-	jump() {}
+	move(x: number, y: number) { }
+	jump() { }
 }

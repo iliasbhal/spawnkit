@@ -1,16 +1,17 @@
 import "dotenv/config";
 
-import { redis } from "./adapters/redis/client";
+import { redis } from "../adapters/redis/client";
 
-import * as Spawnkit from ".";
-import * as RedisAdapter from "./adapters/redis";
+import * as Spawnkit from "..";
+import * as RedisAdapter from "../adapters/redis";
 import {
 	OrderBook,
 	EmptyResponseInstance,
 	BadExample,
 	IntrospectExample,
 } from "./index.test.fixtures";
-import { ControlledPromise } from "./utils/ControlledPromise";
+import { ControlledPromise } from "../utils/ControlledPromise";
+import { wait } from "../utils/wait";
 
 describe.only("Base", () => {
 	const createAdapters = () => ({
@@ -111,7 +112,6 @@ describe.only("Base", () => {
 		const exampleInst2 = client.spawn("IntrospectExample", "intro-12312300", { userID: 'ALHA-2' });
 		const exampleInst3 = client.spawn("IntrospectExample", "intro-12312300", { userID: 'ALHA-3' });
 
-
 		const resolveOrder = [];
 		const createTrackerForInst = (id: string) => (userId) => {
 			resolveOrder.push(id);
@@ -128,6 +128,28 @@ describe.only("Base", () => {
 		expect(userId1).toEqual('ALHA-1');
 		expect(userId2).toEqual('ALHA-2');
 		expect(userId3).toEqual('ALHA-3');
+	})
+
+	it('can handle when instance fails to initialize', async () => {
+		class ErrorInitExample extends Spawnkit.Instance {
+			async initialize() {
+				await wait(1000);
+				throw new Error("INSTANCE FAILED TO INITIALIZE");
+			}
+
+			async dispose() {
+				await wait(1000);
+			}
+
+			doSomething(msg: string) {
+				return true;
+			}
+		}
+
+
+
+
+
 	})
 
 	it.todo("can call for instance method and not wait for the resonse");
