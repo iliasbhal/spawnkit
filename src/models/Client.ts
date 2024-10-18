@@ -438,6 +438,7 @@ export class Client<CP extends SpawnkitConfig> {
 				sendEventToInstance,
 				wakeUpInstance: () => this.scheduler.tryWakeInstanceUp(kind, instanceId),
 				ensureLive: () => { },
+				on: createInternalEventHandler,
 			},
 
 			schedule: scheduleRemoteMethodHandler,
