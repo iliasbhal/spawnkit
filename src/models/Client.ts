@@ -1,5 +1,5 @@
 import type { Instance } from "./Instance";
-import type { InstanceEventChannels, InstanceEventStreamMessage, InternalInstanceEvent } from "./InstanceProxy";
+import type { InstanceEventChannels, InstanceEventStreamMessage, InstanceProxy, InternalInstanceEvent, RemoteProxyUtils } from "./InstanceProxy";
 import { ClientStream } from "./ClientStream";
 import { RemoteError } from "./RemoteError";
 import {
@@ -183,6 +183,9 @@ export class Client<CP extends SpawnkitConfig> {
 		type RemoteMethodes = MakeRemote<AvailableMethods>;
 		type SkipRemoteMethods = MakeSkippable<AvailableMethods>;
 		type ScheduleRemoteMethods = MakeSchedulable<AvailableMethods>;
+
+		type AvailableProxyMethods = ExtractMethods<RemoteProxyUtils>
+		type RemoteProxyMethodes = MakeRemote<AvailableProxyMethods>;
 
 		const instanceIdentifier = {
 			id: instanceId,
@@ -407,10 +410,13 @@ export class Client<CP extends SpawnkitConfig> {
 		const normalRemoteMethodHandler = createRemoteMethodHandler("normal");
 		const skipRemoteMethodHandler = createRemoteMethodHandler("skip");
 
-
-		const internalProxy = this.scheduler.createInternalProxy(kind, instanceId);
-
-
+		const remoteUtils = new Proxy({}, {
+			get(target, prop, receiver) {
+				if (prop in target) return Reflect.get(target, prop, receiver);
+				if (typeof prop !== "string") return;
+				return normalRemoteMethodHandler("__CALL__UTILS__" + prop);
+			},
+		}) as RemoteProxyMethodes;
 
 		const instanceClientAPI = {
 			id: instanceId,
@@ -436,9 +442,11 @@ export class Client<CP extends SpawnkitConfig> {
 
 			internals: {
 				sendEventToInstance,
-				wakeUpInstance: () => this.scheduler.tryWakeInstanceUp(kind, instanceId),
-				ensureLive: () => { },
 				on: createInternalEventHandler,
+				ensureLive: async () => {
+					const response = await remoteUtils.ping();
+					return response === 'pong';
+				},
 			},
 
 			schedule: scheduleRemoteMethodHandler,

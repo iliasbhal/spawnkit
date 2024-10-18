@@ -95,6 +95,8 @@ export class InstanceProxy<Inst extends Instance> {
 
 	public data: Data<Inst['__types']['InstanceData']>;
 
+	private internal = new RemoteProxyUtils(this);
+
 	constructor(config: {
 		indenfier: InstanceIdentifier;
 		adapters: Adapters;
@@ -193,7 +195,17 @@ export class InstanceProxy<Inst extends Instance> {
 					},
 				});
 
-				// @ts-ignore
+				const isClientInternalCall = action.startsWith("__CALL__UTILS__");
+				if (isClientInternalCall) {
+					const methodName = action.slice("__CALL__UTILS__".length);
+					const method = this.internal[methodName]?.bind(proxiedInst);
+					return await Promise.race([
+						method?.(...args),
+						this.aborted.await.then(() => { throw InstanceAbortedError }),
+					]);
+
+				}
+
 				const method = this.instance[action]?.bind(proxiedInst);
 				const methodExists = typeof method == "function";
 				if (!methodExists) throw new Error("Bad Request: Method not found");
@@ -588,5 +600,21 @@ export class InstanceProxy<Inst extends Instance> {
 		// we should wait for newly created operation to complete
 		// before yielding the promise. It the equivalent of a gracefull shutdown
 		await this.keepAlive.waitOnAll();
+	}
+
+
+}
+
+/** These methods can be called from client */
+export class RemoteProxyUtils {
+	proxy: InstanceProxy<any>;
+
+	constructor(proxy: InstanceProxy<any>) {
+		this.proxy = proxy;
+	}
+
+
+	async ping() {
+		return 'pong';
 	}
 }
