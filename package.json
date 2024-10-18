@@ -7,7 +7,8 @@
   "scripts": {
     "docker": "docker-compose --env-file .env -f ./docker/compose.yml up --build",
     "scripts": "bun run --watch  ./scripts/_runner.ts",
-    "benchmark": "bun run --watch  ./scripts/benchmark.ts",
+    "benchmark": "yarn run scripts benchmark",
+    "playground": "yarn run scripts playground",
     "lint": "prettier --write \"**/*.{ts,tsx,js,jsx}\"",
     "test": "jest"
   },
@@ -19,6 +20,9 @@
     "superjson": "^2.2.1"
   },
   "devDependencies": {
+    "@babel/plugin-transform-modules-commonjs": "^7.25.7",
+    "@babel/preset-env": "^7.25.8",
+    "@babel/preset-typescript": "^7.25.7",
     "@types/jest": "^29.5.12",
     "bun": "^1.1.22",
     "dotenv": "^16.4.5",
