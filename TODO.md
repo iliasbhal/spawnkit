@@ -4,16 +4,9 @@
 
 - Start writing documentation / recipes.
 
-- Client should wait for a response/ if reponse take too long, then client will timeout, unless a signal is sent to the client to tall that the message is still processing and everything is fine.
-
 - ability to control how many request can be handled at the same time. ( concurrency )
 
 - use .emitInternal to handle remote eviction? 
-
-- Add ability to send stream 
-     1. Send event to instance to set up a realtime channel
-     2. emit messages to that channel
-     ( we could do that for instead of scheduling messages?? ).
 
 - Add ability to create instance with certain args??
 
