@@ -29,13 +29,11 @@ const client = Spawnkit.Client.from({
 	adapters: createAdapters(),
 	instances: instances,
 	config: {
-		taints: {
-			location: "france",
-		}
+
 	}
 });
 
-const main = async () => {
+export const main = async () => {
 	console.log("-----");
 	console.log("-----");
 	console.log("-----");
@@ -85,7 +83,7 @@ const attributeExample = () => {
 
 const basicExample = async () => {
 	const orderBook = client.spawn("OrderBook", "BTC/EUR", {
-
+		userID: "Henry",
 	});
 	const subscription1 = orderBook.on("orders", (event) => {
 		// console.log("ON CLIENT 1", event);
@@ -124,10 +122,6 @@ const streamExample = async () => {
 
 
 	console.log(streamCtl.kind, streamCtl.id);
-
-	streamCtl.withContext({
-		uid: nanoid(),
-	});
 
 	// Example 1:  consume stream using .map
 	// which returns a Promise that is resolved when the stream ends
@@ -189,10 +183,10 @@ const streamWithErrors = async () => {
 
 const emittedEventsExample = async () => {
 	const orderBook = client.spawn("OrderBook", "BTC/USD", {
-
+		userID: "HECTOR",
 	});
 	const orderBook2 = client.spawn("OrderBook", "ETH/USD", {
-
+		userID: "Henry",
 	});
 
 	// Example 1: can emit from client and handle from instance
@@ -234,79 +228,80 @@ const emittedEventsExample = async () => {
 
 const scheduleCallExample = async () => {
 	// const streamExample = client.spawn("StreamExample", "BTC/ETH", {
-});
-// const scheduleId = await streamExample
-//   .schedule({
-//     name: "Buy AAPL Regularly",
-//     delay: 2000,
-//     // cron: "* * * * *",
-//   })
-//   .startFaultyStreamDuring();
+	// 	userID: "Henry",
+	// ])
+	// const scheduleId = await streamExample
+	//   .schedule({
+	//     name: "Buy AAPL Regularly",
+	//     delay: 2000,
+	//     // cron: "* * * * *",
+	//   })
+	//   .startFaultyStreamDuring();
 
-// setInterval(async () => {
-//   const scheduled = await streamExample.scheduled.list();
-//   console.log("LIST", scheduled);
-//   const data = await streamExample.scheduled.get(scheduleId);
-//   console.log("DATA", data);
-// }, 10_000);
+	// setInterval(async () => {
+	//   const scheduled = await streamExample.scheduled.list();
+	//   console.log("LIST", scheduled);
+	//   const data = await streamExample.scheduled.get(scheduleId);
+	//   console.log("DATA", data);
+	// }, 10_000);
 
-const orderBook = client.spawn("OrderBook", "BTC/ETH", {
-
-});
+	const orderBook = client.spawn("OrderBook", "BTC/ETH", {
+		userID: "Henry",
+	});
 
 	// orderBook.emit("orders", ["asddsa"]);
 
 	// const orderBook2 = client.spawn("OrderBook", "BTC/USD", {
-	});
-// orderBook2.on("orders", (event) => {
-//   console.log("stream: ", event);
-// });
+	// });
+	// orderBook2.on("orders", (event) => {
+	//   console.log("stream: ", event);
+	// });
 
-// const scheduleId = await orderBook2
-//   .schedule({
-//     name: "Buy AAPL Regularly",
-//     delay: 2000,
-//     // cron: "* * * * *",
-//   })
-//   .buy({
-//     tick: "AAPL",
-//   });
+	// const scheduleId = await orderBook2
+	//   .schedule({
+	//     name: "Buy AAPL Regularly",
+	//     delay: 2000,
+	//     // cron: "* * * * *",
+	//   })
+	//   .buy({
+	//     tick: "AAPL",
+	//   });
 
-// const scheduled2 = await orderBook2.scheduled.list();
-// console.log("scheduled2", scheduled2);
+	// const scheduled2 = await orderBook2.scheduled.list();
+	// console.log("scheduled2", scheduled2);
 
-// const before = await orderBook.scheduled.list();
-// console.log("before", before);
-// await orderBook.scheduled.cancel(scheduleId);
-// const after = await orderBook.scheduled.list();
-// console.log("after", after);
-// await orderBook.scheduled.delete(scheduleId);
-// const after2 = await orderBook.scheduled.list();
-// console.log("after2", after2);
+	// const before = await orderBook.scheduled.list();
+	// console.log("before", before);
+	// await orderBook.scheduled.cancel(scheduleId);
+	// const after = await orderBook.scheduled.list();
+	// console.log("after", after);
+	// await orderBook.scheduled.delete(scheduleId);
+	// const after2 = await orderBook.scheduled.list();
+	// console.log("after2", after2);
 
-// const scheduleId2 = await orderBook.schedule({ delay: 3000 }).buy({
-//   tick: "AAPL",
-//   qty: 4,
-// });
+	// const scheduleId2 = await orderBook.schedule({ delay: 3000 }).buy({
+	//   tick: "AAPL",
+	//   qty: 4,
+	// });
 
-// const before2 = await orderBook.scheduled.list();
-// console.log("before", before2.length);
-// await orderBook.scheduled.cancel(scheduleId2);
-// const after2 = await orderBook.scheduled.list();
-// console.log("after", after2.length);
+	// const before2 = await orderBook.scheduled.list();
+	// console.log("before", before2.length);
+	// await orderBook.scheduled.cancel(scheduleId2);
+	// const after2 = await orderBook.scheduled.list();
+	// console.log("after", after2.length);
 
-// await orderBook.schedule({ cron: "* * * * *" }).buy({
-//   tick: "AAPL",
-// });
+	// await orderBook.schedule({ cron: "* * * * *" }).buy({
+	//   tick: "AAPL",
+	// });
 
-// await orderBook.schedule({ delay: 3000 }).buy({
-//   tick: "AAPL",
-// });
+	// await orderBook.schedule({ delay: 3000 }).buy({
+	//   tick: "AAPL",
+	// });
 
-// const list = await orderBook.scheduled.list();
-// console.log("allscheduled", list);
+	// const list = await orderBook.scheduled.list();
+	// console.log("allscheduled", list);
 
-await wait(5000);
+	await wait(5000);
 };
 
 const errorHandlingExample = async () => {
@@ -366,7 +361,7 @@ const exampleXState = async () => {
 
 const exampleData = async () => {
 	const toggle = client.spawn("GameSession", "AAAA", {
-
+		board: 'sad',
 	});
 	const initial = await toggle.get();
 	// console.log('BEFORE', initial);
@@ -383,7 +378,7 @@ const exampleData = async () => {
 
 const exampleBadCall = async () => {
 	const orderBook = client.spawn("OrderBook", "BTC/EUR", {
-
+		userID: "Henry",
 	});
 
 	try {
@@ -444,13 +439,3 @@ const errorOnLifeCycle = async () => {
 	console.log('errorOnLifeCycle - 2');
 
 }
-
-const startTime = Date.now();
-console.log("START");
-main()
-	.then((result) => console.log("DONE"))
-	// .catch((err) => console.error("ERR", err))
-	.finally(() => {
-		const timeSpent = Date.now() - startTime;
-		console.log(timeSpent, "ms");
-	});
