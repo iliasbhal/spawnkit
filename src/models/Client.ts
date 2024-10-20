@@ -20,6 +20,7 @@ import { Scheduler } from "./Scheduler";
 import { nanoid } from "nanoid";
 import { SpawnkitError } from './Error'
 import { EventListener } from "@/utils/EventListenener";
+import { computeLatency } from "@/utils/computeLatency";
 
 export interface SpawnkitConfig {
 	adapters: Adapters;
@@ -417,16 +418,15 @@ export class Client<CP extends SpawnkitConfig> {
 			getLatency: async () => {
 				await utils.ensureLive();
 
-				const before = Date.now();
-				const remoteTime = await remoteUtils.getLocalTimeUnix();
-				const after = Date.now();
-				const timeSpent = after - before;
+				const before = Date.now(); // 13h
+				const remoteTime = await remoteUtils.getLocalTimeUnix(); // 15h
+				const after = Date.now() // 13h:10
 
-				return {
-					up: remoteTime - before,
-					down: after - remoteTime,
-					total: timeSpent,
-				}
+				return computeLatency({
+					before,
+					remoteTime,
+					after
+				});
 			},
 
 			setData: async <Key extends keyof InstanceData>(key: Key, value: InstanceData[Key]) => {
