@@ -185,8 +185,8 @@ export class Client<CP extends SpawnkitConfig> {
 		type SkipRemoteMethods = MakeSkippable<AvailableMethods>;
 		type ScheduleRemoteMethods = MakeSchedulable<AvailableMethods>;
 
-		type AvailableProxyMethods = ExtractMethods<InstanceUtils>
-		type RemoteProxyMethodes = MakeRemote<AvailableProxyMethods>;
+		// type AvailableProxyMethods = ExtractMethods<InstanceUtils<Inst>>
+		type RemoteProxyMethodes = MakeRemote<InstanceUtils<Inst>>;
 
 		const instanceIdentifier = {
 			id: instanceId,
@@ -428,6 +428,10 @@ export class Client<CP extends SpawnkitConfig> {
 					total: timeSpent,
 				}
 			},
+
+			setData: async <Key extends keyof InstanceData>(key: Key, value: InstanceData[Key]) => {
+				return remoteUtils.setData(key, value);
+			},
 		};
 
 		const instanceClientAPI = {
@@ -468,6 +472,7 @@ export class Client<CP extends SpawnkitConfig> {
 				get: async (scheduleId: ScheduleId) => {
 					return this.adapters.events.get(kind, instanceId, scheduleId);
 				},
+
 			},
 		} as const;
 

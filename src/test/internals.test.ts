@@ -5,9 +5,10 @@ import { redis } from "../adapters/redis/client";
 import * as Spawnkit from "..";
 import * as RedisAdapter from "../adapters/redis";
 import { wait } from "../utils/wait";
+import { nanoid } from "nanoid";
 
 describe("Utils", () => {
-  class Example extends Spawnkit.Instance<{}, {}, {}> {
+  class Example extends Spawnkit.Instance<{}, { somekey: number }, {}> {
     async initialize() {
       await wait(1000);
     }
@@ -59,6 +60,7 @@ describe("Utils", () => {
     const orderbook = client.spawn("Example", "1", {
       aaaaaaa: 'bbbbbb',
     });
+
     const latency = await orderbook.utils.getLatency();
     expect(latency.up).toBeGreaterThan(0);
     expect(latency.down).toBeGreaterThanOrEqual(0);
@@ -66,5 +68,16 @@ describe("Utils", () => {
     expect(latency.total).toEqual(latency.up + latency.down);
   })
 
+  it('can update instance data', async () => {
+    const orderbook = client.spawn("Example", nanoid(), {
+      aaaaaaa: 'aaaaaa',
+    });
+
+    await expect(orderbook.data.get('somekey')).resolves.toEqual(null);
+
+    await orderbook.utils.setData('somekey', 3);
+
+    await expect(orderbook.data.get('somekey')).resolves.toEqual(3);
+  })
 
 });
