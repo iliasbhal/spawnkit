@@ -1,6 +1,6 @@
 import type { Instance } from "./Instance";
 import type { InstanceEventChannels, InstanceEventStreamMessage, InternalInstanceEvent } from "./InstanceProxy";
-import type { InstanceUtils } from "./InstanceUtils";
+import { DATA_UTILS_NAMESPACE, type InstanceUtils } from "./InstanceUtils";
 import { ClientStream } from "./ClientStream";
 import { RemoteError } from "./RemoteError";
 import {
@@ -14,7 +14,7 @@ import {
 	BaseAdapter,
 	InstanceIdentifier,
 } from "../adapters";
-import { ClientData } from "./ClientData";
+import { ClientData } from "./Data";
 import { HealthCheckEmitter, HealthCheckListener, InstanceStalledError } from "./HealthCheck";
 import { Scheduler } from "./Scheduler";
 import { nanoid } from "nanoid";
@@ -174,7 +174,7 @@ export class Client<CP extends SpawnkitConfig> {
 		return healthCheck;
 	}
 
-	spawn<Kind extends Extract<keyof CP["instances"], string>, SpawnContext extends InstType<CP, Kind>['InstanceContext']>(kind: Kind, instanceId: InstanceId, context: SpawnContext = {} as any) {
+	spawn<Kind extends Extract<keyof CP["instances"], string>, SpawnContext extends InstType<CP, Kind>['InstanceContext']>(kind: Kind, instanceId: InstanceId, clientContext: SpawnContext = {} as any) {
 		type Inst = InstanceType<CP["instances"][Kind]>;
 		type InstanceData = Inst["__types"]["InstanceData"];
 		type InstanceChannels = Inst["__types"]["InstanceChannels"];
@@ -194,7 +194,7 @@ export class Client<CP extends SpawnkitConfig> {
 			kind: kind.toString(),
 		};
 
-		const sendEventToInstance = async (methodCallConfig: InstanceMethodCall) => {
+		const sendRPC = async (methodCallConfig: InstanceMethodCall) => {
 			const [_, eventId] = await Promise.all([
 				// when sending an event, we shall always try to spawn an instance
 				// to ensure that the event will be processed
@@ -233,7 +233,7 @@ export class Client<CP extends SpawnkitConfig> {
 									args,
 									mode: "scheduled",
 									context: {
-										context: context,
+										context: clientContext,
 									},
 								},
 							});
@@ -304,13 +304,13 @@ export class Client<CP extends SpawnkitConfig> {
 		const createRemoteMethodHandler = (mode: InstanceMethodCall["mode"]) => {
 			return (action: string) => {
 				return async (...args: any[]) => {
-					const eventId = await sendEventToInstance({
+					const eventId = await utils.sendRPC({
 						timestamp: Date.now(),
 						action,
 						args,
 						mode,
 						context: {
-							context: context,
+							context: clientContext,
 						}
 					});
 
@@ -407,16 +407,21 @@ export class Client<CP extends SpawnkitConfig> {
 			},
 		}) as RemoteProxyMethodes;
 
+		// const utilsData = data.withNamespace(DATA_UTILS_NAMESPACE);
+
 		const utils = {
-			sendEventToInstance,
+			sendRPC,
 			on: createInternalEventHandler,
+		};
+
+		const remote = {
 			ensureLive: async () => {
 				const response = await remoteUtils.ping();
 				return response === 'pong';
 			},
 
 			getLatency: async () => {
-				await utils.ensureLive();
+				await remote.ensureLive();
 
 				const before = Date.now(); // 13h
 				const remoteTime = await remoteUtils.getLocalTimeUnix(); // 15h
@@ -429,9 +434,13 @@ export class Client<CP extends SpawnkitConfig> {
 				});
 			},
 
-			setData: async <Key extends keyof InstanceData>(key: Key, value: InstanceData[Key]) => {
-				return remoteUtils.setData(key, value);
+			setConcurrency: async (concurrency: number) => {
+				return remoteUtils.setConcurrency(concurrency);
 			},
+
+			exists: async () => {
+				return remoteUtils.exists();
+			}
 		};
 
 		const instanceClientAPI = {
@@ -454,8 +463,9 @@ export class Client<CP extends SpawnkitConfig> {
 			on: createEventHandler,
 
 			data: data,
-			context: context as typeof context,
+			context: clientContext as typeof clientContext,
 
+			remote: remote,
 			utils: utils,
 
 			schedule: scheduleRemoteMethodHandler,

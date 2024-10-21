@@ -414,6 +414,8 @@ export class InstanceProxy<Inst extends Instance> {
 			throw err;
 		}
 
+		const lastInitializedTimestamp = Date.now();
+		this.utils.setLastInitialized(lastInitializedTimestamp);
 		this.initialized = true;
 	}
 
@@ -482,7 +484,6 @@ export class InstanceProxy<Inst extends Instance> {
 			});
 		});
 	}
-
 
 	public onEventSubscription: { unsubscribe: Function } | undefined;
 	public subscribeToInstanceEvent() {

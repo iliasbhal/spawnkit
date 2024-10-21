@@ -31,6 +31,10 @@ export class OrderBook extends Spawnkit.Instance<OrderBookContext, OrderBookData
 	}
 
 	on<C extends keyof OrderBookEvent>(channel: C, message: OrderBookEvent[C]) {
+		if (channel === 'alphachannel') {
+
+		}
+
 		if (channel === "buyOrders") {
 			const mdg = message;
 			this.emit("orders", mdg as any);

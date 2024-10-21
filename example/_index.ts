@@ -7,3 +7,4 @@ export { LiveDocument } from "./LiveDocument";
 export { OrderBook } from "./OrderBook";
 export { StreamExample } from "./StreamExample";
 export { ToggleMachine } from "./ToggleMachine";
+export { WithInitialData } from "./WithInitialData";

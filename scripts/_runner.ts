@@ -20,5 +20,6 @@ async function executScript() {
   }
 
   const { main } = await import(`./${scriptName}`);
-  return await main(...scriptArgs);
+  const response = await main(...scriptArgs);
+  return response
 }

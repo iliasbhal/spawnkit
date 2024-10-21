@@ -68,16 +68,4 @@ describe("Utils", () => {
     expect(latency.total).toEqual(latency.up + latency.down);
   })
 
-  it('can update instance data', async () => {
-    const orderbook = client.spawn("Example", nanoid(), {
-      aaaaaaa: 'aaaaaa',
-    });
-
-    await expect(orderbook.data.get('somekey')).resolves.toEqual(null);
-
-    await orderbook.remote.setData('somekey', 3);
-
-    await expect(orderbook.data.get('somekey')).resolves.toEqual(3);
-  })
-
 });

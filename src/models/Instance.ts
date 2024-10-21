@@ -29,11 +29,15 @@ export class Instance<
 
 	// TODO: FIX TYPING HERE
 	// For some reason, adding types here break the client types.
-	on(channel: keyof InstanceChannels, message: InstanceChannels[keyof InstanceChannels]) { }
+	on(channel: keyof InstanceChannels, message: InstanceChannels[keyof InstanceChannels]) {
+		channel;
+		message;
+	}
 
 	get id() {
 		return this.api.id;
 	}
+
 	get kind() {
 		return this.api.kind;
 	}

@@ -106,7 +106,7 @@
 //       kind: kind.toString(),
 //     };
 
-//     const sendEventToInstance = async (methodCallConfig: InstanceMethodCall) => {
+//     const sendRPC = async (methodCallConfig: InstanceMethodCall) => {
 //       const [_, eventId] = await Promise.all([
 //         // when sending an event, we shall always try to spawn an instance
 //         // to ensure that the event will be processed
@@ -166,7 +166,7 @@
 //     const createRemoteMethodHandler = (mode: InstanceMethodCall["mode"]) => {
 //       return (action: string) => {
 //         return async (...args: any[]) => {
-//           const eventId = await sendEventToInstance({
+//           const eventId = await sendRPC({
 //             timestamp: Date.now(),
 //             action,
 //             args,
@@ -294,7 +294,7 @@
 //       data: data,
 
 //       __INTERNAL__: {
-//         sendEventToInstance,
+//         sendRPC,
 //         wakeUpInstance: () => this.tryWakeInstanceUp(kind, instanceId),
 //       },
 

@@ -1,4 +1,5 @@
 import * as Spawnkit from "../src";
+import { InstanceLog } from "../src/adapters";
 
 interface LiveDocumentData {
 	pages: string[];
@@ -9,5 +10,9 @@ interface DocumentChange {
 }
 
 export class LiveDocument extends Spawnkit.Instance<LiveDocumentData> {
-	update(change: DocumentChange) {}
+	on(channel, message) {
+
+	}
+
+	update(change: DocumentChange) { }
 }

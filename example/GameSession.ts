@@ -1,4 +1,5 @@
 import * as Spawnkit from "../src";
+import { InstanceLog } from "../src/adapters";
 
 interface GameSessionContext { }
 
@@ -11,6 +12,11 @@ interface GameSessionEvent {
 }
 
 export class GameSession extends Spawnkit.Instance<GameSessionContext, GameSessionData, GameSessionEvent> {
+
+	on(change): void {
+
+	}
+
 	async get() {
 		const world = await this.data.get("board");
 		return world;
