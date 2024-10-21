@@ -143,7 +143,7 @@ export class Scheduler<O extends SpawnkitConfig> {
 		const { action, args } = scheduleEvent.event;
 
 		const remoteInstance = this.client.spawn<any, any>(kind, id, {});
-		await remoteInstance.utils.sendEventToInstance({
+		await remoteInstance.utils.sendRPC({
 			timestamp: Date.now(),
 			args,
 			action,

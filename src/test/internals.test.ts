@@ -42,11 +42,11 @@ describe("Utils", () => {
     });
 
     const now = Date.now();
-    const isLive = await orderbook.utils.ensureLive();
+    const isLive = await orderbook.remote.ensureLive();
     const timeSpent = Date.now() - now;
 
     const now2 = Date.now();
-    const isLive2 = await orderbook.utils.ensureLive();
+    const isLive2 = await orderbook.remote.ensureLive();
     const timeSpent2 = Date.now() - now2;
 
     expect(isLive).toBe(true);
@@ -61,7 +61,7 @@ describe("Utils", () => {
       aaaaaaa: 'bbbbbb',
     });
 
-    const latency = await orderbook.utils.getLatency();
+    const latency = await orderbook.remote.getLatency();
     expect(latency.up).toBeGreaterThan(0);
     expect(latency.down).toBeGreaterThanOrEqual(0);
     expect(latency.total).toBeGreaterThan(0);
@@ -75,7 +75,7 @@ describe("Utils", () => {
 
     await expect(orderbook.data.get('somekey')).resolves.toEqual(null);
 
-    await orderbook.utils.setData('somekey', 3);
+    await orderbook.remote.setData('somekey', 3);
 
     await expect(orderbook.data.get('somekey')).resolves.toEqual(3);
   })
