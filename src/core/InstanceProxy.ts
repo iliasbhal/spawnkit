@@ -58,21 +58,13 @@ type Emit<Channels extends Record<string, any>> = <Channel extends Extract<keyof
 	data: Channels[Channel],
 ) => Promise<void>;
 
-export interface InterfaceAPI<
-	InstanceData extends Record<string, any>,
-	InstanceChannels extends Record<string, any> = Record<string, any>,
-> {
+export interface InterfaceAPI<Inst extends Instance<any, any, any>> {
 	id: string;
 	kind: string;
-	data: {
-		get: Data<InstanceData>["get"];
-		set: Data<InstanceData>["set"];
-	};
-
-	logger: {
-		log: (message: string) => void;
-	};
-	emit: Emit<InstanceChannels>;
+	data: Data<Inst['__types']['InstanceData']>;
+	utils: InstanceUtils<Inst>;
+	logger: Logger;
+	emit: Emit<Inst['__types']['InstanceChannels']>;
 	waitFor: (promise: Promise<any>) => any;
 }
 
@@ -97,7 +89,7 @@ export class InstanceProxy<Inst extends Instance> {
 
 	public data: Data<Inst['__types']['InstanceData']>;
 
-	private utils = new InstanceUtils(this);
+	private utils: InstanceUtils<Inst>;
 
 	constructor(config: {
 		indenfier: InstanceIdentifier;
@@ -127,6 +119,8 @@ export class InstanceProxy<Inst extends Instance> {
 			logger: this.logger,
 		});
 
+		this.utils = new InstanceUtils(this.data);
+
 		this.instance = new Instance();
 		this.configureInstance();
 	}
@@ -136,8 +130,7 @@ export class InstanceProxy<Inst extends Instance> {
 	}
 
 	configureInstance() {
-
-		const configuredAPI = {
+		this.instance.api = {
 			id: this.indenfier.id,
 			kind: this.indenfier.kind,
 
@@ -148,27 +141,11 @@ export class InstanceProxy<Inst extends Instance> {
 			waitFor: (promise: Promise<any>) => {
 				return this.keepAlive.add(promise);
 			},
-			logger: {
-				log: (message: string) => {
-					return this.logger.log({
-						type: "log",
-						message,
-					});
-				},
-			},
-			data: {
-				get: (...args: Parameters<(typeof this.data)["get"]>) => {
-					return this.data.get(...args);
-				},
-				set: (...args: Parameters<(typeof this.data)["set"]>) => {
-					return this.runExternalEffect(async () => {
-						return await this.data.set(...args);
-					});
-				},
-			},
-		}
 
-		this.instance.api = configuredAPI;
+			logger: this.logger,
+			utils: this.utils,
+			data: this.data,
+		};
 	}
 
 	public async callMethodDefinedInEvent(
@@ -230,7 +207,7 @@ export class InstanceProxy<Inst extends Instance> {
 		if (isClientInternalCall) {
 			const methodName = action.slice("utils.".length);
 			const proxiedUtils = this.createProxyInstanceForRequest(this.utils, event)
-			const method = this.utils[methodName]?.bind?.(proxiedUtils);
+			const method = this.instance.utils[methodName]?.bind?.(proxiedUtils);
 			return method;
 		}
 
@@ -399,6 +376,9 @@ export class InstanceProxy<Inst extends Instance> {
 	async initialize() {
 		try {
 			this.trace({ type: "proxy:initialize:start" });
+
+			await this.instance.setup();
+
 			await this.instance.initialize?.();
 			this.trace({ type: "proxy:initialize:success" });
 

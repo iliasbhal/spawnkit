@@ -1,4 +1,4 @@
-import { Machine } from "@/integrations/xstate";
+import { Machine } from "../src/plugins/xstate";
 import { setup } from "xstate";
 
 export const ToggleMachine = Machine.from({

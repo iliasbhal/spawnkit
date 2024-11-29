@@ -154,6 +154,11 @@ export abstract class AdapaterData extends BaseAdapter {
 	): Promise<boolean>;
 }
 
+export abstract class AdapaterFile extends BaseAdapter {
+	abstract download(kind: InstanceKind, id: InstanceId, key: string);
+	abstract upload(kind: InstanceKind, id: InstanceId, key: string);
+}
+
 export type MessageChannel = "rpc" | `reply:${string}` | `broadcast:${string}`;
 
 export abstract class AdapaterMessageBroker extends BaseAdapter {

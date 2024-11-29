@@ -1,5 +1,18 @@
 # Spawnkit lib
 
+- Add ability to tag instances, create relationships between instances. 
+
+- Add ability to load and upload files. We'll then provide access to a local redis/sqlite to each instance. we'll remove client.data and instance.data and replace them with .sql and .redis.
+Also add access to .files to instances and client. files should be downloadable from the internet.
+.redis.on should subscribe to changes using the adapter.messages.
+     
+     .download(instance, filename: string, localpath?: string)
+     .upload(instance, filename: string, fileContentOrLocalPath: string)
+     .list(instance, folderName: string) : Stream 
+     .getConfig(instance, filename: string);
+     .updateConfig(instance, filename: string, config: { isPublic });
+
+
 - Move client validation within .spawn and check if process.env === 'developement'
 
 - Start writing documentation / recipes.

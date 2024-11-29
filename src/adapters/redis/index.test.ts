@@ -4,7 +4,7 @@ import * as RedisAdapters from "./";
 import { Adapters } from "../";
 import { generateTestSuite } from "../generateTestSuite";
 
-generateTestSuite("Redis Adapter", createAdapterFactory);
+generateTestSuite("Redis Adapter / Core", createAdapterFactory);
 
 describe("Redis Adapter", () => {
 	describe("MessageBroker", () => {

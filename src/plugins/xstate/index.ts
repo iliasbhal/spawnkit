@@ -20,7 +20,7 @@ export class Machine<
 	subscriptonByActor = new Map<string, x.Subscription>();
 	snapshotByActorId = new Map<string, MachineData<StateMachine>>();
 
-	static from<StateMachine extends x.AnyStateMachine>(config: {
+	public static from<StateMachine extends x.AnyStateMachine>(config: {
 		sync?: Machine<StateMachine>["sync"];
 		machine: StateMachine;
 	}) {
@@ -168,7 +168,7 @@ export class Machine<
 					const pending = this.childActorDoneByActor.get(actor);
 					pending?.resolve(err);
 				},
-				complete: () => {},
+				complete: () => { },
 			}),
 		);
 	}

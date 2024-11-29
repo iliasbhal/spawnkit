@@ -12,14 +12,18 @@ async function executScript() {
     throw new Error('Script name is required');
   }
 
-  console.log(fs.readdirSync(__dirname));
   const scriptPath = path.resolve(__dirname, `${scriptName}.ts`);
   const moduleExists = fs.existsSync(scriptPath);
   if (!moduleExists) {
     throw new Error(`Script '${scriptName}' not found`);
   }
 
-  const { main } = await import(`./${scriptName}`);
-  const response = await main(...scriptArgs);
-  return response
+  try {
+
+    const { main } = await import(`./${scriptName}`);
+    const response = await main(...scriptArgs);
+    return response
+  } catch (err) {
+    console.log(err);
+  }
 }

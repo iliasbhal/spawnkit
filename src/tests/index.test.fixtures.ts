@@ -29,8 +29,6 @@ export class OrderBook extends Spawnkit.Instance<OrderBookContext, OrderBookData
 	}
 
 	async buy(order: Order) {
-		this.logger.log("-----BUYYYYY------");
-
 		this.emit("orders", [order.tick, order.qty]);
 
 		return {

@@ -34,24 +34,17 @@ const client = Spawnkit.Client.from({
 });
 
 export const main = async () => {
-	console.log("-----");
-	console.log("-----");
-	console.log("-----");
-	console.log("-----");
-	console.log("-----");
-	console.log("-----");
-	console.log("-----");
-	console.log("-----");
-	// await redis.flushall("SYNC");
-	client.start();
+	await redis.flushall("SYNC");
+	await client.start();
 
-	client.on('stalled', (err) => {
+	// client.on('stalled', (err) => {
 
-	})
+	// })
 
 	//   // attributeExample();
 	await Promise.all([
-		errorOnLifeCycle(),
+		withPlugin(),
+		// errorOnLifeCycle(),
 		// severalClients(),
 		// basicExample(),
 		// performanceBenchmanrk(),
@@ -114,6 +107,14 @@ const basicExample = async () => {
 	// console.log("SENT");
 	//
 };
+
+const withPlugin = async () => {
+	const withSQLite = client.spawn("WithSQLite", "Hector");
+
+	await withSQLite.getTaskById('id:test')
+
+	console.log('DONE');
+}
 
 const streamExample = async () => {
 	const streamCtl = client.spawn("StreamExample", "Hector", {

@@ -6,17 +6,20 @@
   "license": "MIT",
   "scripts": {
     "docker": "docker-compose --env-file .env -f ./docker/compose.yml up --build",
-    "scripts": "bun run --watch  ./scripts/_runner.ts",
-    "benchmark": "yarn run scripts benchmark",
-    "playground": "yarn run scripts playground",
+    "scripts": "bun run  ./scripts/_runner.ts",
+    "scripts:watch": "bun run --watch  ./scripts/_runner.ts",
     "lint": "prettier --write \"**/*.{ts,tsx,js,jsx}\"",
     "test": "jest"
   },
   "dependencies": {
     "@msgpack/msgpack": "^3.0.0-beta2",
+    "@types/fs-extra": "^11.0.4",
     "bullmq": "^5.4.5",
+    "fs-extra": "^11.2.0",
+    "libsql": "^0.4.6",
     "nanoid": "^5.0.7",
     "redlock": "^5.0.0-beta.2",
+    "sqlite3": "^5.1.7",
     "superjson": "^2.2.1"
   },
   "devDependencies": {
@@ -34,7 +37,8 @@
     "ts-jest": "^29.1.2",
     "ts-node": "^10.9.2",
     "tsx": "^4.18.0",
-    "typescript": "^5.4.3"
+    "typescript": "^5.4.3",
+    "xstate": "^5.19.0"
   },
   "peerDependencies": {
     "xstate": "^5.9.1"

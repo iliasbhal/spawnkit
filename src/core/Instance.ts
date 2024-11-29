@@ -1,5 +1,6 @@
 import { InstanceLog } from "@/adapters";
 import type { InterfaceAPI } from "./InstanceProxy";
+import { InstancePlugin } from "@/plugins/_common";
 
 export type AnyRecord = { [key: string]: any };
 export type Context = AnyRecord;
@@ -9,7 +10,7 @@ type Prettify<T> = {
 } & {};
 
 export class BaseRemoteEntity<InstanceContext extends Context = Context> {
-	context: InstanceContext = {} as InstanceContext;
+	protected context: InstanceContext = {} as InstanceContext;
 }
 
 export class Instance<
@@ -22,6 +23,23 @@ export class Instance<
 		InstanceData: InstanceData;
 		InstanceChannels: InstanceChannels;
 	};
+
+	async setup() {
+		return new Promise((resolve) => {
+			setTimeout(() => {
+				Object.keys(this).forEach(key => {
+					const plugin = this[key];
+					const isPlugin = plugin instanceof InstancePlugin;
+					if (isPlugin) {
+						plugin.inject(this);
+						plugin.setup();
+					}
+				})
+
+				resolve(true);
+			})
+		})
+	}
 
 	signal(signal: Prettify<InstanceLog>) {
 		signal;
@@ -42,10 +60,18 @@ export class Instance<
 		return this.api.kind;
 	}
 
+	// plugins will add stuff here to the instance
+	// that we'll be able to use in the instance
+	hooks = {
+		initialize: [] as Function[],
+		dispose: [] as Function[],
+	};
+
 	initialize() { }
+
 	dispose() { }
 
-	api!: InterfaceAPI<InstanceData, InstanceChannels>;
+	api!: InterfaceAPI<Instance<InstanceContext, InstanceData, InstanceChannels>>;
 
 	get logger() {
 		return this.api.logger;
@@ -53,6 +79,10 @@ export class Instance<
 
 	get data() {
 		return this.api.data;
+	}
+
+	get utils() {
+		return this.api.utils;
 	}
 
 	/** this will send a message to all client subscribed to this instance specified channel */
