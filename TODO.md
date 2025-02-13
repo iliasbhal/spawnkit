@@ -1,6 +1,13 @@
-# Spawnkit lib
+# Spawkit Plugins
 
-- Add ability to tag instances, create relationships between instances. 
+- File plugin. We should download the file during the initialization and upload when it's done.
+- SQLite plugin, We should maybe reuse the file plugin to create a SQLite plugin.
+- Warm Plugin, implement a mechanism where the instance is conctantly kept awake. 
+     ( maybe create an general instance, that is constantly kept awake using a cron ).
+     ( and that constantly send requests to instances with a WARM plugin ).
+
+# Spawnkit lib 
+ 
 
 - Add ability to load and upload files. We'll then provide access to a local redis/sqlite to each instance. we'll remove client.data and instance.data and replace them with .sql and .redis.
 Also add access to .files to instances and client. files should be downloadable from the internet.
@@ -28,7 +35,7 @@ Also add access to .files to instances and client. files should be downloadable 
 - add methods to logger based on logLevel and channel
      ( .info .error. ... etc) for infra, per request.
 
-- add replica support. we should be able to ????
+
 
 # Spawnkit Redis Adapter:
 - Redis Logger should also make use of an object storage(s3) ??
