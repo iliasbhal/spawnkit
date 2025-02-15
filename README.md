@@ -1,8 +1,31 @@
-![./assets/readme-hero.png](./assets/readme-hero.png)
+<picture>
+  <!-- <source srcset="./banner-dark.png" media="(prefers-color-scheme: dark)"> -->
+  <!-- <source srcset="./banner.png" media="(prefers-color-scheme: light)"> -->
+  <img src="./assets/readme-hero.png" alt="Spawnkit Logo">
+</picture>
 
 # 🌟 Spawnkit
 
-Spawnkit is a powerful open-source alternative to Cloudflare Workers, designed for building distributed, stateful microservices with real-time capabilities. While Cloudflare Workers excel at edge computing, Spawnkit provides a more flexible and self-hosted solution for dynamic and complex distributed systems.
+[![npm](https://img.shields.io/npm/dm/better-auth)](https://npm.chart.dev/better-auth?primary=neutral&gray=neutral&theme=dark)
+[![npm version](https://img.shields.io/npm/v/better-auth.svg)](https://www.npmjs.com/package/better-auth)
+[![GitHub stars](https://img.shields.io/github/stars/better-auth/better-auth)](https://github.com/better-auth/better-auth/stargazers)
+
+Spawnkit is a powerful open-source alternative to Cloudflare Workers, designed for building distributed, stateful microservices with real-time capabilities.
+While Cloudflare Workers excel at edge computing, Spawnkit provides a more flexible and self-hosted solution for dynamic and complex distributed systems.
+Spawnkit provides a comprehensive set of features out of the box and includes a plugin ecosystem that simplifies adding advanced functionalities with minimal code in short amount of time.
+
+The mental model of building backend application using Spawnkit is so much simpler. You can litteraly ship what would have been an extremely complex apps in a matter of hours without having to sacrifice ergonomics, cost, productivity, vendor lock in. 
+
+## Quick Links:
+
+<div>
+  💬 <a href="https://discord.com/invite/GYC3W7tZzb">Discord</a><br/>
+  💻 <a href="https://better-auth.com">Website</a><br/>
+  🐛 <a href="https://github.com/better-auth/better-auth/issues">Issues</a><br/>
+</div>
+
+## Features
+
 
 - **Full Control**: Self-host your infrastructure without vendor lock-in
 - **No Cold Starts**: Persistent instances eliminate cold start latency
@@ -13,7 +36,6 @@ Spawnkit is a powerful open-source alternative to Cloudflare Workers, designed f
 - **Monitoring Dashboard**: Detailed insights into your distributed system ( wip )
 - **Resource Control**: Fine-grained control over compute resources ( wip )
 
-## Features
 ### 🚀 Instance Management
 - Persistent state across instance restarts
 
@@ -146,6 +168,17 @@ Here's an example of a plugin that logs instance lifecycle events:
 
 For detailed documentation and more examples, visit our [documentation site](https://docs.spawnkit.dev).
 
-## Contributing
 
+## Contribution
+
+Better Auth is free and open source project licensed under the [MIT License](./LICENSE.md). You are free to do whatever you want with it.
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+- [Contribute to the source code](./CONTRIBUTING.md)
+- [Suggest new features and report issues](https://github.com/better-auth/better-auth/issues)
+
+
+## Security
+If you discover a security vulnerability within Better Auth, please send an e-mail to security@better-auth.com.
+
+All reports will be promptly addressed, and you'll be credited accordingly.

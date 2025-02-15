@@ -5,6 +5,7 @@
   "author": "ilias.bhal@gmail.com",
   "license": "MIT",
   "scripts": {
+    "website:dev": "cd website && yarn dev",
     "docker": "docker-compose --env-file .env -f ./docker/compose.yml up --build",
     "scripts": "bun run  ./scripts/_runner.ts",
     "scripts:watch": "bun run --watch  ./scripts/_runner.ts",
