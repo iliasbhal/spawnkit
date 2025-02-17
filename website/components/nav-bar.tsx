@@ -51,11 +51,11 @@ export const Navbar = () => {
 					</div>
 					<div />
 					<ul className="md:flex items-center divide-x border-l w-max hidden shrink-0">
-						{navMenu.map((menu, i) => (
+						{/* {navMenu.map((menu, i) => (
 							<NavLink key={menu.name} href={menu.path}>
 								{menu.name}
 							</NavLink>
-						))}
+						))} */}
 						<NavLink
 							href="https://github.com/better-auth/better-auth"
 							className=" bg-muted/20"

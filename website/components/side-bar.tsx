@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { AnimatePresence, motion, MotionConfig } from "framer-motion";
 import { ThemeToggle } from "@/components/theme-toggler";
 
@@ -47,15 +48,19 @@ export default function ArticleLayout() {
 						<div className="flex flex-col">
 							{cts.map((item, index) => {
 								const isOpen = currentOpen === index;
+
 								return (
 									<div 
 										key={item.title}
 										className={
-											cn("border-b py-2.5", isOpen && "bg-white/05")
+											cn("border-b py-2.5", isOpen && "bg-white/05", {
+												"opacity-100 hover:opacity-100": isOpen,
+												"opacity-60 hover:opacity-100": !isOpen,
+											})
 										}
 									>
 										<button
-											className="w-full hover:underline border-lines text-sm px-5 text-left flex items-center gap-2"
+											className="w-full border-lines text-sm px-5 text-left flex items-center gap-2"
 										onClick={() => {
 											if (isOpen) {
 												setCurrentOpen(-1);
@@ -111,12 +116,22 @@ export default function ArticleLayout() {
 																) : (
 																	<AsideLink
 																		href={listItem.href}
-																		startWith="/docs"
 																		title={listItem.title}
-																		className="break-words w-full"
+																		startWith="/docs"
+																		className="break-words w-full rounded-md"
 																	>
-																		<listItem.icon className="w-4 h-4 text-stone-950 dark:text-white" />
-																		{listItem.title}
+																		{({ isActive, isHover }) => (
+																			<React.Fragment>
+																				<listItem.icon
+																					style={isActive || isHover ? { '--foreground': 'var(--primary)'} as React.CSSProperties : {}	}
+																					className={cn("w-4 h-4", {
+																						"text-primary": isActive || isHover,
+																						"text-stone-950 dark:text-white": !(isActive || isHover)
+																					})} 
+																				/>
+																				{listItem.title}
+																			</React.Fragment>
+																		)}
 																	</AsideLink>
 																)}
 															</Suspense>

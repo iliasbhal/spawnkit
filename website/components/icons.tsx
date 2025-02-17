@@ -4,6 +4,7 @@ import { SVGProps } from "react";
 export const Icons = {
 	nextJS: (props?: SVGProps<any>) => (
 		<svg
+			{...(props || {})}
 			className={props?.className}
 			xmlns="http://www.w3.org/2000/svg"
 			width="1.2em"
@@ -18,6 +19,7 @@ export const Icons = {
 	),
 	nuxt: (props?: SVGProps<any>) => (
 		<svg
+			{...(props || {})}
 			className={props?.className}
 			xmlns="http://www.w3.org/2000/svg"
 			width="1.2em"
@@ -32,6 +34,7 @@ export const Icons = {
 	),
 	svelteKit: (props?: SVGProps<any>) => (
 		<svg
+			{...(props || {})}
 			className={props?.className}
 			xmlns="http://www.w3.org/2000/svg"
 			width="1.2em"
@@ -46,6 +49,7 @@ export const Icons = {
 	),
 	solidStart: (props?: SVGProps<any>) => (
 		<svg
+			{...(props || {})}
 			className={props?.className}
 			xmlns="http://www.w3.org/2000/svg"
 			width="1.2em"
@@ -60,6 +64,7 @@ export const Icons = {
 	),
 	react: (props?: SVGProps<any>) => (
 		<svg
+			{...(props || {})}
 			className={props?.className}
 			xmlns="http://www.w3.org/2000/svg"
 			width="1.2em"
@@ -76,6 +81,7 @@ export const Icons = {
 	),
 	hono: (props?: SVGProps<any>) => (
 		<svg
+			{...(props || {})}
 			className={cn(props?.className)}
 			xmlns="http://www.w3.org/2000/svg"
 			width="1.2em"
@@ -95,8 +101,8 @@ export const Icons = {
 	),
 	astro: (props?: SVGProps<any>) => (
 		<svg
+			{...(props || {})}
 			xmlns="http://www.w3.org/2000/svg"
-			{...props}
 			width="1.2em"
 			height="1.2em"
 			viewBox="0 0 128 128"
@@ -107,8 +113,9 @@ export const Icons = {
 			></path>
 		</svg>
 	),
-	vue: () => (
+	vue: (props?: SVGProps<any>) => (
 		<svg
+			{...(props || {})}
 			xmlns="http://www.w3.org/2000/svg"
 			width="1.2em"
 			height="1.2em"
@@ -120,8 +127,9 @@ export const Icons = {
 			></path>
 		</svg>
 	),
-	express: () => (
+	express: (props?: SVGProps<any>) => (
 		<svg
+			{...(props || {})}
 			xmlns="http://www.w3.org/2000/svg"
 			width="1em"
 			height="1em"
@@ -141,8 +149,9 @@ export const Icons = {
 			</g>
 		</svg>
 	),
-	javascript: () => (
+	javascript: (props?: SVGProps<any>) => (
 		<svg
+			{...(props || {})}
 			xmlns="http://www.w3.org/2000/svg"
 			width="1.2em"
 			height="1.2em"
@@ -154,8 +163,9 @@ export const Icons = {
 			></path>
 		</svg>
 	),
-	node: () => (
+	node: (props?: SVGProps<any>) => (
 		<svg
+			{...(props || {})}
 			xmlns="http://www.w3.org/2000/svg"
 			width="1.2em"
 			height="1.2em"
@@ -169,8 +179,9 @@ export const Icons = {
 			></path>
 		</svg>
 	),
-	book: () => (
+	book: (props?: SVGProps<any>) => (
 		<svg
+			{...(props || {})}
 			xmlns="http://www.w3.org/2000/svg"
 			width="1em"
 			height="1em"
@@ -186,8 +197,9 @@ export const Icons = {
 			></path>
 		</svg>
 	),
-	remix: () => (
+	remix: (props?: SVGProps<any>) => (
 		<svg
+			{...(props || {})}
 			width="1.2em"
 			height="1.2em"
 			viewBox="0 0 412 474"
@@ -211,8 +223,9 @@ export const Icons = {
 			/>
 		</svg>
 	),
-	elysia: () => (
+	elysia: (props?: SVGProps<any>) => (
 		<svg
+			{...(props || {})}
 			width="1.2em"
 			height="1.2em"
 			viewBox="0 0 512 512"
@@ -261,6 +274,7 @@ export const Icons = {
 	),
 	tanstack: (props?: SVGProps<any>) => (
 		<svg
+			{...(props || {})}
 			className={cn(props?.className)}
 			xmlns="http://www.w3.org/2000/svg"
 			width="1.2em"
@@ -394,6 +408,7 @@ export const Icons = {
 	),
 	expo: (props?: SVGProps<any>) => (
 		<svg
+			{...(props || {})}
 			xmlns="http://www.w3.org/2000/svg"
 			width="1.2em"
 			height="1.2em"
@@ -408,7 +423,7 @@ export const Icons = {
 	),
 	x: (props?: SVGProps<any>) => (
 		<svg
-			{...props}
+			{...(props || {})}
 			width={30}
 			stroke="currentColor"
 			fill="currentColor"
@@ -422,7 +437,7 @@ export const Icons = {
 	),
 	linkedIn: (props?: SVGProps<any>) => (
 		<svg
-			{...props}
+			{...(props || {})}
 			width={30}
 			stroke="currentColor"
 			fill="currentColor"
@@ -436,12 +451,12 @@ export const Icons = {
 	),
 	nitro: (props?: SVGProps<any>) => (
 		<svg
+			{...(props || {})}
 			xmlns="http://www.w3.org/2000/svg"
 			fill="currentColor" // Use currentColor here
 			width="1.2em"
 			height="1.2em"
 			viewBox="0 0 40 40"
-			{...props}
 		>
 			<g clipPath="url(#a)">
 				<path

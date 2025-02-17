@@ -1,12 +1,15 @@
-import { DocsLayout } from "fumadocs-ui/layouts/docs";
 
+
+import { DocsLayout } from "fumadocs-ui/layouts/docs";
 import type { ReactNode } from "react";
 import { docsOptions } from "../layout.config";
 import ArticleLayout from "@/components/side-bar";
 import { DocsNavBarMobile } from "@/components/nav-mobile";
-import { SearchInput } from "@/components/search";
+// import { usePathname } from "next/navigation";
 
 export default function Layout({ children }: { children: ReactNode }) {
+	// const pathname = usePathname();
+
 	return (
 		<DocsLayout
 			{...docsOptions}
@@ -20,7 +23,13 @@ export default function Layout({ children }: { children: ReactNode }) {
 		>
 
 			<DocsNavBarMobile />
-			{children}
+
+			<div 
+				// key={pathname}
+				className="animate-fade-up flex flex-1"
+			>
+				{children}
+			</div>
 		</DocsLayout>
 	);
 }

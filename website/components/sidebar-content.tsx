@@ -36,8 +36,9 @@ interface Content {
 export const contents: Content[] = [
 	{
 		title: "Get Started",
-		Icon: () => (
+		Icon: (props: SVGProps<any>) => (
 			<svg
+				{...(props || {})}
 				xmlns="http://www.w3.org/2000/svg"
 				width="1.4em"
 				height="1.4em"
@@ -53,8 +54,9 @@ export const contents: Content[] = [
 			{
 				title: "Introduction",
 				href: "/docs/introduction",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="1.2em"
 						height="1.2em"
@@ -70,8 +72,9 @@ export const contents: Content[] = [
 			{
 				title: "Comparison",
 				href: "/docs/comparison",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="1.2em"
 						height="1.2em"
@@ -89,8 +92,9 @@ export const contents: Content[] = [
 			{
 				title: "Installation",
 				href: "/docs/installation",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="1.2em"
 						height="1.2em"
@@ -108,8 +112,9 @@ export const contents: Content[] = [
 			{
 				title: "Basic Usage",
 				href: "/docs/basic-usage",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="1.2em"
 						height="1.2em"
@@ -130,8 +135,9 @@ export const contents: Content[] = [
 			{
 				href: "/docs/concepts/api",
 				title: "API",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="1.2em"
 						height="1.2em"
@@ -148,8 +154,9 @@ export const contents: Content[] = [
 			},
 			{
 				title: "CLI",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="1.2em"
 						height="1.2em"
@@ -166,8 +173,9 @@ export const contents: Content[] = [
 			{
 				title: "Client",
 				href: "/docs/concepts/client",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="1.2em"
 						height="1.2em"
@@ -183,8 +191,9 @@ export const contents: Content[] = [
 			{
 				title: "Cookies",
 				href: "/docs/concepts/cookies",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="1.2em"
 						height="1.2em"
@@ -313,8 +322,9 @@ export const contents: Content[] = [
 			{
 				title: "Sessions",
 				href: "/docs/concepts/session-management",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="1.2em"
 						height="1.2em"
@@ -332,8 +342,9 @@ export const contents: Content[] = [
 			{
 				title: "Typescript",
 				href: "/docs/concepts/typescript",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="1em"
 						height="1em"
@@ -349,8 +360,9 @@ export const contents: Content[] = [
 			{
 				title: "Users & Accounts",
 				href: "/docs/concepts/users-accounts",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="1.2em"
 						height="1.2em"
@@ -364,8 +376,9 @@ export const contents: Content[] = [
 				),
 			},
 		],
-		Icon: () => (
+		Icon: (props: SVGProps<any>) => (
 			<svg
+				{...(props || {})}
 				xmlns="http://www.w3.org/2000/svg"
 				width="1.4em"
 				height="1.4em"
@@ -386,8 +399,9 @@ export const contents: Content[] = [
 	},
 	{
 		title: "Authentication",
-		Icon: () => (
+		Icon: (props: SVGProps<any>) => (
 			<svg
+				{...(props || {})}
 				xmlns="http://www.w3.org/2000/svg"
 				width="1.4em"
 				height="1.4em"
@@ -405,8 +419,9 @@ export const contents: Content[] = [
 			{
 				title: "Email & Password",
 				href: "/docs/authentication/email-password",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="1.2em"
 						height="1.2em"
@@ -430,8 +445,9 @@ export const contents: Content[] = [
 			{
 				title: "Apple",
 				href: "/docs/authentication/apple",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="1.2em"
 						height="1.2em"
@@ -449,8 +465,9 @@ export const contents: Content[] = [
 			{
 				title: "Discord",
 				href: "/docs/authentication/discord",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="1.2em"
 						height="1.2em"
@@ -466,8 +483,9 @@ export const contents: Content[] = [
 			{
 				title: "Facebook",
 				href: "/docs/authentication/facebook",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="1.2em"
 						height="1.2em"
@@ -486,8 +504,9 @@ export const contents: Content[] = [
 			{
 				title: "GitHub",
 				href: "/docs/authentication/github",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="1em"
 						height="1em"
@@ -505,8 +524,9 @@ export const contents: Content[] = [
 			{
 				title: "Google",
 				href: "/docs/authentication/google",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="1em"
 						height="1em"
@@ -523,8 +543,9 @@ export const contents: Content[] = [
 			{
 				title: "Microsoft",
 				href: "/docs/authentication/microsoft",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="1.2em"
 						height="1.2em"
@@ -540,8 +561,9 @@ export const contents: Content[] = [
 			{
 				title: "Twitch",
 				href: "/docs/authentication/twitch",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="1em"
 						height="1em"
@@ -559,8 +581,9 @@ export const contents: Content[] = [
 			{
 				title: "Twitter (X)",
 				href: "/docs/authentication/twitter",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="0.88em"
 						height="1em"
@@ -576,8 +599,9 @@ export const contents: Content[] = [
 			{
 				title: "Dropbox",
 				href: "/docs/authentication/dropbox",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="1.2em"
 						height="1.2em"
@@ -594,8 +618,9 @@ export const contents: Content[] = [
 			{
 				title: "LinkedIn",
 				href: "/docs/authentication/linkedin",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="1.2em"
 						height="1.2em"
@@ -612,8 +637,9 @@ export const contents: Content[] = [
 			{
 				title: "GitLab",
 				href: "/docs/authentication/gitlab",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="1.2em"
 						height="1.2em"
@@ -629,8 +655,9 @@ export const contents: Content[] = [
 			{
 				title: "Reddit",
 				href: "/docs/authentication/reddit",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="1.2em"
 						height="1.2em"
@@ -646,8 +673,9 @@ export const contents: Content[] = [
 			{
 				title: "Spotify",
 				href: "/docs/authentication/spotify",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="1.2em"
 						height="1.2em"
@@ -670,8 +698,9 @@ export const contents: Content[] = [
 			{
 				title: "Other Social Providers",
 				href: "/docs/authentication/other-social-providers",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="16"
 						height="16"
@@ -688,8 +717,9 @@ export const contents: Content[] = [
 	},
 	{
 		title: "Integrations",
-		Icon: () => (
+		Icon: (props: SVGProps<any>) => (
 			<svg
+				{...(props || {})}
 				xmlns="http://www.w3.org/2000/svg"
 				width="1.3em"
 				height="1.3em"
@@ -788,8 +818,9 @@ export const contents: Content[] = [
 	},
 	{
 		title: "Plugins",
-		Icon: () => (
+		Icon: (props: SVGProps<any>) => (
 			<svg
+				{...(props || {})}
 				xmlns="http://www.w3.org/2000/svg"
 				width="1.4em"
 				height="1.4em"
@@ -845,8 +876,9 @@ export const contents: Content[] = [
 			{
 				title: "Passkey",
 				href: "/docs/plugins/passkey",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="1.2em"
 						height="1.2em"
@@ -862,8 +894,9 @@ export const contents: Content[] = [
 			{
 				title: "Generic OAuth",
 				href: "/docs/plugins/generic-oauth",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="1.2em"
 						height="1.2em"
@@ -885,8 +918,9 @@ export const contents: Content[] = [
 			{
 				title: "One Tap",
 				href: "/docs/plugins/one-tap",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="1.2em"
 						height="1.2em"
@@ -910,8 +944,9 @@ export const contents: Content[] = [
 			{
 				title: "Admin",
 				href: "/docs/plugins/admin",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="1.2em"
 						height="1.2em"
@@ -943,8 +978,9 @@ export const contents: Content[] = [
 			{
 				title: "OIDC Provider",
 				href: "/docs/plugins/oidc-provider",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="1.2em"
 						height="1.2em"
@@ -960,8 +996,9 @@ export const contents: Content[] = [
 			},
 			{
 				title: "SSO",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="1.2em"
 						height="1.2em"
@@ -992,8 +1029,9 @@ export const contents: Content[] = [
 			},
 			{
 				title: "Multi Session",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="1.2em"
 						height="1.2em"
@@ -1010,8 +1048,9 @@ export const contents: Content[] = [
 			{
 				title: "OAuth Proxy",
 				href: "/docs/plugins/oauth-proxy",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="1.2em"
 						height="1.2em"
@@ -1032,8 +1071,9 @@ export const contents: Content[] = [
 			{
 				title: "Open API",
 				href: "/docs/plugins/open-api",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="1.1em"
 						height="1.1em"
@@ -1048,8 +1088,9 @@ export const contents: Content[] = [
 			},
 			{
 				title: "JWT",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="1em"
 						height="1em"
@@ -1088,8 +1129,9 @@ export const contents: Content[] = [
 			{
 				title: "Community Plugins",
 				href: "/docs/plugins/community-plugins",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="1em"
 						height="1em"
@@ -1113,8 +1155,9 @@ export const contents: Content[] = [
 	{
 		title: "Guides",
 		href: "/docs/guides",
-		Icon: () => (
+		Icon: (props: SVGProps<any>) => (
 			<svg
+				{...(props || {})}
 				xmlns="http://www.w3.org/2000/svg"
 				width="1.4em"
 				height="1.4em"
@@ -1131,8 +1174,9 @@ export const contents: Content[] = [
 			{
 				title: "Next Auth Migration Guide",
 				href: "/docs/guides/next-auth-migration-guide",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="1em"
 						height="1em"
@@ -1157,8 +1201,9 @@ export const contents: Content[] = [
 			{
 				title: "Create Your First Plugin",
 				href: "/docs/guides/your-first-plugin",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="1em"
 						height="1em"
@@ -1182,8 +1227,9 @@ export const contents: Content[] = [
 			{
 				title: "Browser Extension Guide",
 				href: "/docs/guides/browser-extension-guide",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="1.2em"
 						height="1.2em"
@@ -1209,8 +1255,9 @@ export const contents: Content[] = [
 	},
 	{
 		title: "Reference",
-		Icon: () => (
+		Icon: (props: SVGProps<any>) => (
 			<svg
+				{...(props || {})}
 				xmlns="http://www.w3.org/2000/svg"
 				width="1.3em"
 				height="1.3em"
@@ -1226,8 +1273,9 @@ export const contents: Content[] = [
 			{
 				title: "Options",
 				href: "/docs/reference/options",
-				icon: () => (
+				icon: (props: SVGProps<any>) => (
 					<svg
+						{...(props || {})}
 						xmlns="http://www.w3.org/2000/svg"
 						width="1.2em"
 						height="1.2em"
@@ -1299,8 +1347,9 @@ export const examples: Content[] = [
 	{
 		title: "Examples",
 		href: "/docs/examples/next",
-		Icon: () => (
+		Icon: (props: SVGProps<any>) => (
 			<svg
+				{...(props || {})}
 				xmlns="http://www.w3.org/2000/svg"
 				width="1.4em"
 				height="1.4em"
