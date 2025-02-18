@@ -32,7 +32,7 @@ export const Navbar = () => {
 			<nav className="border-b top-0 flex items-center justify-between ">
 				<Link
 					href="/"
-					className="md:border-r md:px-5 px-2.5 py-4 text-foreground md:col-span-2 shrink-0 transition-colors md:w-[--fd-sidebar-width]"
+					className="md:border-r md:px-5 px-2.5 py-4 text-foreground md:col-span-2 shrink-0 transition-colors md:w-[--fd-sidebar-width] hover:bg-primary/30"
 				>
 					<div className="flex flex-col gap-2 w-full">
 						<div className="flex items-center gap-2">

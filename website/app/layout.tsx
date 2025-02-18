@@ -33,7 +33,7 @@ export default function Layout({ children }: { children: ReactNode }) {
 					}}
 				>
 					<NavbarProvider>
-						<Navbar />
+						{/* <Navbar /> */}
 						{children}
 					</NavbarProvider>
 				</RootProvider>

@@ -123,10 +123,10 @@ export default function ArticleLayout() {
 																		{({ isActive, isHover }) => (
 																			<React.Fragment>
 																				<listItem.icon
-																					style={isActive || isHover ? { '--foreground': 'var(--primary)'} as React.CSSProperties : {}	}
+																					// style={isActive || isHover ? { '--foreground': 'var(--primary)'} as React.CSSProperties : {}	}
 																					className={cn("w-4 h-4", {
-																						"text-primary": isActive || isHover,
-																						"text-stone-950 dark:text-white": !(isActive || isHover)
+																						// "text-primary": isActive || isHover,
+																						// "text-stone-950 dark:text-white": !(isActive || isHover)
 																					})} 
 																				/>
 																				{listItem.title}

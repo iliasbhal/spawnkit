@@ -6,13 +6,13 @@ import { useSelectedLayoutSegment } from "next/navigation";
 import { cn } from "@/lib/utils";
 import React from "react";
 
-type Props = {
+type Props = Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, "children"> & {
 	href: string;
-	children: (config: { isActive: boolean, isHover: boolean }) => React.ReactElement;
+	children: (config: { isActive: boolean, isHover: boolean }) => React.ReactNode;
 	startWith: string;
 	title?: string | null;
 	className?: ClassValue;
-} & React.AnchorHTMLAttributes<HTMLAnchorElement>;
+};
 
 export const AsideLink = ({
 	href,
@@ -33,9 +33,9 @@ export const AsideLink = ({
 			onMouseLeave={() => setIsHover(false)}
 			className={cn(
 				isActive
-					? "bg-primary/10 text-primary"
-					: "text-muted-foreground hover:text-primary/80 hover:bg-primary/10 opacity-90",
-				"w-full transition-colors flex items-center gap-x-2.5 hover:bg-primary/10 px-5 py-1",
+					? "bg-primary/30 text-white"
+					: "text-muted-foreground hover:text-white/80 hover:bg-primary/10 opacity-90",
+				"w-full transition-colors flex items-center gap-x-2.5  px-5 py-1",
 				className,
 			)}
 			{...props}

@@ -17,7 +17,7 @@ export const TechStackDisplay = ({
 	return (
 		<div
 			className={cn(
-				"flex gap-7 flex-wrap mt-3 justify-center items-center max-w-4xl",
+				"flex gap-7 flex-wrap justify-center items-center max-w-4xl",
 				className,
 			)}
 		>
