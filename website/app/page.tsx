@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { LockClosedIcon } from "@radix-ui/react-icons";
 import { Button } from "@/components/ui/button";
-import { Ripple } from "@/components/ripple";
+import { HeroBackground } from "@/components/HeroBackground";
 import { cn } from "@/lib/utils";
 import { Testimonial } from "@/components/landing/people-say";
 import {
@@ -21,6 +21,7 @@ import {
 	PopoverContent,
 	PopoverTrigger,
 } from "@/components/ui/popover";
+import { Logo } from "@/components/logo";
 
 const features = [
 	{
@@ -83,19 +84,51 @@ export default function HomePage() {
 			<div className="relative col-span-3 md:border-[1.2px] h-full py-40">
 					<div className="w-full h-full p-16 pt-10 md:px-10">
 						<div className="absolute top-0 left-0 w-full h-full z-0">
-							<Ripple />
+							<HeroBackground />
 						</div>
-						<div className="flex flex-col items-center justify-center w-full h-full gap-10 z-1 relative">
-							<div className="flex flex-col items-center justify-center w-full h-full gap-3 z-1 relative">
-								<div className="flex items-center gap-2">
-									<Globe2Icon className="w-4 h-4" />
-									<p className="text-gray-600 dark:text-gray-400">
-										Own your auth
-									</p>
+						<div className="flex flex-col items-center justify-end w-full h-full gap-10 z-1 relative">
+							<div className="flex flex-col items-center justify-center w-full h-full gap-10 z-1 relative">
+								<div 
+									className="relativew-20 h-6"
+									style={{
+										width: 449 * 1.3,
+										height: 114 * 1.3,
+									}}
+								>
+									<Logo />
 								</div>
-								<p className="max-w-md mx-auto text-4xl font-normal tracking-tighter text-center md:text-4xl">
-									<strong>Roll your own auth with confidence in minutes!</strong>
+								<div className="flex flex-col items-center justify-center w-full h-full gap-3 z-1 relative">
+								<div className="flex items-center gap-2">
+								<Link href="/docs" className="cursor-pointer hover:bg-primary/30">
+									<Button variant="outline" className="p-6 font-normal text-lg">Documentation</Button>
+								</Link>
+
+								<Popover hideTimeout={2000}>
+									<PopoverTrigger asChild >
+										<Button 
+												variant="outline"
+												className="p-6 font-normal text-lg px-4 bg-slate-700/30 hover:bg-slate-700/40 gap-3 group relative"
+												onClick={(e) => {
+													navigator.clipboard.writeText("npm install spawnkit");
+												}}
+											>
+												<span className="font-mono font-normal">~ npm install spawnkit</span>
+												<Copy className="w-4 h-4" />
+											</Button>
+										</PopoverTrigger>
+										<PopoverContent className="text-white font-light text-sm bg-green-900 px-2 py-1 rounded-md z-1">
+											copied!
+										</PopoverContent>
+									</Popover>
+
+
+								{/* <GithubStat stars={stars} /> */}
+								</div>
+								<p className="mx-auto text-xl font-thin tracking-tighter text-center">
+									Roll your own auth with confidence in minutes!<br />
+									No vendor lock-in, no proprietary code.
 								</p>
+							</div>
 							</div>
 							{/* <div className="flex z-20 justify-center items-start">
 								<TechStackDisplay
@@ -112,32 +145,6 @@ export default function HomePage() {
 									]}
 								/>
 							</div> */}
-							<div className="flex items-center gap-2">
-								<Link href="/docs" className="cursor-pointer hover:bg-primary/30">
-									<Button variant="outline" className="p-5 font-normal" >Documentation</Button>
-								</Link>
-
-								<Popover hideTimeout={2000}>
-									<PopoverTrigger asChild >
-										<Button 
-												variant="default"
-												className="p-5 px-4 bg-primary/30 hover:bg-primary/40 gap-3 group relative"
-												onClick={(e) => {
-													navigator.clipboard.writeText("npm install spawnkit");
-												}}
-											>
-												<span className="font-mono font-normal">~ npm install spawnkit</span>
-												<Copy className="w-4 h-4" />
-											</Button>
-										</PopoverTrigger>
-										<PopoverContent className="text-white font-light text-sm bg-green-900 px-2 py-1 rounded-md z-1">
-											copied!
-										</PopoverContent>
-									</Popover>
-
-
-								{/* <GithubStat stars={stars} /> */}
-							</div>
 						</div>
 					</div>
 				</div>

@@ -34,10 +34,19 @@ export const Navbar = () => {
 					href="/"
 					className="md:border-r md:px-5 px-2.5 py-4 text-foreground md:col-span-2 shrink-0 transition-colors md:w-[--fd-sidebar-width] hover:bg-primary/30"
 				>
-					<div className="flex flex-col gap-2 w-full">
-						<div className="flex items-center gap-2">
-							<Logo />
-							<p>BETTER-AUTH.</p>
+					<div className="flex flex-col gap-2 w-full relative">
+						<div className="flex flex-start items-center gap-2">
+							<div className="relative w-20 h-6 ">
+								<div 
+									className="position absolute"
+									style={{
+										width: 130,
+										height: 30,
+									}}
+								>
+									<Logo />
+								</div>
+							</div>
 						</div>
 					</div>
 				</Link>

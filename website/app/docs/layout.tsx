@@ -18,9 +18,7 @@ export default function Layout({ children }: { children: ReactNode }) {
 				{...docsOptions}
 				sidebar={{
 				component: (
-					<div className="mr-[--fd-sidebar-width]">
-						<ArticleLayout />
-					</div>
+					<ArticleLayout />
 				),
 			}}
 		>

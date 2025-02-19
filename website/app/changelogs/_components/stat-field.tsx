@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useId, useRef } from "react";
+import { useId, useRef } from "react";
 import clsx from "clsx";
-import { type TimelineSegment, animate, timeline } from "motion";
 
 type Star = [x: number, y: number, dim?: boolean, blur?: boolean];
 
@@ -77,37 +76,6 @@ function Star({
 	let groupRef = useRef<React.ElementRef<"g">>(null);
 	let ref = useRef<React.ElementRef<"circle">>(null);
 
-	useEffect(() => {
-		if (!groupRef.current || !ref.current) {
-			return;
-		}
-
-		let delay = Math.random() * 2;
-
-		let animations = [
-			animate(groupRef.current, { opacity: 1 }, { duration: 4, delay }),
-			animate(
-				ref.current,
-				{
-					opacity: dim ? [0.2, 0.5] : [1, 0.6],
-					scale: dim ? [1, 1.2] : [1.2, 1],
-				},
-				{
-					delay,
-					duration: Math.random() * 2 + 2,
-					direction: "alternate",
-					repeat: Infinity,
-				},
-			),
-		];
-
-		return () => {
-			for (let animation of animations) {
-				animation.cancel();
-			}
-		};
-	}, [dim]);
-
 	return (
 		<g ref={groupRef} className="opacity-0">
 			<circle
@@ -138,35 +106,6 @@ function Constellation({
 		(point, pointIndex) =>
 			points.findIndex((p) => String(p) === String(point)) === pointIndex,
 	);
-	let isFilled = uniquePoints.length !== points.length;
-
-	useEffect(() => {
-		if (!ref.current) {
-			return;
-		}
-
-		let sequence: Array<TimelineSegment> = [
-			[
-				ref.current,
-				{ strokeDashoffset: 0, visibility: "visible" },
-				{ duration: 5, delay: Math.random() * 3 + 2 },
-			],
-		];
-
-		if (isFilled) {
-			sequence.push([
-				ref.current,
-				{ fill: "rgb(255 255 255 / 0.02)" },
-				{ duration: 1 },
-			]);
-		}
-
-		let animation = timeline(sequence);
-
-		return () => {
-			animation.cancel();
-		};
-	}, [isFilled]);
 
 	return (
 		<>

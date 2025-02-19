@@ -4,7 +4,7 @@ import {
 	AnimatePresence as PrimitiveAnimatePresence,
 	motion,
 	useReducedMotion,
-} from "framer-motion";
+} from "motion/react";
 import { createContext, useContext } from "react";
 
 const FadeInStaggerContext = createContext(false);

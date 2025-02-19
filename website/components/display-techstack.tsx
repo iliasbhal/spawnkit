@@ -20,7 +20,7 @@ export const TechStackDisplay = ({
 				"flex gap-7 flex-wrap justify-center items-center max-w-4xl",
 				className,
 			)}
-		>
+	>
 			{skills.map((icon) => {
 				return (
 					<TooltipProvider delayDuration={50} key={icon}>
