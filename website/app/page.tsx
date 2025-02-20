@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import Link from "next/link";
 import {
 	Copy,
@@ -22,7 +23,7 @@ import {
 	PopoverTrigger,
 } from "@/components/ui/popover";
 import { Logo } from "@/components/logo";
-import { motion } from "motion/react";
+import { motion, MotionConfig } from "motion/react";
 
 const features = [
 	{
@@ -89,88 +90,39 @@ export default function HomePage() {
 								<HeroBackground />
 							</div>
 							<div className="flex flex-col items-center justify-center w-full  gap-10 z-1 relative py-40">
-								<div 
-									className="relative w-20 h-6"
-									style={{
-										width: 449 * 1.3,
-										height: 114 * 1.3,
-									}}
-								>
-									<motion.div 
-										className="w-full h-full absolute top-0 left-0"
-										initial={{ 
-											opacity: 0, 
-											scale: 0.9,
-											translateY: -30 
-										}}
-										animate={{ 
-											opacity: 1,
-											scale: 1,
-											translateY: 0 
-										}} 
-										transition={{ 
-											type: "spring",
-											bounce: 0.2,
-										}}
-									>
-										<Logo hideKitPart={true} />
-									</motion.div>
-									<motion.div 
-										className="w-full h-full absolute top-0 left-0"
-										initial={{ 
-											opacity: 0,
-											scale: 0.9,
-											translateY: -30 
-										}} 
-										animate={{ 
-											opacity: 1, 
-											scale: 1,
-											translateY: 0
-										 }} 
-										transition={{ 
-											delay: 0.1,
-											type: "spring",
-											bounce: 0.2,
-										}}
-									>
-										<Logo hideSpawnPart={true}/>
-									</motion.div>
-								</div>
+								<AnimatedHeroLogo />
 								<div className="flex flex-col items-center justify-center w-full h-full gap-3 z-1 relative">
-								<div className="flex items-center gap-2">
-								<Link href="/docs" className="cursor-pointer hover:bg-primary/30">
-									<Button variant="outline" className="p-6 font-normal text-lg bg-primary/60 hover:bg-primary/80">Documentation</Button>
-								</Link>
+									<div className="flex items-center gap-2">
+										<Link href="/docs" className="cursor-pointer hover:bg-primary/30">
+											<Button variant="outline" className="p-6 font-normal text-lg bg-primary/60 hover:bg-primary/80">Documentation</Button>
+										</Link>
 
-								<Popover hideTimeout={2000}>
-									<PopoverTrigger asChild >
-										<Button 
-												variant="outline"
-												className="p-6 font-normal text-lg px-4 bg-slate-700/30 hover:bg-slate-700/40 gap-3 group relative"
-												onClick={(e) => {
-													navigator.clipboard.writeText("npm install spawnkit");
-												}}
-											>
-												<span className="font-mono font-normal opacity-70">
-													<span className="opacity-70">{'>'}</span> <span className="opacity-70">npm install</span> spawnkit
-												</span>
-												<Copy className="w-4 h-4" />
-											</Button>
-										</PopoverTrigger>
-										<PopoverContent className="text-white font-light text-sm bg-green-900 px-2 py-1 rounded-md z-1">
-											copied!
-										</PopoverContent>
-									</Popover>
-
-
-								{/* <GithubStat stars={stars} /> */}
-								</div>
+										<Popover hideTimeout={2000}>
+											<PopoverTrigger asChild >
+												<Button 
+														variant="outline"
+														className="p-6 font-normal text-lg px-4 bg-slate-700/30 hover:bg-slate-700/40 gap-3 group relative"
+														onClick={(e) => {
+															navigator.clipboard.writeText("npm install spawnkit");
+														}}
+													>
+														<span className="font-mono font-normal opacity-70">
+															<span className="opacity-70">{'>'}</span> <span className="opacity-70">npm install</span> spawnkit
+														</span>
+														<Copy className="w-4 h-4" />
+													</Button>
+												</PopoverTrigger>
+												<PopoverContent className="text-white font-light text-sm bg-green-900 px-2 py-1 rounded-md z-1">
+													copied!
+												</PopoverContent>
+											</Popover>
+									</div>
 								<div className="h-3" />
-								<p className="mx-auto text-xl font-thin tracking-tighter text-center">
-									Roll your own auth with confidence in minutes!<br />
-									No vendor lock-in, no proprietary code.
-								</p>
-							</div>
+									<p className="mx-auto text-xl font-thin tracking-tighter text-center">
+										Roll your own auth with confidence in minutes!<br />
+										No vendor lock-in, no proprietary code.
+									</p>
+								</div>
 							</div>
 						</div>
 				
@@ -232,4 +184,56 @@ export default function HomePage() {
 		</p>
 		</main>
 	);
+}
+
+const AnimatedHeroLogo = () => {
+	const [isAnimating, setIsAnimating] = React.useState(false);
+	React.useEffect(() => {
+		setTimeout(() => {
+			setIsAnimating(true);
+		}, 300)
+	}, []);
+
+
+	return (
+		<div 
+			className="relative w-20 h-6"
+			style={{
+				width: 449 * 1.3,
+				height: 114 * 1.3,
+			}}
+		>
+			<MotionConfig 
+				transition={{
+					type: "spring",
+					bounce: 0.4,
+				}}
+			>
+				<motion.div 
+					className="w-full h-full absolute top-0 left-0"
+					initial={{ 
+						translateY: 0,
+					}}
+					animate={isAnimating ? { 
+						translateY: [20, 0],
+					} : {
+						translateY: 0,
+					}} 
+				>
+					<Logo hideKitPart={true} />
+				</motion.div>
+				<motion.div 
+					className="w-full h-full absolute top-0 left-0"
+					initial={{ 
+						translateY: -10 
+					}}
+					animate={{ 
+						translateY: [-50,0],
+					}}
+				>
+					<Logo hideSpawnPart={true}/>
+				</motion.div>
+			</MotionConfig>
+		</div>
+	)
 }
