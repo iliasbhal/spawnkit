@@ -216,6 +216,8 @@ const AnimatedHeroLogo = () => {
 					}}
 					animate={isAnimating ? { 
 						translateY: [20, 0],
+						rotate: [1, 0],
+						transformOrigin: "0px 0px"
 					} : {
 						translateY: 0,
 					}} 
@@ -225,10 +227,12 @@ const AnimatedHeroLogo = () => {
 				<motion.div 
 					className="w-full h-full absolute top-0 left-0"
 					initial={{ 
-						translateY: -10 
+						translateY: 0 
 					}}
 					animate={{ 
-						translateY: [-50,0],
+						translateY: [-30,0],
+						rotate: [1, 0],
+						transformOrigin: "0px 0px"
 					}}
 				>
 					<Logo hideSpawnPart={true}/>
