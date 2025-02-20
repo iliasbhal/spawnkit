@@ -9,7 +9,7 @@ interface HeroBackgroundProps {
 }
 
 export const HeroBackground = React.memo((props: HeroBackgroundProps) => {
-	const { boxSize = 40 } = props;
+	const { boxSize = 45 } = props;
 
 	const heroRef = React.useRef<HTMLDivElement>(null);
 
@@ -26,7 +26,7 @@ export const HeroBackground = React.memo((props: HeroBackgroundProps) => {
 				padding: 8,
 			}}
 		>
-			{Array.from({ length: boxColCount }, (_, rowIdx) => {
+			{Array.from({ length: 1 + boxColCount }, (_, rowIdx) => {
 				return (
 					<div 
 						key={rowIdx}
@@ -72,13 +72,16 @@ const BackgroundBox = React.memo((props: { size: number }) => {
 		return () => clearInterval(interval);
 	}, [isActive]);
 
+	const GAP = 4;
+	const SIZE = props.size - GAP;
+
 	return (
 		<motion.div
 			className="flex items-center justify-center shadow-xl border rounded-md"
 			initial={{	
-				width: props.size,
-				height: props.size,
-				margin: 4,
+				width: SIZE,
+				height: SIZE,
+				margin: GAP,
 				opacity: 0.2,
 				borderWidth: 1,
 				borderColor: baseColor,
@@ -110,8 +113,8 @@ const BackgroundBox = React.memo((props: { size: number }) => {
 					// 	bounce: 0.25
 					// }
 				}}
-				width="24px" 
-				height="24px" 
+				width={SIZE / 2} 
+				height={SIZE / 2} 
 				viewBox="0 0 256 256"
 			>
 				<path d="M240.58984,128a15.84794,15.84794,0,0,1-10.53125,15.03711l-63.81543,23.206-23.206,63.81543a16.001,16.001,0,0,1-30.07422,0L89.75684,166.24316l-63.81543-23.206a16.001,16.001,0,0,1,0-30.07422L89.75684,89.75684l23.20605-63.81543a16.001,16.001,0,0,1,30.07422,0l23.206,63.81543,63.81543,23.20605A15.84794,15.84794,0,0,1,240.58984,128Z"/>

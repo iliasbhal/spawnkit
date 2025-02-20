@@ -227,10 +227,10 @@ const AnimatedHeroLogo = () => {
 				<motion.div 
 					className="w-full h-full absolute top-0 left-0"
 					initial={{ 
-						translateY: 0 
+						translateY: -30 
 					}}
 					animate={{ 
-						translateY: [-30,0],
+						translateY: 0,
 						rotate: [1, 0],
 						transformOrigin: "0px 0px"
 					}}
