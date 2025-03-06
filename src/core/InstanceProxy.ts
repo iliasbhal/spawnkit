@@ -1,7 +1,7 @@
 import { PromiseList } from "@/utils/PromiseList";
 import { ControlledPromise } from "@/utils/ControlledPromise";
 import { ControlledTimeout } from "@/utils/ControlledTimeout";
-import { Stream } from "@/models/Stream";
+import { Stream } from "./Stream";
 import { BaseRemoteEntity, Instance } from "./Instance";
 import { HealthCheckEmitter } from "./HealthCheck";
 import {
@@ -379,7 +379,12 @@ export class InstanceProxy<Inst extends Instance> {
 
 			await this.instance.setup();
 
+			for (const hook of this.instance.hooks.initialize) {
+				await hook();
+			}
+
 			await this.instance.initialize?.();
+
 			this.trace({ type: "proxy:initialize:success" });
 
 		} catch (err) {
@@ -408,7 +413,11 @@ export class InstanceProxy<Inst extends Instance> {
 		try {
 			this.trace({ type: "proxy:dispose:start" });
 			if (this.initialized) {
-				await this.instance.dispose?.()
+				for (const hook of this.instance.hooks.dispose) {
+					await hook();
+				}
+
+				await this.instance.dispose?.();
 			}
 			this.trace({ type: "proxy:dispose:success" });
 		} catch (err) {

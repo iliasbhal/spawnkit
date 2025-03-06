@@ -1,7 +1,5 @@
 # Spawkit Plugins
 
-- File plugin. We should download the file during the initialization and upload when it's done.
-- SQLite plugin, We should maybe reuse the file plugin to create a SQLite plugin.
 - Conccurency, allow the dev to control how many requests are handled in parallel.
 - Load Balancer, allow to distribute the load between a number of instances
 - Warm Plugin, implement a mechanism where the instance is conctantly kept awake. 

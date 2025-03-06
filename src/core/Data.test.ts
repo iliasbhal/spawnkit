@@ -1,4 +1,4 @@
-import { Data } from "@/models/Data";
+import { Data } from "../core/Data";
 
 describe("Data", () => {
 	it.todo("should be able to set and get data");

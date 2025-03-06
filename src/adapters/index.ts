@@ -1,4 +1,4 @@
-import { Context } from "@/models/Instance";
+import { Context } from "../core/Instance";
 import type { Client } from "..";
 
 export type InstanceId = string;

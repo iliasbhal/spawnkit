@@ -1,8 +1,8 @@
 import { Adapters, InstanceMethodCall } from "@/adapters";
 import { ControlledInterval } from "@/utils/ControlledInterval";
-import { SpawnkitError } from '@/models/Error';
 import { EventListener } from "@/utils/EventListenener";
 import { ControlledTimeout } from "@/utils/ControlledTimeout";
+import { SpawnkitError } from './Error';
 
 export const HEALTH_CHECK_INTERVAL = 5000;
 export const HEALTH_CHECK_NOTIFY_PER_INTERVAL = 2;

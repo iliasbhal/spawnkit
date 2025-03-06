@@ -27,15 +27,22 @@ export class Instance<
 	async setup() {
 		return new Promise((resolve) => {
 			setTimeout(() => {
-				Object.keys(this).forEach(key => {
-					const plugin = this[key];
-					const isPlugin = plugin instanceof InstancePlugin;
-					if (isPlugin) {
-						plugin.inject(this);
-						plugin.setup();
-					}
-				})
 
+				// Recursively setup plugins in the instance
+				// If a plugin has a plugin, it will be setup too
+				const setupPlugin = (root: any) => {
+					Object.keys(root).forEach(key => {
+						const plugin = root[key];
+						const isPlugin = plugin instanceof InstancePlugin;
+						if (isPlugin) {
+							plugin.inject(this);
+							setupPlugin(plugin);
+							plugin.setup();
+						}
+					})
+				}
+
+				setupPlugin(this);
 				resolve(true);
 			})
 		})
