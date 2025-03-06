@@ -109,8 +109,8 @@ export class Instance<
 		return;
 	}
 
-	public async waitFor(promise: Promise<any>) {
-		return this.api.waitFor(promise);
+	public async waitFor(callback: () => Promise<any>) {
+		return this.api.waitFor(callback);
 	}
 }
 

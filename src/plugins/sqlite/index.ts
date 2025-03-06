@@ -1,9 +1,10 @@
 import sqlite3 from 'sqlite3'
+import path from 'path';
 import { InstancePlugin } from '../_common'
-import fs from 'fs-extra';
 import { Volume } from '../volume';
 import { MockVolume } from '../volume/mock';
-import path from 'path';
+import { AsyncQueue } from '../../utils/AsyncQueue';
+
 interface SQLiteConfig {
   name?: string;
 }
@@ -33,23 +34,48 @@ export class SQLite extends InstancePlugin {
     });
 
     super.setup();
+
     this.instance.hooks.initialize.push(async () => {
       await this.startSqliteDatabase();
     });
   }
 
-  async query(strings: TemplateStringsArray, ...values: any[]) {
-    let result = strings[0];
+  parseQuery(strings: TemplateStringsArray, ...values: any[]) {
+    let query = strings[0];
     for (let i = 0; i < values.length; i++) {
-      result += values[i] + strings[i + 1];
+      const value = values[i];
+      query += value + strings[i + 1];
     }
 
-    try {
-      return await this.db.exec(result);
-    } catch (error) {
-      console.error('error', error);
-      throw error;
+    return query;
+  }
+
+  async query(strings: TemplateStringsArray, ...values: any[]) {
+    const query = this.parseQuery(strings, ...values);
+
+    const result = await this.db.exec(query);
+    this.syncVolume();
+    return result;
+  }
+
+
+  private syncQueue: AsyncQueue = new AsyncQueue();
+
+  /**
+   * This will sync the volume 
+   * and keeps the instance awake while it's uploading
+   */
+  private async syncVolume() {
+    const willAlreadySync = this.syncQueue.waitingCount >= 1;
+    if (willAlreadySync) {
+      return;
     }
+
+    this.syncQueue.enqueue(async () => {
+      return await this.instance.waitFor(async () => {
+        return await this.volume.upload();
+      });
+    });
   }
 
   private async startSqliteDatabase() {

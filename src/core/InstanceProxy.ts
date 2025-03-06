@@ -65,7 +65,7 @@ export interface InterfaceAPI<Inst extends Instance<any, any, any>> {
 	utils: InstanceUtils<Inst>;
 	logger: Logger;
 	emit: Emit<Inst['__types']['InstanceChannels']>;
-	waitFor: (promise: Promise<any>) => any;
+	waitFor: (callback: () => Promise<any>) => Promise<any>;
 }
 
 interface MessageContext {
@@ -138,8 +138,8 @@ export class InstanceProxy<Inst extends Instance> {
 				return this.emit(channel, data);
 			},
 
-			waitFor: (promise: Promise<any>) => {
-				return this.keepAlive.add(promise);
+			waitFor: (callback: () => Promise<any>) => {
+				return this.runExternalEffect(callback);
 			},
 
 			logger: this.logger,
