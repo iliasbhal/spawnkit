@@ -47,14 +47,22 @@ export class SQLite extends InstancePlugin {
       query += value + strings[i + 1];
     }
 
-    return query;
+    const sqlQuery = query.trim();
+    const isRead = sqlQuery.toUpperCase().startsWith('SELECT');
+    return {
+      sqlQuery,
+      isRead,
+      isWrite: !isRead,
+    };
   }
 
   async query(strings: TemplateStringsArray, ...values: any[]) {
-    const query = this.parseQuery(strings, ...values);
+    const parsed = this.parseQuery(strings, ...values);
 
-    const result = await this.db.exec(query);
-    this.syncVolume();
+    const result = await this.db.exec(parsed.sqlQuery);
+    if (parsed.isWrite) {
+      this.syncVolume();
+    }
     return result;
   }
 
