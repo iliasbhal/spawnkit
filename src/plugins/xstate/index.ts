@@ -1,6 +1,8 @@
 import * as x from "xstate";
 import { ControlledPromise } from "@/utils/ControlledPromise";
-import * as Spawnkit from "../../../src";
+import { InstancePlugin } from "../_common";
+import { Volume } from '../volume';
+import { MockVolume } from '../volume/mock';
 
 type MachineEvent<M extends x.AnyStateMachine> = Parameters<
 	ReturnType<typeof x.createActor<M>>["send"]
@@ -10,134 +12,144 @@ type MachineData<M extends x.AnyStateMachine> = ReturnType<
 	ReturnType<typeof x.createActor<M>>["getPersistedSnapshot"]
 >;
 
-export class Machine<
-	StateMachine extends x.AnyStateMachine = x.AnyStateMachine,
-> extends Spawnkit.Instance<{ snapshot: MachineData<StateMachine> }> {
-	machine: StateMachine = null as any;
-	sync?: (actor: x.Actor<typeof this.machine>) => any;
-	actor: x.Actor<StateMachine> = null as any;
-	actorByActorId = new Map<string, x.AnyActorRef>();
-	subscriptonByActor = new Map<string, x.Subscription>();
-	snapshotByActorId = new Map<string, MachineData<StateMachine>>();
+interface PluginConfig<T extends x.AnyStateMachine = x.AnyStateMachine> {
+	machine: T;
+	onSnapshot?: (data: { actorId: string; snapshot: MachineData<T> }) => void;
+}
 
-	public static from<StateMachine extends x.AnyStateMachine>(config: {
-		sync?: Machine<StateMachine>["sync"];
-		machine: StateMachine;
-	}) {
-		// simply preconfigure the class with the machine object
-		return class extends Machine<StateMachine> {
-			machine = config.machine;
-			sync = config?.sync;
-		};
+export class Machine<StateMachine extends x.AnyStateMachine = x.AnyStateMachine> extends InstancePlugin {
+	private machine: StateMachine = null as any;
+	private actor: x.Actor<StateMachine> = null as any;
+	private actorByActorId = new Map<string, x.AnyActorRef>();
+	private subscriptonByActor = new Map<string, x.Subscription>();
+	private snapshotByActorId = new Map<string, MachineData<StateMachine>>();
+
+	public async initialize(input?: any) {
+		await this.getOrInitializeActor(input);
+		const snapshot = await this.getSnapshot();
+		return snapshot
 	}
 
-	private eventProcessing = new Map<MachineEvent<StateMachine>, ControlledPromise<true>>();
+	public async send(event: MachineEvent<StateMachine>, init?: any) {
+		await this.getOrInitializeActor(init);
+		this.actor.send(event);
+		const snapshot = this.actor.getSnapshot();
+		return snapshot;
+	};
 
-	public async send(event: MachineEvent<StateMachine>) {
-		const actor = await this.ensureInitializedActor();
-		const eventProcessed = new ControlledPromise<true>();
-
-		this.eventProcessing.set(event, eventProcessed);
-		actor.send(event);
-
-		await eventProcessed.await;
-		return actor.getSnapshot();
+	public async getSnapshot() {
+		await this.getOrInitializeActor();
+		return this.actor.getSnapshot();
 	}
 
-	initializedWithInput = false;
 
-	public async init(input: Exclude<Parameters<StateMachine["getInitialSnapshot"]>[1], undefined>) {
-		const snapshot = await this.data.get("snapshot");
-		if (snapshot) {
-			throw new Error("Cannot Create Actor Already Created");
+	// Promise to track initialization status and prevent race conditions
+	private getActorPromise: Promise<x.Actor<StateMachine>> | null = null;
+
+	/**
+	 * Ensures the actor is initialized, handling potential race conditions
+	 * by using a shared initialization Promise
+	 */
+	private async getOrInitializeActor(input?: any): Promise<x.Actor<StateMachine>> {
+		if (!this.getActorPromise) {
+			this.getActorPromise = Promise.resolve()
+				.then(() => this.initializeActor({ input }))
+				.catch((error) => {
+					this.getActorPromise = null;
+					throw error;
+				});
 		}
 
-		const actor = await this.getOrInitializeActor(async () => {
-			this.initializedWithInput = true;
-			return { input };
-		});
-
-		return actor.getSnapshot();
-	}
-
-	initializedWithSnapshot = false;
-	private async ensureInitializedActor() {
-		const actor = await this.getOrInitializeActor(async () => {
-			this.initializedWithSnapshot = true;
-			const snapshot = await this.data.get("snapshot");
-			return { snapshot };
-		});
-
+		const actor = await this.getActorPromise;
 		return actor;
 	}
 
-	private actorPromise: ControlledPromise<Awaited<ReturnType<typeof this.initializeActor>>> | null =
-		null;
+	private volume: Volume;
+	private config: PluginConfig<StateMachine>;
 
-	private async getOrInitializeActor(getConfig: () => Promise<any>) {
-		if (this.actorPromise) {
-			return this.actorPromise.await;
-		}
-
-		this.actorPromise = new ControlledPromise<Awaited<ReturnType<typeof this.initializeActor>>>();
-
-		const initConfig = await getConfig();
-		this.initializeActor(initConfig)
-			.then((actor) => {
-				this.actor = actor;
-				this.actor.start();
-				this.actorPromise?.resolve(actor);
-			})
-			.catch((err) => {
-				this.actorPromise?.reject(err);
-			});
-
-		return this.actorPromise.await;
-	}
-
-	private async initializeActor(config: { snapshot?: any; input?: any }) {
-		return x.createActor(this.machine, {
-			...config,
-			id: `${this.id}`,
-			inspect: (inspectionEvent) => {
-				switch (inspectionEvent.type) {
-					case "@xstate.event":
-						return this.handleActorEvent(inspectionEvent);
-					case "@xstate.actor":
-						return this.handleChildActorCreateEvent(inspectionEvent);
-					case "@xstate.snapshot":
-						return this.handleSnapshot();
-				}
-			},
+	constructor(config: PluginConfig<StateMachine>) {
+		super();
+		this.machine = config.machine;
+		this.config = config;
+		this.volume = new MockVolume({
+			name: 'xstate/' + this.getActorId()
 		});
 	}
 
-	skippedInitialSnapshot = false;
-	private async handleSnapshot() {
-		const snapshot = this.actor.getPersistedSnapshot();
-		this.snapshotByActorId.set(this.actor.id, snapshot);
-
-		// We should emitting a new snapshot event only when the actor is created or when a transition happens.
-		// or when state or context changed. Not when the actor is recosturcted with a snapshot.
-		// This is because there is no new data. We only emit when there is new data basicaly.
-		const shouldSkipFirstSnapshotEmit =
-			this.initializedWithSnapshot && !this.skippedInitialSnapshot;
-		if (shouldSkipFirstSnapshotEmit) {
-			this.skippedInitialSnapshot = true;
-			return;
-		}
-
-		await this.data.set("snapshot", snapshot).then(() => this.sync?.(this.actor));
+	getActorId() {
+		return this.instance.id;
 	}
 
-	childActorDoneByActor = new Map<x.AnyActorRef, ControlledPromise<any>>();
+	private async initializeActor(config: { input?: any }) {
+		try {
+			const snapshot = await this.readSnapshot();
+
+			this.actor = x.createActor(this.machine, {
+				...config,
+				snapshot,
+				id: this.getActorId(),
+				inspect: (inspectionEvent) => {
+					console.log("inspect", inspectionEvent);
+
+					switch (inspectionEvent.type) {
+						// case "@xstate.event":
+						// 	return this.handleActorEvent(inspectionEvent);
+						case "@xstate.actor":
+							return this.handleChildActorCreateEvent(inspectionEvent);
+						case "@xstate.snapshot":
+							return this.handleSnapshot(inspectionEvent);
+					}
+				},
+			});
+
+			this.actor.start();
+
+			return this.actor;
+		} catch (error) {
+			console.error("Failed to initialize actor:", error);
+			throw error;
+		}
+	}
+
+	private async handleSnapshot(inspectionEvent: x.InspectedSnapshotEvent) {
+		const actor = inspectionEvent.actorRef as x.Actor<StateMachine>;
+		const snapshot = actor.getPersistedSnapshot();
+
+		console.log("handleSnapshot", actor, snapshot);
+		this.snapshotByActorId.set(actor.id, snapshot);
+		await this.writeSnapshot(snapshot);
+
+		// Notify snapshot listeners
+		if (this.config.onSnapshot) {
+			this.config.onSnapshot({
+				actorId: this.actor.id,
+				snapshot: snapshot
+			});
+		}
+	}
+
+	private async writeSnapshot(snapshot: MachineData<StateMachine>) {
+		await this.volume.fs.writeJson("snapshot.json", snapshot);
+	}
+
+	private async readSnapshot() {
+		try {
+			const snapshot = await this.volume.fs.readJson("snapshot.json");
+			return snapshot;
+		} catch (error) {
+			// Return undefined if snapshot file doesn't exist yet
+			return undefined;
+		}
+	}
+
+	private childActorDoneByActor = new Map<x.AnyActorRef, ControlledPromise<any>>();
 	private async handleChildActorCreateEvent(event: x.InspectedActorEvent) {
-		const actor = event.actorRef;
+		const actor = event.actorRef as x.Actor<any>;
 
 		this.actorByActorId.set(actor.id, actor);
 
 		const isAlreadySubscribed = this.subscriptonByActor.has(actor.id);
-		const isRootActor = actor.id === `${this.id}`;
+		const isRootActor = actor.id === this.instance.id;
 		if (isAlreadySubscribed || isRootActor) {
 			// Note: Root snapshots are handled directly
 			// from handling the snapshot event
@@ -148,7 +160,7 @@ export class Machine<
 		const alreadyWaitingOnCompletiong = this.childActorDoneByActor.has(actor);
 		if (!alreadyWaitingOnCompletiong) {
 			const actorPending = new ControlledPromise(`child actor pending (id: ${actor.id})`);
-			this.waitFor(actorPending.await);
+			this.instance.waitFor(() => actorPending.await);
 			this.childActorDoneByActor.set(actor, actorPending);
 		}
 
@@ -158,6 +170,15 @@ export class Machine<
 				next: () => {
 					const snapshot = actor.getPersistedSnapshot() as MachineData<typeof this.machine>;
 					this.snapshotByActorId.set(actor.id, snapshot);
+
+					// Notify snapshot listeners for child actors as well
+					if (this.config.onSnapshot) {
+						this.config.onSnapshot({
+							actorId: actor.id,
+							snapshot: snapshot
+						});
+					}
+
 					const shouldResolve = ["error", "done"].includes(snapshot.status);
 					if (shouldResolve) {
 						const pending = this.childActorDoneByActor.get(actor);
@@ -168,20 +189,24 @@ export class Machine<
 					const pending = this.childActorDoneByActor.get(actor);
 					pending?.resolve(err);
 				},
-				complete: () => { },
+				complete: () => {
+					// Notify listeners about completion
+					if (this.config.onSnapshot) {
+						this.config.onSnapshot({
+							actorId: actor.id,
+							snapshot: actor.getPersistedSnapshot(),
+						});
+					}
+				},
 			}),
 		);
 	}
 
-	/**
-	 * This method releases the event that we received within onEvent
-	 */
-	private async handleActorEvent(event: x.InspectedEventEvent) {
-		const eventData = event.event as MachineEvent<StateMachine>;
-		const isExternaEventBeeingProcessed = this.eventProcessing.has(eventData);
-		if (isExternaEventBeeingProcessed) {
-			const isProcessedCtl = this.eventProcessing.get(eventData)!;
-			isProcessedCtl.resolve(true);
-		}
-	}
+	// /**
+	//  * This method releases the event that we received within onEvent
+	//  */
+	// private async handleActorEvent(event: x.InspectedEventEvent) {
+	// 	const eventData = event.event as MachineEvent<StateMachine>;
+	// 	this.actor.send(eventData);
+	// }
 }
