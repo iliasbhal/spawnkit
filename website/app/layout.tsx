@@ -1,4 +1,7 @@
 import "./global.css";
+
+import { scan } from 'react-scan';
+
 import { Navbar } from "@/components/nav-bar";
 import { RootProvider } from "fumadocs-ui/provider";
 import type { ReactNode } from "react";
@@ -8,12 +11,20 @@ import { GeistSans } from "geist/font/sans";
 import { baseUrl, createMetadata } from "@/lib/metadata";
 import Loglib from "@loglib/tracker/react";
 
+if (typeof window !== 'undefined') {
+  const ENABLE_SCAN = process.env.NODE_ENV === 'development';
+  scan({
+    enabled: true,
+    log: true, // logs render info to console (default: false)
+  });
+}
+
 export const metadata = createMetadata({
 	title: {
-		template: "%s | Better Auth",
-		default: "Better Auth",
+		template: "%s | Spawnkit",
+		default: "Spawnkit",
 	},
-	description: "The most comprehensive authentication library for TypeScript.",
+	description: "Build distributed, stateful microservices that scale and works on your own infrastructure.",
 	metadataBase: baseUrl,
 });
 
@@ -30,6 +41,7 @@ export default function Layout({ children }: { children: ReactNode }) {
 					theme={{
 						enableSystem: true,
 						defaultTheme: "dark",
+						forcedTheme: "dark",
 					}}
 				>
 					<NavbarProvider>

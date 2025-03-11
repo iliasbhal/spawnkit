@@ -139,9 +139,9 @@ export default function ArticleLayout() {
 						</div>
 					</MotionConfig>
 
-					<div className="flex flex-0 border-t">
+					{/* <div className="flex flex-0 border-t">
 						<ThemeToggle />
-					</div>
+					</div> */}
 				</div>
 			</aside>
 		</div>

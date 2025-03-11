@@ -24,57 +24,56 @@ import {
 } from "@/components/ui/popover";
 import { Logo } from "@/components/logo";
 import { motion, MotionConfig } from "motion/react";
+import { AnimatedHeroLogo } from "@/components/HeroAnimatedLogo";
 
 const features = [
 	{
 		id: 1,
-		label: "Framework Agnostic",
-		title: "Supports for popular <strong>frameworks</strong>.",
+		label: "Full Control",
+		title: "Self-host with <strong>no vendor lock-in</strong>.",
 		description:
-			"Supports popular frameworks, including React, Vue, Svelte, Astro, Solid, Next.js, Nuxt, Tanstack Start, Hono, and more.",
-		icon: PlugZap2Icon,
+			"Deploy and manage your infrastructure anywhere without being tied to specific cloud providers. You have complete control over your setup.",
+		icon: Globe2Icon,
 	},
 	{
 		id: 2,
-		label: "Authentication",
-		title: "Email & Password <strong>Authentication</strong>.",
+		label: "No Cold Starts",
+		title: "Persistent <strong>instances</strong> with no latency.",
 		description:
-			"Built-in support for email and password authentication, with session and account management features.",
-		icon: LockClosedIcon,
+			"Eliminate cold start latency with persistent instances that maintain state and stay ready to handle requests instantly.",
+		icon: PlugZap2Icon,
 	},
 	{
 		id: 3,
-		label: "Social Sign-on",
-		title: "Support multiple <strong>OAuth providers</strong>.",
+		label: "Real-time",
+		title: "<strong>Real-time</strong> Communication.",
 		description:
-			"Allow users to sign in with their accounts, including GitHub, Google, Discord, Twitter, and more.",
+			"Built-in support for response streaming, broadcast capabilities, pub/sub messaging system, and remote procedure calls (RPC).",
 		icon: Webhook,
 	},
 	{
 		id: 4,
-		label: "Two Factor",
-		title: "Multi Factor <strong>Authentication</strong>.",
+		label: "Scheduling",
+		title: "Advanced <strong>Job Scheduling</strong>.",
 		description:
-			"Secure your users accounts with two factor authentication with a few lines of code.",
-		icon: ShieldCheckIcon,
+			"Powerful scheduling features including delayed job execution, cron-style scheduling, and comprehensive job management.",
+		icon: RabbitIcon,
 	},
 	{
 		id: 5,
-		label: "Multi Tenant",
-		title: "<strong>Organization</strong> Members and Invitation.",
+		label: "Plugin System",
+		title: "Extensible <strong>Plugin</strong> Architecture.",
 		description:
-			"Multi tenant support with members, organization, teams and invitation with access control.",
-
-		icon: RabbitIcon,
+			"Enhance your application with plugins that add features like SQLite database support and more from our growing ecosystem.",
+		icon: PlugIcon,
 	},
-
 	{
 		id: 6,
-		label: "Plugin Ecosystem",
-		title: "A lot more features with <strong>plugins</strong>.",
+		label: "Developer Experience",
+		title: "First-class <strong>TypeScript</strong> Support.",
 		description:
-			"Improve your application experience with our official plugins and those created by the community.",
-		icon: PlugIcon,
+			"Enjoy strong type safety and graceful error propagation for a superior development experience.",
+		icon: ShieldCheckIcon,
 	},
 ];
 
@@ -83,7 +82,7 @@ export default function HomePage() {
 		<main className="h-min mx-auto overflow-x-hidden">
 				<div className="md:w-10/12 my-20 mx-auto font-geist relative  rounded-none -pr-2">
 			<div className="w-full md:mx-0">
-			<div className="relative col-span-3 md:border-[1.2px] h-full">
+			<div className="relative col-span-3 border-yellow-200/20 border-[0.1px] h-full">
 					<div className="w-full h-full">
 						<div className="flex flex-col items-center justify-end w-full h-full gap-10 z-1 relative">
 							<div className="absolute top-0 left-0 w-full h-full z-0">
@@ -119,17 +118,16 @@ export default function HomePage() {
 									</div>
 								<div className="h-3" />
 									<p className="mx-auto text-xl font-thin tracking-tighter text-center">
-										Roll your own auth with confidence in minutes!<br />
-										No vendor lock-in, no proprietary code.
+										Build distributed, stateful microservices that scale and works on your own infrastructure.
 									</p>
 								</div>
 							</div>
 						</div>
 				
-						<div className="grid grid-cols-1 relative md:grid-rows-2 md:grid-cols-3 border-b-[1.2px] border-r-[1.2px]">
+						<div className="grid grid-cols-1 relative md:grid-rows-2 md:grid-cols-3 ">
 							<div className="hidden md:grid top-1/2 left-0 -translate-y-1/2 w-full grid-cols-3 z-10 pointer-events-none select-none absolute">
-								<Plus className="w-8 h-8 text-neutral-300 translate-x-[16.5px] translate-y-[.5px] ml-auto dark:text-neutral-600" />
-								<Plus className="w-8 h-8 text-neutral-300 ml-auto translate-x-[16.5px] translate-y-[.5px] dark:text-neutral-600" />
+								<Plus className="w-8 h-8 text-yellow-200/20 translate-x-[16.5px] translate-y-[.5px] ml-auto dark:text-yellow-200/20" />
+								<Plus className="w-8 h-8 text-yellow-200/20 ml-auto translate-x-[16.5px] translate-y-[.5px] dark:text-yellow-200/20" />
 							</div>
 							{features.map((feature, index) => {
 								const isStartOfRow = index % 3 === 0;
@@ -138,10 +136,10 @@ export default function HomePage() {
 									<div
 									key={feature.id}
 									className={cn(
-										"justify-center md:min-h-[240px] border-t-[1.2px] transform-gpu flex flex-col p-10",
+										"flex flex-col items-start justify-start md:min-h-[240px] border-yellow-200/20 border-t-[0.1px] transform-gpu p-10",
 										{
-											"border-l-[1.2px]": !isStartOfRow,
-											"border-r-[1.2px]": !isEndOfRow,
+											"border-l-[0.1px]": !isStartOfRow,
+											// "border-r-[0.1px]": !isEndOfRow,
 										}
 									)}
 								>
@@ -184,60 +182,4 @@ export default function HomePage() {
 		</p>
 		</main>
 	);
-}
-
-const AnimatedHeroLogo = () => {
-	const [isAnimating, setIsAnimating] = React.useState(false);
-	React.useEffect(() => {
-		setTimeout(() => {
-			setIsAnimating(true);
-		}, 300)
-	}, []);
-
-
-	return (
-		<div 
-			className="relative w-20 h-6"
-			style={{
-				width: 449 * 1.3,
-				height: 114 * 1.3,
-			}}
-		>
-			<MotionConfig 
-				transition={{
-					type: "spring",
-					bounce: 0.4,
-				}}
-			>
-				<motion.div 
-					className="w-full h-full absolute top-0 left-0"
-					initial={{ 
-						translateY: 0,
-					}}
-					animate={isAnimating ? { 
-						translateY: [20, 0],
-						rotate: [1, 0],
-						transformOrigin: "0px 0px"
-					} : {
-						translateY: 0,
-					}} 
-				>
-					<Logo hideKitPart={true} />
-				</motion.div>
-				<motion.div 
-					className="w-full h-full absolute top-0 left-0"
-					initial={{ 
-						translateY: -30 
-					}}
-					animate={{ 
-						translateY: 0,
-						rotate: [1, 0],
-						transformOrigin: "0px 0px"
-					}}
-				>
-					<Logo hideSpawnPart={true}/>
-				</motion.div>
-			</MotionConfig>
-		</div>
-	)
 }
