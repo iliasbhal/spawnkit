@@ -9,7 +9,6 @@ export class SQLiteExample extends Spawnkit.Instance {
     name: 'test',
   });
 
-
   async query(name: string, content: string) {
     this.sqlite.query`
       CREATE TABLE IF NOT EXISTS ${name} (
@@ -38,6 +37,11 @@ describe('SQLiteExample', () => {
   it('should be able to download and upload', async () => {
     const remoteSqlite = client.spawn('SQLiteExample', 'test');
     const uuid = nanoid();
+
+    // remoteSqlite.schedule({
+    //   name: 'test',
+    //   cron: '*/1 * * * *',
+    // })
 
     try {
       await remoteSqlite.query('task', uuid);

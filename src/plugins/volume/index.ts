@@ -1,19 +1,35 @@
 import { InstancePlugin } from '../_common'
 import path from 'path'
 import fs from 'fs-extra'
+import { VolumeFileSystem } from './VolumeFileSystem';
 
 export interface VolumeConfig {
   name: string;
 }
 
+// Define a type for the fs interface
+type FsInterface = {
+  [K in keyof typeof fs]?: K extends 'constants'
+  ? typeof fs.constants
+  : Function;
+};
+
 export class Volume extends InstancePlugin {
   static TmpDirPath = path.resolve(__dirname, 'tmp');
 
   config: VolumeConfig;
+  private fileSystem = new VolumeFileSystem(this);
 
   constructor(config: VolumeConfig) {
     super();
     this.config = config;
+  }
+
+  /**
+   * Get the fs-extra interface with paths relative to the volume root
+   */
+  get fs(): FsInterface {
+    return this.fileSystem.fs;
   }
 
   async getInstancePath() {

@@ -1,22 +1,19 @@
 # Spawkit Plugins
 
-- Conccurency, allow the dev to control how many requests are handled in parallel.
-- Load Balancer, allow to distribute the load between a number of instances
-- Warm Plugin, implement a mechanism where the instance is conctantly kept awake. 
+<!-- - Conccurency, allow the dev to control how many requests are handled in parallel. -->
+<!-- - Load Balancer, allow to distribute the load between a number of instances -->
+<!-- -  -->
+<!-- - Warm Plugin, implement a mechanism where the instance is conctantly kept awake. 
      ( maybe create an general instance, that is constantly kept awake using a cron ).
-     ( and that constantly send requests to instances with a WARM plugin ).
+     ( and that constantly send requests to instances with a WARM plugin ). -->
 
 # Spawnkit lib
+
+- Add ability to schedule function from within the instance.
+
  
-- Add ability to load and upload files. We'll then provide access to a local redis/sqlite to each instance. we'll remove client.data and instance.data and replace them with .sql and .redis.
-Also add access to .files to instances and client. files should be downloadable from the internet.
-.redis.on should subscribe to changes using the adapter.messages.
-     
-     .download(instance, filename: string, localpath?: string)
-     .upload(instance, filename: string, fileContentOrLocalPath: string)
-     .list(instance, folderName: string) : Stream 
-     .getConfig(instance, filename: string);
-     .updateConfig(instance, filename: string, config: { isPublic });
+- Add ability to load and upload files. We'll then provide access to a local redis to each instance. we'll remove client.data and instance.data and replace them with .redis.
+Also add access to .files to instances and client.
 
 - Move client validation within .spawn and check if process.env === 'developement'
 

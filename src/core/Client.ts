@@ -176,18 +176,7 @@ export class Client<CP extends SpawnkitConfig> {
 
 	spawn<Kind extends Extract<keyof CP["instances"], string>, SpawnContext extends InstType<CP, Kind>['InstanceContext']>(kind: Kind, instanceId: InstanceId, clientContext: SpawnContext = {} as any) {
 		type Inst = InstanceType<CP["instances"][Kind]>;
-		type InstanceData = Inst["__types"]["InstanceData"];
-		type InstanceChannels = Inst["__types"]["InstanceChannels"];
-		type InstanceContext = Inst["__types"]["InstanceContext"];
-
-		type InheritedMethods = Exclude<ExtractMethodNames<Instance>, undefined>;
-		type AvailableMethods = Omit<ExtractMethods<Inst>, InheritedMethods>;
-		type RemoteMethodes = MakeRemote<AvailableMethods>;
-		type SkipRemoteMethods = MakeSkippable<AvailableMethods>;
-		type ScheduleRemoteMethods = MakeSchedulable<AvailableMethods>;
-
-		// type AvailableProxyMethods = ExtractMethods<InstanceUtils<Inst>>
-		type RemoteProxyMethodes = MakeRemote<InstanceUtils<Inst>>;
+		type InstTypes = ReturnType<typeof createTypeof<Inst>>;
 
 		const instanceIdentifier = {
 			id: instanceId,
@@ -205,7 +194,7 @@ export class Client<CP extends SpawnkitConfig> {
 			return eventId;
 		};
 
-		const data = new ClientData<InstanceData>({
+		const data = new ClientData<InstTypes['Data']>({
 			adapters: this.adapters,
 			instance: instanceIdentifier,
 		});
@@ -216,7 +205,7 @@ export class Client<CP extends SpawnkitConfig> {
 			};
 
 			return (schedule: CommonScheduleConfig & (Delay | Cron)) => {
-				return new Proxy({} as ScheduleRemoteMethods, {
+				return new Proxy({} as InstTypes["ScheduleRemoteMethods"], {
 					get: (target, prop, receiver) => {
 						if (prop in target) return Reflect.get(target, prop, receiver);
 						if (typeof prop !== "string") return;
@@ -255,7 +244,7 @@ export class Client<CP extends SpawnkitConfig> {
 			});
 		});
 
-		const createEventHandler = <Channel extends Extract<keyof InstanceChannels, string>, Message extends InstanceChannels[Channel]>(
+		const createEventHandler = <Channel extends Extract<keyof InstTypes['Channels'], string>, Message extends InstTypes['Channels'][Channel]>(
 			channel: Channel,
 			callback: (data: Message) => any,
 		) => {
@@ -405,7 +394,7 @@ export class Client<CP extends SpawnkitConfig> {
 				if (typeof prop !== "string") return;
 				return normalRemoteMethodHandler(`utils.${prop}`);
 			},
-		}) as RemoteProxyMethodes;
+		}) as InstTypes["RemoteProxyMethodes"];
 
 		// const utilsData = data.withNamespace(DATA_UTILS_NAMESPACE);
 
@@ -447,9 +436,9 @@ export class Client<CP extends SpawnkitConfig> {
 			id: instanceId,
 			kind: kind,
 
-			async emit<Channel extends Extract<keyof InstanceChannels, string>>(
+			async emit<Channel extends Extract<keyof InstTypes['Channels'], string>>(
 				channel: Channel,
-				message: InstanceChannels[Channel],
+				message: InstTypes['Channels'][Channel],
 			) {
 				await skipRemoteMethodHandler("emit")(channel, message);
 				return true;
@@ -482,13 +471,12 @@ export class Client<CP extends SpawnkitConfig> {
 				get: async (scheduleId: ScheduleId) => {
 					return this.adapters.events.get(kind, instanceId, scheduleId);
 				},
-
 			},
 		} as const;
 
 		// We use the Kind type here just o it to show nicely
 		// in the intelissense. it will show as Remote<OrderBook> for example
-		type Spawn<Kind> = RemoteMethodes & typeof instanceClientAPI;
+		type Spawn<Kind> = InstTypes["RemoteMethodes"] & typeof instanceClientAPI;
 
 		return new Proxy(instanceClientAPI, {
 			get(target, prop, receiver) {
@@ -527,3 +515,38 @@ type MakeSchedulable<T> = {
 	? (...args: Parameters<T[K]>) => Promise<ScheduleId>
 	: never;
 };
+
+type ExtractInstanceTypes<T extends Instance> = {
+	InstanceData: T["__types"]["InstanceData"],
+	InstanceChannels: T["__types"]["InstanceChannels"],
+	InstanceContext: T["__types"]["InstanceContext"],
+};
+
+const createTypeof = <T extends Instance>(inst: T) => {
+	type InstanceData = T["__types"]["InstanceData"];
+	type InstanceChannels = T["__types"]["InstanceChannels"];
+	type InstanceContext = T["__types"]["InstanceContext"];
+	type InstBase = Instance<InstanceContext, InstanceData, InstanceChannels>;
+
+	type InheritedMethods = Exclude<ExtractMethodNames<InstBase>, undefined>;
+	type AvailableMethods = Omit<ExtractMethods<T>, InheritedMethods>;
+	type RemoteMethodes = MakeRemote<AvailableMethods>;
+	type SkipRemoteMethods = MakeSkippable<AvailableMethods>;
+	type ScheduleRemoteMethods = MakeSchedulable<AvailableMethods>;
+
+	// type AvailableProxyMethods = ExtractMethods<InstanceUtils<Inst>>
+	type RemoteProxyMethodes = MakeRemote<InstanceUtils<T>>;
+
+	return {} as {
+		Data: InstanceData,
+		Channels: InstanceChannels,
+		Context: InstanceContext,
+		Base: InstBase,
+		InheritedMethods: InheritedMethods,
+		AvailableMethods: AvailableMethods,
+		RemoteMethodes: RemoteMethodes,
+		SkipRemoteMethods: SkipRemoteMethods,
+		ScheduleRemoteMethods: ScheduleRemoteMethods,
+		RemoteProxyMethodes: RemoteProxyMethodes,
+	}
+}

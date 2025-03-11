@@ -4,8 +4,8 @@ import { wait } from "../src/utils/wait";
 
 import * as instances from "../example/_index";
 import { nanoid } from "nanoid";
-import { Logger } from "../src/models/Logger";
-import { Lock } from "../src/models/Lock";
+import { Logger } from "../src/core/Logger";
+import { Lock } from "../src/core/Lock";
 
 
 import * as Spawnkit from "..";

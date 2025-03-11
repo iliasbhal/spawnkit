@@ -1,0 +1,93 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:../github-export.db"
+}
+
+model Repository {
+  id           Int           @id @default(autoincrement())
+  name         String
+  orgName      String
+  createdAt    DateTime?
+  commits      Commit[]
+  issues       Issue[]
+  pullRequests PullRequest[]
+  branches     Branch[]
+
+  @@unique([name, orgName])
+}
+
+model Commit {
+  id           Int        @id @default(autoincrement())
+  sha          String     @unique
+  repository   Repository @relation(fields: [repositoryId], references: [id])
+  repositoryId Int
+  author       String?
+  message      String?
+  committedAt  DateTime?
+}
+
+model Issue {
+  id           Int        @id @default(autoincrement())
+  githubId     Int        @unique
+  repository   Repository @relation(fields: [repositoryId], references: [id])
+  repositoryId Int
+  number       Int
+  title        String?
+  state        String?
+  author       String?
+  createdAt    DateTime?
+  closedAt     DateTime?
+  reactions    Reaction[]
+}
+
+model PullRequest {
+  id        Int       @id @default(autoincrement())
+  githubId  Int       @unique
+  number    Int
+  title     String?
+  state     String?
+  author    String?
+  createdAt DateTime?
+  closedAt  DateTime?
+  mergeable Boolean?
+  merged    Boolean?
+  mergedAt  DateTime?
+  mergedBy  String?
+  draft     Boolean?
+
+  base String?
+  head String?
+
+  reactions    Reaction[]
+  repositoryId Int
+  repository   Repository @relation(fields: [repositoryId], references: [id])
+}
+
+model Reaction {
+  id            Int          @id @default(autoincrement())
+  issue         Issue?       @relation(fields: [issueId], references: [id])
+  issueId       Int?
+  pullRequest   PullRequest? @relation(fields: [pullRequestId], references: [id])
+  pullRequestId Int?
+  content       String?
+  user          String?
+  createdAt     DateTime?
+}
+
+model Branch {
+  id           Int        @id @default(autoincrement())
+  name         String
+  sha          String // Latest commit SHA
+  repository   Repository @relation(fields: [repositoryId], references: [id])
+  repositoryId Int
+  isDefault    Boolean    @default(false)
+  protected    Boolean    @default(false)
+  createdAt    DateTime?
+  updatedAt    DateTime?
+
+  @@unique([name, repositoryId])
+}
