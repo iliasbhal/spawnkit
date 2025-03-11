@@ -1,6 +1,5 @@
 import * as Spawnkit from "../../../src";
 import * as x from "xstate";
-import { Machine } from "./index";
 import { baseRedisAdapters } from "../../../src/adapters/redis/base";
 
 describe("XState Machine Integration", () => {
@@ -11,7 +10,8 @@ describe("XState Machine Integration", () => {
       // Collection to store the snapshot history for testing
       snapshotHistory: Array<{ actorId: string; snapshot: any }> = [];
 
-      machine = new Machine({
+      machine = new Spawnkit.Plugins.Machine({
+        id: 'toggle-machine',
         machine: x.createMachine({
           initial: "TRUE",
           meta: {
@@ -142,7 +142,7 @@ describe("XState Machine Integration", () => {
     class InvokeResolvedMachine extends Spawnkit.Instance {
       snapshotHistory: Array<{ actorId: string; snapshot: any }> = [];
 
-      machine = new Machine({
+      machine = new Spawnkit.Plugins.Machine({
         machine: createInvokeMachine({
           invoke: stubs.invokeResolve,
         }),
@@ -167,7 +167,7 @@ describe("XState Machine Integration", () => {
     class InvokeRejectedMachine extends Spawnkit.Instance {
       snapshotHistory: Array<{ actorId: string; snapshot: any }> = [];
 
-      machine = new Machine({
+      machine = new Spawnkit.Plugins.Machine({
         machine: createInvokeMachine({
           invoke: stubs.invokeReject,
         }),
@@ -192,7 +192,7 @@ describe("XState Machine Integration", () => {
     class DelayedInvokeMachine extends Spawnkit.Instance {
       snapshotHistory: Array<{ actorId: string; snapshot: any }> = [];
 
-      machine = new Machine({
+      machine = new Spawnkit.Plugins.Machine({
         machine: createInvokeMachine({
           invoke: stubs.delayedInvoke,
         }),
@@ -279,7 +279,7 @@ describe("XState Machine Integration", () => {
   //     // Collection to store the snapshot history for testing
   //     snapshotHistory: Array<{ actorId: string; snapshot: any }> = [];
 
-  //     machine = new Machine({
+  //     machine = new Spawnkit.Plugins.Machine({
   //       machine: x.createMachine({
   //         initial: "TRUE",
   //         meta: {

@@ -55,8 +55,12 @@ export class Volume extends InstancePlugin {
     });
 
     this.instance.hooks.dispose.push(async () => {
-      await this.upload();
-      await this.cleanup();
+      try {
+        await this.upload();
+      } catch (error) {
+        await this.cleanup();
+        throw error;
+      }
     });
   }
 

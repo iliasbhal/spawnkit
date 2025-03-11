@@ -1,4 +1,4 @@
-import { Volume, VolumeConfig } from ".";
+import { Volume } from ".";
 import fs from 'fs-extra';
 import path from 'path';
 
@@ -13,7 +13,6 @@ export class MockVolume extends Volume {
   }
 
   async download(): Promise<void> {
-    console.log('DOWNALOD');
     const originalPath = await this.getMockPath();
     const content = await fs.readdir(originalPath);
     if (!content.length) {
@@ -25,16 +24,13 @@ export class MockVolume extends Volume {
     await fs.copy(originalPath, volumePath, {
       overwrite: true,
     });
-    console.log('DOWNLOADED END');
   }
 
   async upload(): Promise<void> {
-    console.log('UPLOAD');
     const originalPath = await this.getMockPath();
     const volumePath = await this.getPath();
     await fs.copy(volumePath, originalPath, {
       overwrite: true,
     });
-    console.log('UPLOADED END', originalPath);
   }
 }

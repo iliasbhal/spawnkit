@@ -13,6 +13,7 @@ type MachineData<M extends x.AnyStateMachine> = ReturnType<
 >;
 
 interface PluginConfig<T extends x.AnyStateMachine = x.AnyStateMachine> {
+	id?: string;
 	machine: T;
 	onSnapshot?: (data: { actorId: string; snapshot: MachineData<T> }) => void;
 }
@@ -71,13 +72,15 @@ export class Machine<StateMachine extends x.AnyStateMachine = x.AnyStateMachine>
 		super();
 		this.machine = config.machine;
 		this.config = config;
+
+
 		this.volume = new MockVolume({
-			name: 'xstate/' + this.getActorId()
+			name: 'xstate/' + this.getActorName()
 		});
 	}
 
-	getActorId() {
-		return this.instance.id;
+	getActorName() {
+		return this.config.id || 'machine'
 	}
 
 	private async initializeActor(config: { input?: any }) {
@@ -87,10 +90,8 @@ export class Machine<StateMachine extends x.AnyStateMachine = x.AnyStateMachine>
 			this.actor = x.createActor(this.machine, {
 				...config,
 				snapshot,
-				id: this.getActorId(),
+				id: this.getActorName(),
 				inspect: (inspectionEvent) => {
-					console.log("inspect", inspectionEvent);
-
 					switch (inspectionEvent.type) {
 						// case "@xstate.event":
 						// 	return this.handleActorEvent(inspectionEvent);

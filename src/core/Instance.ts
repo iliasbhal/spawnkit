@@ -34,11 +34,11 @@ export class Instance<
 					Object.keys(root).forEach(key => {
 						const plugin = root[key];
 						const isPlugin = plugin instanceof InstancePlugin;
-						if (isPlugin) {
-							plugin.inject(this);
-							setupPlugin(plugin);
-							plugin.setup();
-						}
+						if (!isPlugin) return;
+
+						plugin.inject(this);
+						setupPlugin(plugin);
+						plugin.setup();
 					})
 				}
 
