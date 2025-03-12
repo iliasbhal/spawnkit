@@ -150,7 +150,7 @@ export class Machine<StateMachine extends x.AnyStateMachine = x.AnyStateMachine>
 		this.actorByActorId.set(actor.id, actor);
 
 		const isAlreadySubscribed = this.subscriptonByActor.has(actor.id);
-		const isRootActor = actor.id === this.instance.id;
+		const isRootActor = actor.id === this.getActorName();
 		if (isAlreadySubscribed || isRootActor) {
 			// Note: Root snapshots are handled directly
 			// from handling the snapshot event
@@ -182,15 +182,17 @@ export class Machine<StateMachine extends x.AnyStateMachine = x.AnyStateMachine>
 
 					const shouldResolve = ["error", "done"].includes(snapshot.status);
 					if (shouldResolve) {
-						const pending = this.childActorDoneByActor.get(actor);
-						pending?.resolve(true);
+						const actorPending = this.childActorDoneByActor.get(actor);
+						actorPending?.resolve(true);
 					}
 				},
 				error: (err) => {
-					const pending = this.childActorDoneByActor.get(actor);
-					pending?.resolve(err);
+					const actorPending = this.childActorDoneByActor.get(actor);
+					actorPending?.resolve(err);
 				},
 				complete: () => {
+					const actorPending = this.childActorDoneByActor.get(actor);
+					actorPending?.resolve(true);
 					// Notify listeners about completion
 					if (this.config.onSnapshot) {
 						this.config.onSnapshot({
