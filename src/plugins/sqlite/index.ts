@@ -29,6 +29,9 @@ export class SQLite extends InstancePlugin {
   }
 
   async setup() {
+
+    // Ensure the db is closed when the instance is disposed
+    // So that the volume is uploaded with a clean state
     this.instance.hooks.dispose.push(async () => {
       await this.db.close();
     });
