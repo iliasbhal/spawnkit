@@ -1,4 +1,3 @@
-import { Redis } from "ioredis";
 import * as BullMQ from "bullmq";
 import * as Adapters from "../../index";
 import { BaseQueue } from "./_base";
@@ -9,24 +8,20 @@ interface JobData {
 	config: any;
 }
 export class InstanceScheduler extends BaseQueue implements Adapters.AdapaterInstanceScheduler {
-	instanceQueue: BullMQ.Queue<JobData, any, string>;
-	constructor(redis: Redis) {
-		super(redis);
-		this.instanceQueue = this.createQueue("instances");
-	}
-
 	async schedule(schedule: Adapters.InstanceIdentifier) {
 		const job = this.getScheduleInstanceJobId(schedule, {});
-		await this.instanceQueue.add("schedule", job.data, {
+		const queue = this.createQueue(`instances:${schedule.kind}`);
+		await queue.add("schedule", job.data, {
 			jobId: job.id,
 		});
 
 		return job.id;
 	}
 
-	subscribe(callback: (data: Adapters.InstanceIdentifier, context: Adapters.ScheduleContext) => any) {
+	subscribe(kind: Adapters.InstanceKind, callback: (data: Adapters.InstanceIdentifier, context: Adapters.ScheduleContext) => any) {
+		const queue = this.createQueue(`instances:${kind}`);
 		const worker = new BullMQ.Worker<JobData>(
-			this.instanceQueue.name,
+			queue.name,
 			async (job) => {
 				await callback(job.data, {});
 			},
@@ -34,7 +29,7 @@ export class InstanceScheduler extends BaseQueue implements Adapters.AdapaterIns
 				autorun: true,
 				concurrency: 10 ** 9,
 				connection: this.redis,
-				prefix: this.instanceQueue.opts.prefix,
+				prefix: queue.opts.prefix,
 			},
 		);
 

@@ -32,14 +32,17 @@ export class Scheduler<O extends SpawnkitConfig> {
 
 	startInstanceScheduler() {
 
-		this.subscriptions.add(
-			this.adapters.instances.subscribe(async (data, context) => {
-				await this.runOnlyOneOfInstance(data.kind, data.id, async () => {
-					const exeuctionId = nanoid();
-					await this.tryInstantiateInstance(exeuctionId, data);
-				});
-			})
-		);
+		Object.keys(this.client.instances).forEach((kind) => {
+			this.subscriptions.add(
+				this.adapters.instances.subscribe(kind, async (data, context) => {
+					// console.log('SUBSCRIBED TO INSTANCE SCHEDULER', data, Object.keys(this.instances));
+					await this.runOnlyOneOfInstance(data.kind, data.id, async () => {
+						const exeuctionId = nanoid();
+						await this.tryInstantiateInstance(exeuctionId, data);
+					});
+				})
+			);
+		});
 	}
 
 	async tryWakeInstanceUp(kind: InstanceKind, id: InstanceId) {
@@ -197,6 +200,7 @@ export class Scheduler<O extends SpawnkitConfig> {
 
 		try {
 			await lock.using(async (abortSignal) => {
+				// console.log('LOCK ACQUIRED');
 				this.registerInstance(exeuctionId, proxy);
 				proxy.syncWithAbortSignal(abortSignal);
 				await proxy.start();
@@ -214,6 +218,8 @@ export class Scheduler<O extends SpawnkitConfig> {
 		} finally {
 			this.unregisterInstanceByOwnerId(exeuctionId);
 		}
+
+		// console.log('UNLOCKED');
 
 		// // In order to make sure that we didn't miss any event and to avoid any race conditions
 		// // we'll check if there any event left to process. But we do it outside of the lock.

@@ -242,7 +242,7 @@ export abstract class AdapterEventScheduler extends BaseAdapter {
 
 export abstract class AdapaterInstanceScheduler extends BaseAdapter {
 	abstract schedule(schedule: InstanceIdentifier): Promise<ScheduleId>;
-	abstract subscribe(callback: (data: InstanceIdentifier, context: ScheduleContext) => any): {
+	abstract subscribe(kind: InstanceKind, callback: (data: InstanceIdentifier, context: ScheduleContext) => any): {
 		unsubscribe: Function;
 	};
 }
