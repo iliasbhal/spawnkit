@@ -3,6 +3,7 @@ import { ControlledPromise } from "@/utils/ControlledPromise";
 import { InstancePlugin } from "../_common";
 import { Volume } from '../volume';
 import { MockVolume } from '../volume/mock';
+import { AsyncQueue } from "@/utils/AsyncQueue";
 
 type MachineEvent<M extends x.AnyStateMachine> = Parameters<
 	ReturnType<typeof x.createActor<M>>["send"]
@@ -129,8 +130,16 @@ export class Machine<StateMachine extends x.AnyStateMachine = x.AnyStateMachine>
 		}
 	}
 
+	private writeQueue: AsyncQueue = new AsyncQueue();
 	private async writeSnapshot(snapshot: MachineData<StateMachine>) {
-		await this.volume.fs.writeJson("snapshot.json", snapshot);
+		const willAlreadyWrite = this.writeQueue.waitingCount > 1;
+		if (willAlreadyWrite) {
+			return;
+		}
+
+		this.writeQueue.enqueue(async () => {
+			await this.volume.fs.writeJson("snapshot.json", snapshot);
+		});
 	}
 
 	private async readSnapshot() {
