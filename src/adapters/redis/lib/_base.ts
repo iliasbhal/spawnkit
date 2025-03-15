@@ -7,32 +7,54 @@ import * as MsgPack from "@msgpack/msgpack"
 
 export class RedisAdapter extends BaseAdapter {
 	redis: Redis;
+	pubsubRedis: Redis;
 
 	constructor(redis: Redis) {
 		super();
 
-		this.redis = redis;
+		this.redis = this.cloneRedisClient(redis);
+		this.pubsubRedis = this.cloneRedisClient(redis);
+		this.startHandlingPubSub();
 	}
 
-	getNewRedisClient() {
-		const redisConfig = this.redis.options;
+	private cloneRedisClient(redis: Redis) {
+		const redisConfig = redis.options;
 		const client = new Redis(redisConfig);
 		return client;
 	}
 
-	redisSubscribe(channel: string, callback: (event: any) => any) {
-		const redis = this.getNewRedisClient();
-		redis.subscribe(channel);
+	startHandlingPubSub() {
+		this.pubsubRedis.on("message", async (clientChannel, message) => {
+			const callbacks = this.globalPubSubCallbacksByChannels.get(clientChannel)!;
+			if (!callbacks) return;
 
-		redis.on("message", async (clientChannel, message) => {
-			callback(message);
+			callbacks?.forEach((callback) => {
+				callback(message);
+			});
 		});
+	}
 
-		return {
+	globalPubSubCallbacksByChannels = new Map<string, Set<Parameters<typeof this.globalSubscribe>[1]>>();
+	globalSubscribe(channel: string, callback: (event: any) => any) {
+		if (!this.globalPubSubCallbacksByChannels.has(channel)) {
+			this.globalPubSubCallbacksByChannels.set(channel, new Set<any>());
+		}
+
+		const callbacks = this.globalPubSubCallbacksByChannels.get(channel)!;
+		callbacks.add(callback);
+
+		this.pubsubRedis.subscribe(channel)
+			.then(() => result.live = true)
+			.catch(() => result.live = false);
+
+		const result = {
+			live: false,
 			unsubscribe() {
-				redis.unsubscribe();
+				callbacks.delete(callback);
 			},
-		};
+		}
+
+		return result;;
 	}
 }
 

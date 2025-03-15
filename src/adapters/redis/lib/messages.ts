@@ -14,7 +14,7 @@ interface Message<DataShape> {
 export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMessageBroker {
 	messageBrokerId = nanoid();
 
-	private callbackByChannel = new Map<string, Set<Parameters<typeof this.subscribe>[2]>>();
+	private clientChannelCallbacks = new Map<string, Set<Parameters<typeof this.subscribe>[2]>>();
 
 	getClientChannel() {
 		return this.getOriginChannel(this.messageBrokerId);
@@ -32,10 +32,10 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 
 		const clientChannel = this.getClientChannel();
 
-		return this.redisSubscribe(clientChannel, async (message) => {
+		return this.globalSubscribe(clientChannel, async (message) => {
 			const parsed = await Serde.deserialize(message) as any;
 
-			const callbacks = this.callbackByChannel.get(parsed.channel);
+			const callbacks = this.clientChannelCallbacks.get(parsed.channel);
 			if (callbacks) {
 				callbacks.forEach((callback) => {
 					callback(parsed.message);
@@ -169,6 +169,11 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 	}
 
 	async publishClientBroadcast<EventData>(channel: string, message: Message<EventData>) {
+		// TODO: This is a temporary solution to avoid
+		// having to manually poll the channel for new messages
+		// on the receiving end.
+		// We should find a better solution in the future.
+
 		// 1. get the list of clients subscribed to this channel
 		// And delete outdated client that didn't renew their subscription
 		const now = Date.now();
@@ -199,17 +204,17 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 	}
 
 	listenClientPubSub<Data>(channel: string, callback: (data: Data) => any) {
-		if (!this.callbackByChannel.has(channel)) {
-			this.callbackByChannel.set(channel, new Set<any>());
+		if (!this.clientChannelCallbacks.has(channel)) {
+			this.clientChannelCallbacks.set(channel, new Set<any>());
 		}
 
-		const callbacks = this.callbackByChannel.get(channel)!;
+		const callbacks = this.clientChannelCallbacks.get(channel)!;
 		callbacks.add(callback as any);
 		const subscription = {
 			unsubscribe: () => {
 				callbacks.delete(callback as any);
 				if (callbacks.size === 0) {
-					this.callbackByChannel.delete(channel);
+					this.clientChannelCallbacks.delete(channel);
 				}
 			},
 		};
@@ -218,7 +223,7 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 	}
 
 	private isClientListeningToChannel(channel: string) {
-		const callbacks = this.callbackByChannel.get(channel);
+		const callbacks = this.clientChannelCallbacks.get(channel);
 		if (!callbacks) {
 			return false;
 		}
@@ -316,9 +321,8 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 
 		// Also listen to the global direct pubsub channel to avoid 
 		// Having to manually poll the channel for new messages
-		const subscription = this.redisSubscribe(`${channel}:direct`, async (message) => {
+		const subscription = this.globalSubscribe(`${channel}:direct`, async (message: any) => {
 			const event = await Serde.deserialize<PublishedEvent>(message);
-			console.log('event', event);
 			if (abortCtl.signal.aborted) return;
 			if (previousEventsIds.has(event.message.id)) return;
 			callback(event.message);
@@ -326,8 +330,17 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 			previousEventsIds.add(event.message.id);
 		});
 
+		let pingSinceSubscriptionLive = 0;
 		Promise.resolve().then(async () => {
 			while (!abortCtl.signal.aborted) {
+				if (subscription.live) pingSinceSubscriptionLive++;
+				if (pingSinceSubscriptionLive > 1) {
+					// For some reason, the subscription is not live
+					// Or the published message do not arrive on time
+					// So we have to wait for an extra poll cycle before stoping
+					break;
+				}
+
 				const timestampBeforeRequest = loop.range.from === 0 ? timestampListeningStarted : Date.now();
 				const rawEvents = await this.getLatestMessagesRaw(channel, loop.range);
 				loop.range.from = timestampBeforeRequest;

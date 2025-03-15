@@ -150,7 +150,11 @@ export const generateTestSuite = (name: string, createAdapters: () => () => Prom
 			});
 
 			it("should emit and receive events in same order", async () => {
-				// Sometimes, the order is not maintained if two message are sent in the same timestamp.
+				// TODO: test with same client send multiple messages in same timestamp
+				// and check if they are received in order
+
+				// TODO: test with different clients sending messages in different timestamp
+				// and check if they are received in order
 				throw new Error("TODO");
 			});
 
