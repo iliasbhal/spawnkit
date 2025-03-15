@@ -74,7 +74,7 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 			const rpcIncomingMessageId = channel.split(":").pop();
 			if (!rpcIncomingMessageId) throw new Error("Bad Reply: Missing Message Id");
 			const originRpc = this.rpcOriginByMessageId.get(rpcIncomingMessageId);
-			if (!originRpc) throw new Error("AAAA");
+			if (!originRpc) throw new Error("Cannot Find RPC Origin");
 			await this.publishClientPubSub(originRpc, messageChannel, message);
 			return eventId;
 		}
