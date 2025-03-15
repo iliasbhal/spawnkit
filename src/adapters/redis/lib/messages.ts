@@ -26,15 +26,13 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 	}
 
 	isInitialized = false;
-	ensureInitializedGlobalPubSub() {
+	ensureInitializedClientPubSub() {
 		if (this.isInitialized) return;
 		this.isInitialized = true;
 
-		const redis = this.getNewRedisClient();
 		const clientChannel = this.getClientChannel();
 
-		redis.subscribe(clientChannel);
-		redis.on("message", async (clientChannel, message) => {
+		return this.redisSubscribe(clientChannel, async (message) => {
 			const parsed = await Serde.deserialize(message) as any;
 
 			const callbacks = this.callbackByChannel.get(parsed.channel);
@@ -43,13 +41,7 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 					callback(parsed.message);
 				});
 			}
-		});
-
-		return {
-			unsubscribe() {
-				redis.unsubscribe();
-			},
-		};
+		})
 	}
 
 	private getChannel(instance: Adapters.InstanceIdentifier, channel: string) {
@@ -103,7 +95,7 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 		channel: string,
 		callback: (event: E) => any,
 	): { unsubscribe: Function } {
-		this.ensureInitializedGlobalPubSub();
+		this.ensureInitializedClientPubSub();
 
 		const messageChannel = this.getChannel(instance, channel);
 		const isRpcCall = channel.startsWith("rpc");

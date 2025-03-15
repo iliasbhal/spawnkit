@@ -19,10 +19,25 @@ export class RedisAdapter extends BaseAdapter {
 		const client = new Redis(redisConfig);
 		return client;
 	}
+
+	redisSubscribe(channel: string, callback: (event: any) => any) {
+		const redis = this.getNewRedisClient();
+		redis.subscribe(channel);
+
+		redis.on("message", async (clientChannel, message) => {
+			callback(message);
+		});
+
+		return {
+			unsubscribe() {
+				redis.unsubscribe();
+			},
+		};
+	}
 }
 
 export class BaseQueue extends RedisAdapter {
-		createQueue(name: string) {
+	createQueue(name: string) {
 		return new BullMQ.Queue(name, {
 			connection: this.redis,
 			prefix: "spawnkit:queues",
