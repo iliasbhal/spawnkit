@@ -103,6 +103,8 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 			const subscription = this.listenMQ(messageChannel, (event) => {
 				const replyToClient = event.meta.origin;
 				if (replyToClient) {
+					// we to store the origin of the RPC call
+					// so that we can reply to the correct client
 					this.rpcOriginByMessageId.set(event.id, event.meta.origin);
 				}
 
@@ -274,6 +276,13 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 		});
 
 		await Promise.all([
+			// publish to the direct pubsub channel to avoid
+			// Having to manually poll the channel for new messages
+			// on the receiving end.
+			this.redis.publish(`${channel}:direct`, serialized),
+
+			// Also add message to queue to be processed by the worker
+			// when it becomes live, if it's not already live.
 			this.redis.zadd(channel, timestamp, message.id),
 			this.redis.hset(channel + ":data", message.id, serialized),
 		]);
@@ -285,8 +294,9 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 	}
 
 	private listenMQ(channel: string, callback: (event: any) => any) {
-		const timestampListeningStarted = Date.now();
+		type PublishedEvent = Awaited<ReturnType<typeof this.publishMQ>>;
 
+		const timestampListeningStarted = Date.now();
 		const abortCtl = new AbortController();
 		const previousEventsIds = new Set();
 		const loop = {
@@ -303,6 +313,19 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 			stepCount: 25,
 		});
 
+
+		// Also listen to the global direct pubsub channel to avoid 
+		// Having to manually poll the channel for new messages
+		const subscription = this.redisSubscribe(`${channel}:direct`, async (message) => {
+			const event = await Serde.deserialize<PublishedEvent>(message);
+			console.log('event', event);
+			if (abortCtl.signal.aborted) return;
+			if (previousEventsIds.has(event.message.id)) return;
+			callback(event.message);
+
+			previousEventsIds.add(event.message.id);
+		});
+
 		Promise.resolve().then(async () => {
 			while (!abortCtl.signal.aborted) {
 				const timestampBeforeRequest = loop.range.from === 0 ? timestampListeningStarted : Date.now();
@@ -314,7 +337,8 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 					rawEvents.map((e) => Serde.deserialize<PublishedEvent>(e))
 				);
 
-				const eventMessages = events.sort((a, b) => a.order - b.order)
+				const eventMessages = events
+					.sort((a, b) => a.order - b.order)
 					.map((a) => a.message);
 
 
@@ -341,6 +365,7 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 
 		return {
 			unsubscribe: () => {
+				subscription.unsubscribe();
 				abortCtl.abort();
 			},
 		};
@@ -348,7 +373,6 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 
 	private async getLatestMessagesRaw(channel: string, range: { from: number; to: number }) {
 		const messageIds = await this.redis.zrangebyscore(channel, range.from, range.to);
-
 		if (!messageIds.length) {
 			return [];
 		}
