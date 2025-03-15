@@ -293,6 +293,8 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 	}
 
 	private listenMQ(channel: string, callback: (event: any) => any) {
+		const timestampListeningStarted = Date.now();
+
 		const abortCtl = new AbortController();
 		const previousEventsIds = new Set();
 		const loop = {
@@ -311,7 +313,7 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 
 		Promise.resolve().then(async () => {
 			while (!abortCtl.signal.aborted) {
-				const timestampBeforeRequest = Date.now();
+				const timestampBeforeRequest = loop.range.from === 0 ? timestampListeningStarted : Date.now();
 				const rawEvents = await this.getLatestMessagesRaw(channel, loop.range);
 				loop.range.from = timestampBeforeRequest;
 
