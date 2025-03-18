@@ -1,25 +1,22 @@
 # Spawkit Plugins
 
-<!-- - Conccurency, allow the dev to control how many requests are handled in parallel. -->
-<!-- - Load Balancer, allow to distribute the load between a number of instances -->
-<!-- -  -->
+
+- Redis plugin. We should expose kv plugin will all the redis command. it should have the same api as redisio.
 <!-- - Warm Plugin, implement a mechanism where the instance is conctantly kept awake. 
      ( maybe create an general instance, that is constantly kept awake using a cron ).
      ( and that constantly send requests to instances with a WARM plugin ). -->
 
 # Spawnkit lib
 
-- Add ability to schedule function from within the instance.
+- Add ability for an instance to be able to use a client with all the instances.
 
  
-- Add ability to load and upload files. We'll then provide access to a local redis to each instance. we'll remove client.data and instance.data and replace them with .redis.
+- Add ability provide access to a local redis to each instance. we'll remove client.data and instance.data and replace them with .redis.
 Also add access to .files to instances and client.
 
 - Move client validation within .spawn and check if process.env === 'developement'
 
 - Start writing documentation / recipes.
-
-- ability to control how many request can be handled at the same time. ( concurrency )
 
 - use .emitInternal to handle remote eviction? 
 

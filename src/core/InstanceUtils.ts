@@ -28,7 +28,6 @@ export class InstanceUtils<Inst extends Instance> extends BaseRemoteEntity<Inst>
     return Date.now();
   }
 
-
   async exists() {
     const exists = await this.utilsData.get('last_initialized');
     return !!exists;
@@ -38,34 +37,16 @@ export class InstanceUtils<Inst extends Instance> extends BaseRemoteEntity<Inst>
     return await this.utilsData.set('last_initialized', timestamp);
   }
 
-  concurrency = {
-    get: async () => {
-      const conccurency = await this.utilsData.get('conccurency');
-      return conccurency;
-    },
-
-    set: async (conccurency: number) => {
-      if (conccurency < 1) {
-        throw new Error('Concurrency should be greater than 0');
-      }
-
-      return await this.utilsData.set('conccurency', conccurency);
-    }
-  }
-
-  lock = {
-    lock: async () => {
-      return this.utilsData.set('is_locked', true);
-    },
-    unlock: async () => {
-      return this.utilsData.set('is_locked', false);
-    },
-    check: async () => {
-      return this.utilsData.get('is_locked');
-    },
-  }
-
-
-
+  // lock = {
+  //   lock: async () => {
+  //     return this.utilsData.set('is_locked', true);
+  //   },
+  //   unlock: async () => {
+  //     return this.utilsData.set('is_locked', false);
+  //   },
+  //   check: async () => {
+  //     return this.utilsData.get('is_locked');
+  //   },
+  // }
 }
 

@@ -148,11 +148,6 @@ describe.only("Base", () => {
 //   it.todo("can subscribe to data changes via .data.on('key', subscriber)");
 // });
 
-// describe("Stream", () => {
-//   it.todo("forwards returned stream to client (.map)");
-//   it.todo("forwards returned stream to client (async iterator)");
-//   it.todo("should replay messages in the same order they have been emitted");
-// });
 
 // describe("Schedule", () => {
 //   it.todo("can schedule method call (delay)");

@@ -174,8 +174,7 @@ export class Client<CP extends SpawnkitConfig> {
 		return healthCheck;
 	}
 
-	spawn<Kind extends Extract<keyof CP["instances"], string>, SpawnContext extends InstType<CP, Kind>['InstanceContext']>(kind: Kind, instanceId: InstanceId, clientContext: SpawnContext = {} as any) {
-		type Inst = InstanceType<CP["instances"][Kind]>;
+	createInstanceClient<Inst extends Instance>(kind: string, instanceId: string, clientContext: any) {
 		type InstTypes = ReturnType<typeof createTypeof<Inst>>;
 
 		const instanceIdentifier = {
