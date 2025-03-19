@@ -156,8 +156,3 @@ describe.only("Base", () => {
 //   it.todo("can cancel schedule method call (cron)");
 //   it.todo("can list all scheduled method call");
 // });
-
-// describe("PubSub", () => {
-//   it.todo("can emit and listen to instance channels");
-//   it.todo("when subscrbing to channel, it should not replay past events");
-// });
