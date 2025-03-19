@@ -66,6 +66,7 @@ export interface InterfaceAPI<Inst extends Instance<any, any, any>> {
 	logger: Logger;
 	emit: Emit<Inst['__types']['InstanceChannels']>;
 	client: Client<any>;
+	waitFor: (callback: () => Promise<any>) => Promise<any>;
 }
 
 interface MessageContext {

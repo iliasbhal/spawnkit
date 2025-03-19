@@ -112,5 +112,36 @@ export class Instance<
 	public async waitFor(callback: () => Promise<any>) {
 		return this.api.waitFor(callback);
 	}
+
+	private validateInstancces = () => {
+		// const clientInst = this.spawn('TEST_INST' as any, "__TEST_ID__", {});
+		// clientInst.dispose();
+
+		// Object.values(this.instances).forEach((InstanceClass: any) => {
+		// 	const inst = new InstanceClass();
+		// 	const instanceName = InstanceClass.name;
+
+
+		// 	const clientKeys = new Set(Object.keys(clientInst));
+		// 	const instanceKeys = new Set(
+		// 		Object.getOwnPropertyNames(Object.getPrototypeOf(inst)).concat(Object.keys(inst)),
+		// 	);
+
+		// 	const instanceProtoKeys = new Set(
+		// 		Object.getOwnPropertyNames(Object.getPrototypeOf(Object.getPrototypeOf(inst))),
+		// 	);
+
+		// 	const intersect = new Set([...Array.from(clientKeys)].filter((i) => instanceKeys.has(i)));
+		// 	const cannotUseKeys = new Set(
+		// 		[...Array.from(intersect)].filter((i) => !instanceProtoKeys.has(i)),
+		// 	);
+
+		// 	if (cannotUseKeys.size > 0) {
+		// 		throw new Error(
+		// 			`Cannot use reserved keys: ${Array.from(cannotUseKeys).join(", ")} in instance ${instanceName}`,
+		// 		);
+		// 	}
+		// });
+	};
 }
 

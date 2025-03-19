@@ -22,12 +22,15 @@ import { SpawnkitError } from './Error'
 import { EventListener } from "@/utils/EventListenener";
 import { computeLatency } from "@/utils/computeLatency";
 
+export interface Instances {
+	[key: string]: typeof Instance<any, any, any>;
+}
+
 export interface SpawnkitConfig {
 	adapters: Adapters;
-	instances: { [key: string]: typeof Instance<any, any, any> };
+	instances: Instances;
 	config?: {
 		throwOnStalledInstance?: boolean;
-		disconnectOnStalledInstance?: boolean;
 	}
 }
 
@@ -57,12 +60,11 @@ export class Client<CP extends SpawnkitConfig> {
 	}
 
 	id = nanoid();
-	scheduler: Scheduler<any>;
+	scheduler: Scheduler<CP>;
 
 	static createConfig<Provided extends SpawnkitConfig['config']>(provided: Provided): Required<SpawnkitConfig['config']> {
 		return {
 			throwOnStalledInstance: provided?.throwOnStalledInstance ?? true,
-			disconnectOnStalledInstance: provided?.disconnectOnStalledInstance ?? true,
 		}
 	}
 
@@ -88,46 +90,6 @@ export class Client<CP extends SpawnkitConfig> {
 		this.config = nextConfig;
 		this.eventListeners.notify('changed', this.config);
 	}
-
-	private linkAndValidateAdapters = () => {
-		Object.values(this.adapters).forEach((adapter) => {
-			const isBaseAdapter = adapter instanceof BaseAdapter;
-			if (!isBaseAdapter) {
-				throw new Error("Invalid Adapter, need to extend BaseAdapter");
-			};
-		});
-	};
-
-	private validateInstancces = () => {
-		const clientInst = this.spawn('TEST_INST' as any, "__TEST_ID__", {});
-		clientInst.dispose();
-
-		Object.values(this.instances).forEach((InstanceClass: any) => {
-			const inst = new InstanceClass();
-			const instanceName = InstanceClass.name;
-
-
-			const clientKeys = new Set(Object.keys(clientInst));
-			const instanceKeys = new Set(
-				Object.getOwnPropertyNames(Object.getPrototypeOf(inst)).concat(Object.keys(inst)),
-			);
-
-			const instanceProtoKeys = new Set(
-				Object.getOwnPropertyNames(Object.getPrototypeOf(Object.getPrototypeOf(inst))),
-			);
-
-			const intersect = new Set([...Array.from(clientKeys)].filter((i) => instanceKeys.has(i)));
-			const cannotUseKeys = new Set(
-				[...Array.from(intersect)].filter((i) => !instanceProtoKeys.has(i)),
-			);
-
-			if (cannotUseKeys.size > 0) {
-				throw new Error(
-					`Cannot use reserved keys: ${Array.from(cannotUseKeys).join(", ")} in instance ${instanceName}`,
-				);
-			}
-		});
-	};
 
 	static from<CP extends SpawnkitConfig>(opts: CP) {
 		return new Client<CP>(opts);
@@ -422,10 +384,6 @@ export class Client<CP extends SpawnkitConfig> {
 				});
 			},
 
-			setConcurrency: async (concurrency: number) => {
-				return remoteUtils.setConcurrency(concurrency);
-			},
-
 			exists: async () => {
 				return remoteUtils.exists();
 			}
@@ -485,6 +443,11 @@ export class Client<CP extends SpawnkitConfig> {
 			},
 		}) as Spawn<Inst>;
 	}
+
+	spawn<Kind extends Extract<keyof CP["instances"], string>, SpawnContext extends InstType<CP, Kind>['InstanceContext']>(kind: Kind, instanceId: InstanceId, clientContext: SpawnContext = {} as any) {
+		type Inst = InstanceType<CP["instances"][Kind]>;
+		return this.createInstanceClient<Inst>(kind, instanceId, clientContext);
+	}
 }
 
 // Utility Types:
@@ -521,7 +484,7 @@ type ExtractInstanceTypes<T extends Instance> = {
 	InstanceContext: T["__types"]["InstanceContext"],
 };
 
-const createTypeof = <T extends Instance>(inst: T) => {
+export const createTypeof = <T extends Instance>(inst: T) => {
 	type InstanceData = T["__types"]["InstanceData"];
 	type InstanceChannels = T["__types"]["InstanceChannels"];
 	type InstanceContext = T["__types"]["InstanceContext"];
