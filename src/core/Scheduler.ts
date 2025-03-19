@@ -146,6 +146,7 @@ export class Scheduler<O extends SpawnkitConfig> {
 		const { action, args } = scheduleEvent.event;
 
 		const remoteInstance = this.client.spawn<any, any>(kind, id, {});
+		try {
 		await remoteInstance.utils.sendRPC({
 			timestamp: Date.now(),
 			args,
@@ -156,6 +157,13 @@ export class Scheduler<O extends SpawnkitConfig> {
 				context: scheduleEvent.event.context,
 			},
 		});
+
+		} finally {
+			// Ensure we dispose of the instance
+			// To avoid any memory leaks
+			remoteInstance.dispose();
+		}
+
 	}
 
 	runningInstancesByOwnerId: Map<string, InstanceProxy<any>> = new Map();
