@@ -32,7 +32,7 @@ export class Scheduler<O extends SpawnkitConfig> {
 
 	startInstanceScheduler() {
 
-		Object.keys(this.client.instances).forEach((kind) => {
+		Object.keys(this.instances).forEach((kind) => {
 			this.subscriptions.add(
 				this.adapters.instances.subscribe(kind, async (data, context) => {
 					// console.log('SUBSCRIBED TO INSTANCE SCHEDULER', data, Object.keys(this.instances));
@@ -147,16 +147,16 @@ export class Scheduler<O extends SpawnkitConfig> {
 
 		const remoteInstance = this.client.spawn<any, any>(kind, id, {});
 		try {
-		await remoteInstance.utils.sendRPC({
-			timestamp: Date.now(),
-			args,
-			action,
-			mode: "skip",
-			context: {
-				...context,
-				context: scheduleEvent.event.context,
-			},
-		});
+			await remoteInstance.utils.sendRPC({
+				timestamp: Date.now(),
+				args,
+				action,
+				mode: "skip",
+				context: {
+					...context,
+					context: scheduleEvent.event.context,
+				},
+			});
 
 		} finally {
 			// Ensure we dispose of the instance
