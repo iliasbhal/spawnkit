@@ -10,7 +10,7 @@
 
 # Spawnkit lib
 
-
+- expose things that are happening on the client. instance starting, disposing, initializing, errors etc.
  
 - Add ability provide access to a local redis to each instance. we'll remove client.data and instance.data and replace them with .redis.
 Also add access to .files to instances and client.
