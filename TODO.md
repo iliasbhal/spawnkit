@@ -1,6 +1,10 @@
 # Spawkit Plugins
 - make it possible to load load hooks in parallel. Each plugin has a uuid generated on fly. And you can place yourself into the pipeline? I don't know, but we should figure out a way to make initializing plugins more parrallel.
 
+- KV: Complete plugin using: 
+// https://www.npmjs.com/package/keyv
+// https://github.com/zaaack/keyv-file
+
 - add hooks for method call middlware like trpc of fastify.
 
 - Redis plugin. We should expose kv plugin will all the redis command. it should have the same api as redisio.

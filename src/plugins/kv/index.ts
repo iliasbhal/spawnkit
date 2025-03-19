@@ -1,6 +1,9 @@
 import { InstancePlugin } from '../_common'
 import { SQLite } from '../sqlite';
 
+// https://www.npmjs.com/package/keyv
+// https://github.com/zaaack/keyv-file
+
 interface SQLiteConfig {
   name?: string;
 }
