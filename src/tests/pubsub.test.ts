@@ -60,7 +60,7 @@ describe("PubSub", () => {
 
   });
 
-  it("when subscrbing to channel, it should not replay past events", async () => {
+  it("when subscribing to channel, it should not replay past events", async () => {
     const instance = client.spawn("PubSubExample", "test-2", {
       userID: "test-user-id",
     });
@@ -84,6 +84,82 @@ describe("PubSub", () => {
     await waitFor(() => {
       expect(callback).toHaveBeenCalled();
       expect(callback).toHaveBeenCalledTimes(1);
+    }, {
+      interval: 10,
+    });
+
+    instance.dispose();
+  });
+
+  it("should broadcast events to all instances", async () => {
+    const instance = client.spawn("PubSubExample", "test-3", {
+      userID: "test-user-id",
+    });
+
+    const instance2 = client.spawn("PubSubExample", "test-3", {
+      userID: "test-user-id-2",
+    });
+
+    const callback = jest.fn();
+    const callback2 = jest.fn();
+    instance.on("enterChat", callback);
+    instance2.on("enterChat", callback2);
+
+    await instance.enterChat();
+
+    await waitFor(() => {
+      expect(callback).toHaveBeenCalled();
+      expect(callback).toHaveBeenCalledTimes(1);
+      expect(callback).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: "test-user-id" })
+      );
+
+      expect(callback2).toHaveBeenCalled();
+      expect(callback2).toHaveBeenCalledTimes(1);
+      expect(callback2).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: "test-user-id" })
+      );
+    }, {
+      interval: 10,
+    });
+
+    instance.dispose();
+  });
+
+  it("when disposing instance, it should react to emitted events", async () => {
+    const instance = client.spawn("PubSubExample", "test-4", {
+      userID: "test-user-id",
+    });
+
+    const instance2 = client.spawn("PubSubExample", "test-4", {
+      userID: "test-user-id-2",
+    });
+
+    const callback = jest.fn();
+    const callback2 = jest.fn();
+    instance.on("enterChat", callback);
+    instance2.on("enterChat", callback2);
+
+    await instance.enterChat();
+
+    await waitFor(() => {
+      expect(callback).toHaveBeenCalledTimes(1);
+      expect(callback2).toHaveBeenCalledTimes(1);
+    }, {
+      interval: 10,
+    });
+
+    callback.mockClear();
+    callback2.mockClear();
+
+    instance2.dispose();
+    await instance.enterChat();
+
+    await waitFor(() => {
+      expect(callback).toHaveBeenCalled();
+      expect(callback).toHaveBeenCalledTimes(1);
+
+      expect(callback2).not.toHaveBeenCalled();
     }, {
       interval: 10,
     });

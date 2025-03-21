@@ -205,6 +205,7 @@ export class Client<CP extends SpawnkitConfig> {
 			});
 		});
 
+		const eventHandlers = new Set<Function>();
 		const createEventHandler = <Channel extends Extract<keyof InstTypes['Channels'], string>, Message extends InstTypes['Channels'][Channel]>(
 			channel: Channel,
 			callback: (data: Message) => any,
@@ -221,11 +222,16 @@ export class Client<CP extends SpawnkitConfig> {
 				},
 			);
 
+			const unsubscribe = () => {
+				subscribe.unsubscribe();
+				callbackEmitter.unsubscribe();
+				eventHandlers.delete(unsubscribe);
+			}
+
+			eventHandlers.add(unsubscribe);
+
 			return {
-				unsubscribe: () => {
-					subscribe.unsubscribe();
-					callbackEmitter.unsubscribe();
-				},
+				unsubscribe,
 			};
 		}
 
@@ -389,6 +395,15 @@ export class Client<CP extends SpawnkitConfig> {
 			}
 		};
 
+		const disposeInstance = () => {
+			healthCheck.dispose();
+			instantEventListener.clear();
+
+			// Dispose all pubsub event handlers
+			eventHandlers.forEach(unsubscribe => unsubscribe());
+			eventHandlers.clear();
+		}
+
 		const instanceClientAPI = {
 			id: instanceId,
 			kind: kind,
@@ -402,13 +417,12 @@ export class Client<CP extends SpawnkitConfig> {
 			},
 
 			dispose: () => {
-				healthCheck.dispose();
-				instantEventListener.clear();
+				disposeInstance();
 			},
 
 			on: createEventHandler,
 
-			data: data,
+			// data: data,
 			context: clientContext as typeof clientContext,
 
 			remote: remote,
