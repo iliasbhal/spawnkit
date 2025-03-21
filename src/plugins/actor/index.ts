@@ -19,7 +19,7 @@ interface PluginConfig<T extends x.AnyStateMachine = x.AnyStateMachine> {
 	onSnapshot?: (data: { actorId: string; snapshot: MachineData<T> }) => void;
 }
 
-export class Machine<StateMachine extends x.AnyStateMachine = x.AnyStateMachine> extends InstancePlugin {
+export class Actor<StateMachine extends x.AnyStateMachine = x.AnyStateMachine> extends InstancePlugin {
 	private machine: StateMachine = null as any;
 	private actor: x.Actor<StateMachine> = null as any;
 	private actorByActorId = new Map<string, x.AnyActorRef>();
@@ -117,7 +117,6 @@ export class Machine<StateMachine extends x.AnyStateMachine = x.AnyStateMachine>
 		const actor = inspectionEvent.actorRef as x.Actor<StateMachine>;
 		const snapshot = actor.getPersistedSnapshot();
 
-		console.log("handleSnapshot", actor, snapshot);
 		this.snapshotByActorId.set(actor.id, snapshot);
 		await this.writeSnapshot(snapshot);
 
