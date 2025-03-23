@@ -1,14 +1,9 @@
-import "dotenv/config";
-
-import { redis } from "../adapters/redis/client";
-
 import * as Spawnkit from "..";
-import * as RedisAdapter from "../adapters/redis";
 import { wait } from "../utils/wait";
-import { nanoid } from "nanoid";
+import { testRedisAdapters } from "./_utils";
 
 describe("Utils", () => {
-  class Example extends Spawnkit.Instance<{}, { somekey: number }, {}> {
+  class Example extends Spawnkit.Instance<{}, {}> {
     async initialize() {
       await wait(1000);
     }
@@ -22,17 +17,8 @@ describe("Utils", () => {
     }
   }
 
-  const createAdapters = () => ({
-    lock: new RedisAdapter.Lock(redis),
-    data: new RedisAdapter.Data(redis),
-    messages: new RedisAdapter.MessageBroker(redis),
-    events: new RedisAdapter.EventScheduler(redis),
-    instances: new RedisAdapter.InstanceScheduler(redis),
-    logger: new RedisAdapter.Logger(redis),
-  });
-
   const client = Spawnkit.Client.from({
-    adapters: createAdapters(),
+    adapters: testRedisAdapters,
     instances: {
       Example,
     },
