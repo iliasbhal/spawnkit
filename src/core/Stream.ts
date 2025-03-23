@@ -45,7 +45,7 @@ export class Stream<StreamValue> {
 	}
 
 	async map(callback: (data: StreamValue) => any) {
-		console.log("this closed", this.closed);
+		// console.log("this closed", this.closed);
 		if (this.closed) return Promise.resolve();
 
 		return await new Promise((resolve, reject) => {

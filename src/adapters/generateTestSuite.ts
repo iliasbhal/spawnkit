@@ -257,7 +257,7 @@ function createPubSubTestConfig() {
 		}) as const;
 }
 
-async function waitUntilOK(callback: Function) {
+export async function waitUntilOK(callback: Function) {
 	await waitFor(callback, {
 		interval: 10,
 	});

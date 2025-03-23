@@ -15,12 +15,10 @@ export class BaseRemoteEntity<InstanceContext extends Context = Context> {
 
 export class Instance<
 	InstanceContext extends Context = Context,
-	InstanceData extends AnyRecord = AnyRecord,
 	InstanceChannels extends AnyRecord = AnyRecord,
 > extends BaseRemoteEntity<InstanceContext> {
 	__types = {} as {
 		InstanceContext: InstanceContext;
-		InstanceData: InstanceData;
 		InstanceChannels: InstanceChannels;
 	};
 
@@ -72,13 +70,14 @@ export class Instance<
 	hooks = {
 		initialize: [] as Function[],
 		dispose: [] as Function[],
+		middleware: [] as Function[],
 	};
 
 	initialize() { }
 
 	dispose() { }
 
-	api!: InterfaceAPI<Instance<InstanceContext, InstanceData, InstanceChannels>>;
+	api!: InterfaceAPI<Instance<InstanceContext, InstanceChannels>>;
 
 	get logger() {
 		return this.api.logger;

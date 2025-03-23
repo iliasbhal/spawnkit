@@ -14,7 +14,7 @@ import {
 	BaseAdapter,
 	InstanceIdentifier,
 } from "../adapters";
-import { ClientData } from "./Data";
+// import { ClientData } from "./Data";
 import { HealthCheckEmitter, HealthCheckListener, InstanceStalledError } from "./HealthCheck";
 import { Scheduler } from "./Scheduler";
 import { nanoid } from "nanoid";
@@ -23,7 +23,7 @@ import { EventListener } from "@/utils/EventListenener";
 import { computeLatency } from "@/utils/computeLatency";
 
 export interface Instances {
-	[key: string]: typeof Instance<any, any, any>;
+	[key: string]: typeof Instance<any, any>;
 }
 
 export interface SpawnkitConfig {
@@ -44,7 +44,6 @@ type InternalMessageData = InstanceEventChannels[keyof InstanceEventChannels];
 
 interface InstType<Config extends SpawnkitConfig, Kind extends keyof Config['instances']> {
 	Inst: InstanceType<Config["instances"][Kind]>,
-	InstanceData: InstType<Config, Kind>['Inst']["__types"]["InstanceData"],
 	InstanceChannels: InstType<Config, Kind>['Inst']["__types"]["InstanceChannels"],
 	InstanceContext: InstType<Config, Kind>['Inst']["__types"]["InstanceContext"],
 }
@@ -154,11 +153,6 @@ export class Client<CP extends SpawnkitConfig> {
 
 			return eventId;
 		};
-
-		const data = new ClientData<InstTypes['Data']>({
-			adapters: this.adapters,
-			instance: instanceIdentifier,
-		});
 
 		const createScheduledMethodHandler = () => {
 			type CommonScheduleConfig = {
@@ -493,16 +487,14 @@ type MakeSchedulable<T> = {
 };
 
 type ExtractInstanceTypes<T extends Instance> = {
-	InstanceData: T["__types"]["InstanceData"],
 	InstanceChannels: T["__types"]["InstanceChannels"],
 	InstanceContext: T["__types"]["InstanceContext"],
 };
 
 export const createTypeof = <T extends Instance>(inst: T) => {
-	type InstanceData = T["__types"]["InstanceData"];
 	type InstanceChannels = T["__types"]["InstanceChannels"];
 	type InstanceContext = T["__types"]["InstanceContext"];
-	type InstBase = Instance<InstanceContext, InstanceData, InstanceChannels>;
+	type InstBase = Instance<InstanceContext, InstanceChannels>;
 
 	type InheritedMethods = Exclude<ExtractMethodNames<InstBase>, undefined>;
 	type AvailableMethods = Omit<ExtractMethods<T>, InheritedMethods>;
@@ -514,7 +506,6 @@ export const createTypeof = <T extends Instance>(inst: T) => {
 	type RemoteProxyMethodes = MakeRemote<InstanceUtils<T>>;
 
 	return {} as {
-		Data: InstanceData,
 		Channels: InstanceChannels,
 		Context: InstanceContext,
 		Base: InstBase,

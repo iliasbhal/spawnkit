@@ -30,7 +30,7 @@ interface Order extends Pick<Stock, "tick"> {
 	qty: number;
 }
 
-export class OrderBook extends Spawnkit.Instance<OrderBookContext, OrderBookData, OrderBookEvent> {
+export class OrderBook extends Spawnkit.Instance<OrderBookContext, OrderBookEvent> {
 	on<C extends keyof OrderBookEvent>(channel: C, message: OrderBookEvent[C]) {
 		if (channel === "buyOrders") {
 			const mdg = message;

@@ -1,8 +1,14 @@
 import * as Spawnkit from "../src";
 import type { Client } from './client'
 
+class RequestMiddleware {
+
+}
+
 export class Tenant extends Spawnkit.Instance {
   client = new Spawnkit.Plugins.Client<Client['instances']>()
+
+
 
   doSomething() {
     const tenantBg = this.client.spawn('TenantBackgroundQueue', 'asd')

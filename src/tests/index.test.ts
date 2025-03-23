@@ -1,9 +1,5 @@
-import "dotenv/config";
-
-import { redis } from "../adapters/redis/client";
-
 import * as Spawnkit from "..";
-import * as RedisAdapter from "../adapters/redis";
+
 import {
 	OrderBook,
 	EmptyResponseInstance,
@@ -11,21 +7,13 @@ import {
 	IntrospectExample,
 } from "./index.test.fixtures";
 import { ControlledPromise } from "../utils/ControlledPromise";
-import { wait } from "../utils/wait";
+
 import { nanoid } from "nanoid";
+import { testRedisAdapters } from "./_utils";
 
 describe.only("Base", () => {
-	const createAdapters = () => ({
-		lock: new RedisAdapter.Lock(redis),
-		data: new RedisAdapter.Data(redis),
-		messages: new RedisAdapter.MessageBroker(redis),
-		events: new RedisAdapter.EventScheduler(redis),
-		instances: new RedisAdapter.InstanceScheduler(redis),
-		logger: new RedisAdapter.Logger(redis),
-	});
-
 	const client = Spawnkit.Client.from({
-		adapters: createAdapters(),
+		adapters: testRedisAdapters,
 		instances: {
 			OrderBook,
 			EmptyResponseInstance,
@@ -42,7 +30,7 @@ describe.only("Base", () => {
 
 		const createClient = () =>
 			Spawnkit.Client.from({
-				adapters: createAdapters(),
+				adapters: testRedisAdapters,
 				instances: {
 					BadExample,
 				},
