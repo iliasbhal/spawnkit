@@ -6,12 +6,10 @@ import { MockVolume } from '../volume/mock';
 import { AsyncQueue } from '../../utils/AsyncQueue';
 
 interface SQLiteConfig {
-  name?: string;
+  volume?: Volume;
 }
 
-const DEFAULT_CONFIG: Required<SQLiteConfig> = {
-  name: 'default'
-}
+
 
 export class SQLite extends InstancePlugin {
   db: sqlite3.Database;
@@ -22,9 +20,8 @@ export class SQLite extends InstancePlugin {
   constructor(config?: SQLiteConfig) {
     super();
 
-    const dbName = config?.name || DEFAULT_CONFIG.name;
-    this.volume = new MockVolume({
-      name: 'sqlite/' + dbName
+    this.volume = config?.volume || new MockVolume({
+      name: 'sqlite/' + this.instance.id
     });
   }
 

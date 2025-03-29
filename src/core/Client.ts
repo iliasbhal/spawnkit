@@ -1,16 +1,19 @@
 import type { Instance } from "./Instance";
 import type { InstanceEventChannels, InstanceEventStreamMessage, InternalInstanceEvent } from "./InstanceProxy";
-import { DATA_UTILS_NAMESPACE, type InstanceUtils } from "./InstanceUtils";
+// import { DATA_UTILS_NAMESPACE } from "./InstanceUtils";
+import { type InstanceUtils } from "./InstanceUtils";
 import { ClientStream } from "./ClientStream";
 import { RemoteError } from "./RemoteError";
 import {
 	Adapters,
 	ScheduleId,
+	ScheduleConfig,
 	Cron,
 	Delay,
 	InstanceId,
 	EventId,
 	InstanceMethodCall,
+
 	BaseAdapter,
 	InstanceIdentifier,
 } from "../adapters";
@@ -155,11 +158,7 @@ export class Client<CP extends SpawnkitConfig> {
 		};
 
 		const createScheduledMethodHandler = () => {
-			type CommonScheduleConfig = {
-				name?: string;
-			};
-
-			return (schedule: CommonScheduleConfig & (Delay | Cron)) => {
+			return (schedule: ScheduleConfig) => {
 				return new Proxy({} as InstTypes["ScheduleRemoteMethods"], {
 					get: (target, prop, receiver) => {
 						if (prop in target) return Reflect.get(target, prop, receiver);
@@ -384,6 +383,10 @@ export class Client<CP extends SpawnkitConfig> {
 				});
 			},
 
+			stayLiveFor: async (waitMs: number) => {
+				return remoteUtils.stayLiveFor(waitMs);
+			},
+
 			exists: async () => {
 				return remoteUtils.exists();
 			}
@@ -436,6 +439,9 @@ export class Client<CP extends SpawnkitConfig> {
 				get: async (scheduleId: ScheduleId) => {
 					return this.adapters.events.get(kind, instanceId, scheduleId);
 				},
+				runs: async (scheduleId: ScheduleId) => {
+					return this.adapters.events.runs(kind, instanceId, scheduleId);
+				}
 			},
 		} as const;
 

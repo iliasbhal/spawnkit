@@ -15,6 +15,8 @@
 # Spawnkit lib
 
 - expose things that are happening on the client. instance starting, disposing, initializing, errors etc.
+
+- Add ability to list using some queries. ( first X, lastX, between2 dates );
  
 - Add ability provide access to a local redis to each instance. we'll remove client.data and instance.data and replace them with .redis.
 Also add access to .files to instances and client.
@@ -49,3 +51,8 @@ Also add access to .files to instances and client.
 # Documentation
 
 - Talk about dispose, and that it removes all ressources used by the client instance. pubsub handlers are unsubscribed, etc.
+
+- Talk about Response Streams and forwarded errors.
+- Spawnkit is location independent. Workers and Client only need to connect to the same redis instance for everything to work. All the nitty gritty signaling, messaging and scheduling stuff is done in the background. 
+
+- Write about 

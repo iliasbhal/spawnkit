@@ -241,6 +241,13 @@ export const generateTestSuite = (name: string, createAdapters: () => () => Prom
 				});
 			});
 		});
+
+		describe("Events", () => {
+			it.todo('can schedule an event for later without providing an id');
+			it.todo('can schedule an event for later with provided id');
+			it.todo('can cancel a delayed event');
+		})
+
 	});
 };
 

@@ -58,10 +58,10 @@ type Emit<Channels extends Record<string, any>> = <Channel extends Extract<keyof
 	data: Channels[Channel],
 ) => Promise<void>;
 
-export interface InterfaceAPI<Inst extends Instance<any, any, any>> {
+export interface InterfaceAPI<Inst extends Instance<any, any>> {
 	id: string;
 	kind: string;
-	data: Data<Inst['__types']['InstanceData']>;
+	data: Data<Record<string, any>>;
 	utils: InstanceUtils<Inst>;
 	logger: Logger;
 	emit: Emit<Inst['__types']['InstanceChannels']>;
@@ -88,7 +88,7 @@ export class InstanceProxy<Inst extends Instance> {
 	public adapters: Adapters;
 	public client: Client<any>;
 
-	public data: Data<Inst['__types']['InstanceData']>;
+	public data: Data<Record<string, any>>;
 
 	private utils: InstanceUtils<Inst>;
 
@@ -114,13 +114,13 @@ export class InstanceProxy<Inst extends Instance> {
 			instance: config.indenfier,
 		});
 
-		this.data = new Data<Inst['__types']['InstanceData']>({
+		this.data = new Data<Record<string, any>>({
 			adapters: this.adapters,
 			instance: this.indenfier,
 			logger: this.logger,
 		});
 
-		this.utils = new InstanceUtils(this.data);
+		this.utils = new InstanceUtils(this);
 
 		this.instance = new Instance();
 		this.configureInstance();
@@ -589,6 +589,4 @@ export class InstanceProxy<Inst extends Instance> {
 		// before yielding the promise. It the equivalent of a gracefull shutdown
 		await this.keepAlive.waitOnAll();
 	}
-
-
 }

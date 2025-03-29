@@ -69,6 +69,21 @@ export class BaseQueue extends RedisAdapter {
 			},
 		});
 	}
+
+	createWorker<JobData>(queue: BullMQ.Queue, callback: (job: BullMQ.Job<JobData>) => Promise<void>) {
+		return new BullMQ.Worker<JobData>(
+			queue.name,
+			async (job) => {
+				await callback(job);
+			},
+			{
+				autorun: true,
+				concurrency: 10 ** 9,
+				connection: queue.opts.connection,
+				prefix: queue.opts.prefix,
+			},
+		)
+	}
 }
 
 export class Serde {

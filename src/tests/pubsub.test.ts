@@ -26,7 +26,6 @@ describe("PubSub", () => {
 
   }
 
-
   const client = Spawnkit.Client.from({
     adapters: testRedisAdapters,
     instances: {

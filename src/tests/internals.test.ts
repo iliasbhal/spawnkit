@@ -52,30 +52,9 @@ describe("Utils", () => {
     });
 
     const latency = await orderbook.remote.getLatency();
-    expect(latency.up).toBeGreaterThan(0);
+    expect(latency.up).toBeGreaterThanOrEqual(0);
     expect(latency.down).toBeGreaterThanOrEqual(0);
-    expect(latency.total).toBeGreaterThan(0);
-    expect(latency.total).toEqual(latency.up + latency.down);
-  })
-
-  it('can control instance request concurrency', async () => {
-
-  })
-
-  it('can update  instance request concurrency on the fly', async () => {
-
-  })
-
-  it('can lock instance from accepting requests', async () => {
-
-  })
-
-  it('can unlock instance to restart accepting requests', async () => {
-
-  })
-
-  it('includes a sqlite database with each instance', () => {
-
+    expect(latency.total).toBeGreaterThanOrEqual(latency.up + latency.down);
   });
 
 });

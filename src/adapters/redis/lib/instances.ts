@@ -20,18 +20,9 @@ export class InstanceScheduler extends BaseQueue implements Adapters.AdapaterIns
 
 	subscribe(kind: Adapters.InstanceKind, callback: (data: Adapters.InstanceIdentifier, context: Adapters.ScheduleContext) => any) {
 		const queue = this.createQueue(`instances:${kind}`);
-		const worker = new BullMQ.Worker<JobData>(
-			queue.name,
-			async (job) => {
-				await callback(job.data, {});
-			},
-			{
-				autorun: true,
-				concurrency: 10 ** 9,
-				connection: this.redis,
-				prefix: queue.opts.prefix,
-			},
-		);
+		const worker = this.createWorker<JobData>(queue, async (job) => {
+			await callback(job.data, {});
+		});
 
 		// PAUSE NEW JOB FROM BEEING PROCESSED IF CPU IS GROWING TOO FAST
 		// const cpuCheckInterval = ControlledInterval.new({

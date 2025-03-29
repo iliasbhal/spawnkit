@@ -23,7 +23,7 @@ export class StreamExample extends Spawnkit.Instance {
     return new Spawnkit.Stream<string>(async (stream) => {
       for (let i = 0; i < 4; i++) {
         if (i === 2) {
-          throw new Error("OUPS");
+          throw new Error(`ERROR DURING STREAM ${i}`);
         }
         stream.emit(`EMMITED VALUE: ${i + 1}/4`);
         // console.log("EMITTED");
@@ -132,4 +132,18 @@ describe("Stream", () => {
 
     expect(streamResultStub).toHaveBeenCalledTimes(0);
   })
+
+  it.todo('forwards error message, stacktrace and other attributes');
+
+
+  it('forward error when stream errors in middle of stream', async () => {
+    const inst = client.spawn("StreamExample", "1");
+    const stream = await inst.startFaultyStreamDuring();
+
+    const streamResultStub = jest.fn();
+
+    await expect(() => stream.map((value) => { streamResultStub(value) }))
+      .rejects.toThrow("ERROR DURING STREAM 2");
+
+  });
 });

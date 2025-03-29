@@ -26,7 +26,7 @@ export interface ScheduleByType {
 }
 
 type CommonScheduleConfig = {
-	name?: string;
+	id?: string;
 };
 
 export type ScheduleConfig = CommonScheduleConfig & (Cron | Delay);
@@ -201,6 +201,7 @@ export interface ScheduleContext {
 }
 
 export interface ScheduledCallMetaData {
+
 	start_at: number;
 	ended_at: number;
 	response: {
@@ -224,7 +225,14 @@ export abstract class AdapterEventScheduler extends BaseAdapter {
 	): Promise<any>;
 
 	/* Retrieve Schedule Results */
-	abstract get<Data extends ScheduledCallMetaData>(
+	abstract get<Data extends ScheduleEventMetadata>(
+		kind: InstanceKind,
+		id: InstanceId,
+		scheduleId: ScheduleId,
+		last?: number,
+	): Promise<Data>;
+
+	abstract runs<Data extends ScheduledCallMetaData>(
 		kind: InstanceKind,
 		id: InstanceId,
 		scheduleId: ScheduleId,

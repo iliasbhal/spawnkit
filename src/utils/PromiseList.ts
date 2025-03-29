@@ -16,10 +16,12 @@ export class PromiseList extends ControlledPromise<unknown> {
 		return promiseCtl;
 	}
 
-	addWait(timeout: number, name: string) {
-		const timeoutPromise = new Promise((r) => setTimeout(r, timeout));
-		Object.assign(timeoutPromise, { name });
-		this.add(timeoutPromise);
+	addWait(timeout: number, name?: string) {
+		const promiseCtl = this.addControlled(name);
+
+		setTimeout(() => { promiseCtl.resolve(true) }, timeout);
+
+		return promiseCtl;
 	}
 
 	clear() {
