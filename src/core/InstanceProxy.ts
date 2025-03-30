@@ -62,7 +62,7 @@ export interface InterfaceAPI<Inst extends Instance<any, any>> {
 	id: string;
 	kind: string;
 	data: Data<Record<string, any>>;
-	utils: InstanceUtils<Inst>;
+	utils: InstanceUtils<InstanceProxy<Inst>>;
 	logger: Logger;
 	emit: Emit<Inst['__types']['InstanceChannels']>;
 	client: Client<any>;
@@ -90,7 +90,7 @@ export class InstanceProxy<Inst extends Instance> {
 
 	public data: Data<Record<string, any>>;
 
-	private utils: InstanceUtils<Inst>;
+	private utils: InstanceUtils<InstanceProxy<Inst>>;
 
 	constructor(config: {
 		indenfier: InstanceIdentifier;
@@ -169,6 +169,8 @@ export class InstanceProxy<Inst extends Instance> {
 		const [error, response] = await Promise.resolve()
 			.then(async () => {
 				this.healthCheckEmitter.assertNotStalled(event);
+
+				this
 
 				const method = this.createMethodForRequest(event);
 				const methodExists = typeof method == "function";

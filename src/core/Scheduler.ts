@@ -1,14 +1,22 @@
+import { nanoid } from "nanoid";
 import { wait } from "../utils/wait";
 import { Lock } from "./Lock";
 import { InstanceId, InstanceIdentifier, InstanceKind, ScheduleByType, ScheduleContext } from "../adapters";
 import type { Client, SpawnkitConfig } from "./Client";
 import { InstanceProxy } from "./InstanceProxy";
-import { nanoid } from "nanoid";
+import { EventBus } from "../utils/EventBus";
+
+interface SchedulerEvents {
+	'instance-error': Error;
+}
+
 
 export class Scheduler<O extends SpawnkitConfig> {
 	instances: O["instances"];
 	adapters: O["adapters"];
 	client: Client<O>;
+
+	eventBus = new EventBus<SchedulerEvents>();
 
 	constructor(config: O, client: Client<any>) {
 		this.instances = config.instances;
@@ -22,10 +30,14 @@ export class Scheduler<O extends SpawnkitConfig> {
 		this.startInstanceScheduler();
 	}
 
+	get on() {
+		return this.eventBus.on;
+	}
+
 	startEventScheduler() {
 		this.subscriptions.add(
 			this.adapters.events.subscribe(async (data, context) => {
-				return await this.handleScheduledInstanceMethodCall(data, context);
+				await this.handleScheduledInstanceMethodCall(data, context);
 			})
 		);
 	}
@@ -221,8 +233,10 @@ export class Scheduler<O extends SpawnkitConfig> {
 			// that should be handled by the client.
 			// err instanceof Lock.ExtendError || 
 			if (!shouldSilenceError) {
+				this.eventBus.emit('instance-error', err);
 				throw err;
 			}
+
 		} finally {
 			this.unregisterInstanceByOwnerId(exeuctionId);
 		}

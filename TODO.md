@@ -1,4 +1,5 @@
 # Spawkit Plugins
+
 - make it possible to load load hooks in parallel. Each plugin has a uuid generated on fly. And you can place yourself into the pipeline? I don't know, but we should figure out a way to make initializing plugins more parrallel.
 
 - KV: Complete plugin using: 
@@ -8,20 +9,14 @@
 - add hooks for method call middlware like trpc of fastify.
 
 - Redis plugin. We should expose kv plugin will all the redis command. it should have the same api as redisio.
-<!-- - Warm Plugin, implement a mechanism where the instance is conctantly kept awake. 
-     ( maybe create an general instance, that is constantly kept awake using a cron ).
-     ( and that constantly send requests to instances with a WARM plugin ). -->
 
 # Spawnkit lib
 
 - expose things that are happening on the client. instance starting, disposing, initializing, errors etc.
 
 - Add ability to list using some queries. ( first X, lastX, between2 dates );
- 
-- Add ability provide access to a local redis to each instance. we'll remove client.data and instance.data and replace them with .redis.
-Also add access to .files to instances and client.
 
-- Move client validation within .spawn and check if process.env === 'developement'
+- Move instance validation within .spawn.
 
 - Start writing documentation / recipes.
 

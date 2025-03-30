@@ -1,13 +1,13 @@
 import { Instance } from '../core/Instance';
 
 export class InstancePlugin {
-  instance: Instance<any, any, any>
+  instance: Instance
 
   constructor() { }
 
   setup() { }
 
-  inject(instance: Instance<any, any, any>) {
+  inject(instance: Instance) {
     this.instance = instance
   }
 }
