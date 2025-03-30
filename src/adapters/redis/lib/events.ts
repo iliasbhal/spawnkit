@@ -12,11 +12,6 @@ export class EventScheduler extends BaseQueue implements Adapters.AdapterEventSc
 		this.queue = this.createQueue("events");
 	}
 
-	private getBullJobId(job: BullMQ.Job) {
-		const scheduleId = job.repeatJobKey || job.id;
-		return scheduleId!;
-	}
-
 	subscribe(callback: (event: Adapters.ScheduleEventConfig, context: { scheduleId: string }) => any) {
 		const worker = this.createWorker<Adapters.ScheduleEventConfig>(this.queue, async (job) => {
 			const [kind, id, scheduleId] = job.name.split(':').slice(1);
@@ -33,7 +28,7 @@ export class EventScheduler extends BaseQueue implements Adapters.AdapterEventSc
 			await callback(data.config, context);
 		});
 
-		worker.run();
+		// worker.run();
 		return {
 			unsubscribe() {
 				return worker.close();
@@ -56,64 +51,40 @@ export class EventScheduler extends BaseQueue implements Adapters.AdapterEventSc
 		return true;
 	}
 
+	getBullJobIdFor(kind: Adapters.InstanceKind, id: Adapters.InstanceId, scheduleId: Adapters.ScheduleId) {
+		return `event:${kind}:${id}:${scheduleId}` as const;
+	}
+
 	async schedule(config: Adapters.ScheduleEventConfig) {
 		if (!config.schedule.id) {
 			config.schedule.id = nanoid();
 		}
 
 		const scheduleId = config.schedule.id;
-		const jobName = `event:${config.instance.kind}:${config.instance.id}:${scheduleId}` as const;
+		const globalScheduleId = this.getBullJobIdFor(config.instance.kind, config.instance.id, scheduleId);
 
 		const bullJobConfig: BullMQ.JobsOptions =
-			"delay" in config.schedule ? { delay: config.schedule.delay, jobId: scheduleId, }
-				: "cron" in config.schedule ? { repeat: { pattern: config.schedule.cron }, repeatJobKey: scheduleId, }
+			"delay" in config.schedule ? { delay: config.schedule.delay, jobId: globalScheduleId, }
+				: "cron" in config.schedule ? { repeat: { pattern: config.schedule.cron }, repeatJobKey: globalScheduleId, }
 					: null;
 
 		if (!bullJobConfig) {
 			throw new Error("Schedule type not implemented");
 		}
 
-		const job = await this.queue.add(jobName, null, bullJobConfig);
-		const bullJobKey = this.getBullJobId(job);
-		if (!bullJobKey) {
-			throw new Error("Uh Oh!");
-		}
+		await this.queue.add(globalScheduleId, null, bullJobConfig);
 
-		await Promise.all([
-			this.register(scheduleId, Object.assign({}, config, {
-				_bullJobKey: bullJobKey,
-			})),
-		])
+		await this.register(scheduleId, config);
 
 		return scheduleId;
 	}
 
 	private async remove(kind: Adapters.InstanceKind, id: Adapters.InstanceId, scheduleId: string) {
+		const globalScheduleId = this.getBullJobIdFor(kind, id, scheduleId);
 
-
-		// const metaData: Adapters.ScheduleEventMetadata = {
-		// 	config,
-		// 	scheduleId: scheduleId,
-		// 	created_at: Date.now(),
-		// 	canceled: false,
-		// };
-		// const redisKey = `spawnkit:scheduled:${kind}:${id}:index`;
-		// const scheduleDataRaw = await this.redis.hget(redisKey, scheduleId);
-		// const scheduleData = await Serde.deserialize<Adapters.ScheduleEventMetadata>(scheduleDataRaw);
-
-		// // _bullJobKey is not typed as it's not part of the ScheduleEventMetadata
-		// // we use it only within the adapter to track the bull job
-		// // it's not exposed outside of the adapter
-		// // @ts-expect-error 
-		// const bullJobKey = scheduleData.config._bullJobKey;
-		// if (!bullJobKey) {
-		// 	throw new Error("Uh Oh!");
-		// }
-
-		// const jobIdOrScheduleKey = this.
 		await Promise.all([
-			this.queue.removeRepeatableByKey(scheduleId),
-			this.queue.remove(scheduleId),
+			this.queue.removeRepeatableByKey(globalScheduleId),
+			this.queue.remove(globalScheduleId),
 		]);
 	}
 

@@ -6,8 +6,8 @@ import { Instance } from "../../core/Instance";
 interface WarmerConfig {
   id?: string;
 
-  stayAliveFor: number;
-  cron: string;
+  stayAliveFor?: number;
+  cron?: string;
 }
 
 export class Warmer extends InstancePlugin {
@@ -17,25 +17,37 @@ export class Warmer extends InstancePlugin {
   constructor(config: WarmerConfig) {
     super();
     this.config = config;
+
+    this.config.id = this.config.id ?? `warmer-default`;
   }
 
   setup() {
     this.instance.hooks.initialize.push(async () => {
-      await this.ensureSchedule();
+      await this.tryScheduleWarmer();
     });
   }
 
-  async ensureSchedule() {
+  async setConfig(config: WarmerConfig) {
+    this.config = Object.assign(this.config, config);
+    await this.tryScheduleWarmer();
+  }
+
+  async tryScheduleWarmer() {
+    if (!this.config.cron || !this.config.stayAliveFor) {
+      return;
+    }
+
     const client = this.instance.api.client;
     const { kind, id } = this.instance;
     const inst = client.createInstanceClient<Instance>(kind, id, {});
 
 
-    const scheduleId = this.config.id ?? `warmer-default`;
+    const scheduleId = this.config.id;
     const scheduledCron = await inst.scheduled.get(scheduleId);
     const hasWarmerAlreadyScheduled = !!scheduledCron;
     if (hasWarmerAlreadyScheduled) return;
 
-    inst.schedule({ cron: this.config.cron, id: scheduleId })[`utils.stayLiveFor`](this.config.stayAliveFor);
+    await inst.scheduled.delete(scheduleId);
+    await inst.schedule({ cron: this.config.cron, id: scheduleId })[`utils.stayLiveFor`](this.config.stayAliveFor);
   }
 }

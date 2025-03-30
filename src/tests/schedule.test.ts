@@ -178,7 +178,21 @@ describe("Schedule", () => {
 
     await inst.schedule({ id: 'test', delay: 300 }).hello();
     const scheduled2 = await inst.scheduled.get('test');
-    expect(scheduled2).toMatchObject({});
+    expect(scheduled2).toMatchObject({
+      config: {
+        event: {
+          action: 'hello',
+          args: [],
+        },
+        schedule: {
+          delay: 300,
+          id: 'test',
+        },
+      },
+    });
+
+    // Cancel the scheduled event 
+    await inst.scheduled.cancel('test');
   })
 
   it("should override scheduled event using same id but different config", async () => {
@@ -217,4 +231,28 @@ describe("Schedule", () => {
     expect(helloStub).toHaveBeenCalledTimes(1);
     expect(doSomethingStub).toHaveBeenCalledTimes(0);
   });
+
+  it('can schedule an event for later without providing an id', async () => {
+    const inst = client.spawn("ScheduleExample", uuidv4());
+    const scheduleId = await inst.schedule({ delay: 300 }).hello();
+    const scheduleId2 = await inst.schedule({ delay: 300 }).hello();
+
+    expect(scheduleId).not.toEqual(scheduleId2);
+    expect(typeof scheduleId).toBe('string');
+    expect(typeof scheduleId2).toBe('string');
+  })
+
+  it('can schedule an event with the same id on different instances', async () => {
+    // schedule Ids should be unique per instance, not globally
+    const inst = client.spawn("ScheduleExample", uuidv4());
+    const inst2 = client.spawn("ScheduleExample", uuidv4());
+    const scheduleId = await inst.schedule({ id: 'test', delay: 300 }).doSomething('1');
+    const scheduleId2 = await inst2.schedule({ id: 'test', delay: 300 }).doSomething('2');
+    inst.scheduled.cancel(scheduleId);
+
+    await wait(1000);
+
+    expect(doSomethingStub).toHaveBeenCalledTimes(1);
+    expect(doSomethingStub).toHaveBeenCalledWith('2');
+  })
 });
