@@ -4,7 +4,10 @@ import { Instance } from "../../core/Instance";
 
 
 interface WarmerConfig {
-  id?: string
+  id?: string;
+
+  stayAliveFor: number;
+  cron: string;
 }
 
 export class Warmer extends InstancePlugin {
@@ -33,8 +36,6 @@ export class Warmer extends InstancePlugin {
     const hasWarmerAlreadyScheduled = !!scheduledCron;
     if (hasWarmerAlreadyScheduled) return;
 
-    const STAY_ALIVE_FOR_45_MINUTES = 1000 * 60 * 45;
-    const EVERY_30_MINUTES = '*/30 * * * *';
-    inst.schedule({ cron: EVERY_30_MINUTES, id: scheduleId })[`utils.stayLiveFor`](STAY_ALIVE_FOR_45_MINUTES);
+    inst.schedule({ cron: this.config.cron, id: scheduleId })[`utils.stayLiveFor`](this.config.stayAliveFor);
   }
 }
