@@ -1,5 +1,5 @@
 import { Instance } from "@/core";
-import { InstancePlugin } from "../_common";
+import { InstancePlugin } from "../InstancePlugin";
 
 export class Scheduler<Inst extends Instance> extends InstancePlugin {
   getInstanceClient() {

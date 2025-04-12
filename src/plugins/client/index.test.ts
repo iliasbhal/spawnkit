@@ -1,13 +1,13 @@
 import * as Spawnkit from "../..";
-import { Client } from ".";
-import { baseRedisAdapters } from "../../adapters/redis/base";
 import { nanoid } from 'nanoid';
 
 describe('ClientExample', () => {
   class ClientExample extends Spawnkit.Instance {
-    client = new Client<typeof instances>();
+    client = new Spawnkit.Plugins.Client<typeof instances>();
 
     sendMessageToAnotherInstance() {
+
+      // console.log('this.client', this.client.spawn)
       const another = this.client.spawn('PingPong', `test-${nanoid()}`)
 
       return another.ping()
@@ -26,7 +26,7 @@ describe('ClientExample', () => {
   };
 
   const client = Spawnkit.Client.from({
-    adapters: baseRedisAdapters,
+    adapter: new Spawnkit.Adapters.InMemoryAdapter(),
     instances: instances,
   });
 

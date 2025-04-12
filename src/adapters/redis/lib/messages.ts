@@ -1,5 +1,5 @@
 import { nanoid } from "nanoid";
-import * as Adapters from "../../index";
+import * as Adapters from "../../_common";
 import { RedisAdapter, Serde } from "./_base";
 import { BackoffController } from "@/utils/BackoffContoller";
 

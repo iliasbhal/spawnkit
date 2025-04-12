@@ -1,10 +1,10 @@
-import { InstancePlugin } from "../_common";
+import { InstancePlugin } from "../InstancePlugin";
 import { Client as ClientCore, Instances } from "../../core/Client";
 
 export class Client<C extends Instances> extends InstancePlugin {
   get client() {
     return this.instance.api.client as ClientCore<{
-      adapters: any,
+      adapter: any,
       instances: C
     }>
   }
@@ -16,7 +16,7 @@ export class Client<C extends Instances> extends InstancePlugin {
   }
 
   get spawn() {
-    return this.client.spawn
+    return this.client.spawn.bind(this.client);
   }
 }
 

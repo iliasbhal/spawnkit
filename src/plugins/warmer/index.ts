@@ -1,4 +1,4 @@
-import { InstancePlugin } from "../_common";
+import { InstancePlugin } from "../InstancePlugin";
 import { Scheduler } from "../scheduler";
 import { Instance } from "../../core/Instance";
 

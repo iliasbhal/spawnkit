@@ -10,13 +10,13 @@ describe("Errors", () => {
     }
 
     on(event, callback) {
-      console.log('EVENT', event)
+      // console.log('EVENT', event)
     }
 
     async dispose() {
-      console.log('DISPOSE STARTED')
+      // console.log('DISPOSE STARTED')
       await wait(1000);
-      console.log('WHILE ---- DISPOSE ErrorInitExample')
+      // console.log('WHILE ---- DISPOSE ErrorInitExample')
       // throw new Error("BAD BAD DISPOSE");
     }
 
@@ -26,7 +26,7 @@ describe("Errors", () => {
   }
 
   const client = Spawnkit.Client.from({
-    adapters: testRedisAdapters,
+    adapter: testRedisAdapters,
     instances: {
       ErrorInitExample,
     },

@@ -35,7 +35,7 @@ describe("Schedule", () => {
   }
 
   const client = Spawnkit.Client.from({
-    adapters: testRedisAdapters,
+    adapter: testRedisAdapters,
     instances: {
       ScheduleExample,
     },

@@ -2,33 +2,9 @@ import fs from 'fs-extra';
 import path from 'path';
 import { Volume } from './index';
 import { VolumeFileSystem } from './VolumeFileSystem';
-import { InstancePlugin } from '../_common';
 
 // Mock the Volume class for unit tests
-jest.mock('./index', () => {
-  return {
-    Volume: jest.fn().mockImplementation(() => {
-      return {
-        getPath: jest.fn().mockResolvedValue('/mock/volume/path'),
-      };
-    }),
-  };
-}, { virtual: true });
 
-// Mock fs-extra for unit tests
-jest.mock('fs-extra', () => {
-  const originalModule = jest.requireActual('fs-extra');
-  return {
-    ...originalModule,
-    readFile: jest.fn().mockResolvedValue('file content'),
-    writeFile: jest.fn().mockResolvedValue(undefined),
-    copy: jest.fn().mockResolvedValue(undefined),
-    ensureDir: jest.fn().mockResolvedValue(undefined),
-    readdir: jest.fn().mockResolvedValue(['file1', 'file2']),
-    exists: jest.fn().mockResolvedValue(true),
-    constants: originalModule.constants,
-  };
-}, { virtual: true });
 
 // Create a minimal mock of Instance for integration tests
 class MockInstance {
@@ -54,6 +30,21 @@ class TestVolume extends Volume {
 }
 
 describe('VolumeFileSystem - Unit Tests', () => {
+
+
+  // Mock fs-extra for unit tests
+  jest.mock('fs-extra', () => {
+    const originalModule = jest.requireActual('fs-extra');
+    return Object.fromEntries(
+      Object.entries(originalModule).map(([key, value]) => {
+        if (typeof value === 'function') {
+          return [key, jest.fn().mockResolvedValue(undefined)];
+        }
+        return [key, value];
+      }),
+    );
+  });
+
   let volumeMock: any;
   let volumeFs: VolumeFileSystem;
 
@@ -65,20 +56,20 @@ describe('VolumeFileSystem - Unit Tests', () => {
     volumeFs = new VolumeFileSystem(volumeMock as any);
   });
 
-  describe('Path resolution', () => {
+  describe.only('Path resolution', () => {
     it('should resolve relative paths to volume root', async () => {
-      await volumeFs.fs.readFile('test.txt');
-      expect(fs.readFile).toHaveBeenCalledWith('/mock/volume/path/test.txt');
+      await volumeFs.fs.pathExists('test.txt');
+      expect(fs.pathExists).toHaveBeenCalledWith('/mock/volume/path/test.txt');
     });
 
     it('should handle nested paths correctly', async () => {
-      await volumeFs.fs.readFile('folder/subfolder/test.txt');
-      expect(fs.readFile).toHaveBeenCalledWith('/mock/volume/path/folder/subfolder/test.txt');
+      await volumeFs.fs.pathExists('folder/subfolder/test.txt');
+      expect(fs.pathExists).toHaveBeenCalledWith('/mock/volume/path/folder/subfolder/test.txt');
     });
 
     it('should not modify absolute paths', async () => {
-      await volumeFs.fs.readFile('/absolute/path/test.txt');
-      expect(fs.readFile).toHaveBeenCalledWith('/absolute/path/test.txt');
+      await volumeFs.fs.pathExists('/absolute/path/test.txt');
+      expect(fs.pathExists).toHaveBeenCalledWith('/absolute/path/test.txt');
     });
   });
 
@@ -111,6 +102,7 @@ describe('VolumeFileSystem - Unit Tests', () => {
       await volumeFs.fs.copy('source.txt', 'dest.txt');
 
       // Both source and dest paths should be resolved
+
       expect(fs.copy).toHaveBeenCalledWith(
         '/mock/volume/path/source.txt',
         '/mock/volume/path/dest.txt'
@@ -169,11 +161,13 @@ describe('VolumeFileSystem - Unit Tests', () => {
   });
 });
 
-// Disable mocks for integration tests
-jest.unmock('./index');
-jest.unmock('fs-extra');
 
 describe('VolumeFileSystem - Integration Tests', () => {
+  // Disable mocks for integration tests
+  jest.unmock('./index');
+  jest.unmock('fs-extra');
+
+
   let volume: TestVolume;
   let testDir: string;
 

@@ -12,8 +12,6 @@
 
 # Spawnkit lib
 
-- expose things that are happening on the client. instance starting, disposing, initializing, errors etc.
-
 - Add ability to list using some queries. ( first X, lastX, between2 dates );
 
 - Move instance validation within .spawn.

@@ -1,14 +1,13 @@
-import fs, { ensureFile } from 'fs-extra';
+import fs from 'fs-extra';
 import path from 'path';
 
-import * as Spawnkit from "../../../src";
-import { MockVolume } from "./mock";
-import { baseRedisAdapters } from "../../../src/adapters/redis/base";
+import * as Spawnkit from "../..";
+import { LocalVolume } from "./LocalVolume";
 import { nanoid } from 'nanoid';
 
 export class VolumeExample extends Spawnkit.Instance {
 
-  volume = new MockVolume({
+  volume = new LocalVolume({
     name: 'test',
   });
 
@@ -29,14 +28,14 @@ export class VolumeExample extends Spawnkit.Instance {
 }
 
 const client = Spawnkit.Client.from({
-  adapters: baseRedisAdapters,
+  adapter: new Spawnkit.Adapters.InMemoryAdapter(),
   instances: {
     VolumeExample,
   },
 });
 
 
-describe('MockVolume', () => {
+describe('LocalVolume', () => {
   client.start();
 
   it('should be able to download and upload', async () => {
@@ -47,7 +46,7 @@ describe('MockVolume', () => {
     expect(filePath).toContain(uuid);
 
     const files = await volume.listFiles();
-    console.log('files', files);
+    // console.log('files', files);
     expect(files).toBeDefined();
     expect(files.length).toBeGreaterThan(0);
     expect(files.includes(filePath)).toBe(true);

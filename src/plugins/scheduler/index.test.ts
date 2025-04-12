@@ -1,6 +1,5 @@
 import * as Spawnkit from "../../../src";
 import { Scheduler } from ".";
-import { baseRedisAdapters } from "../../../src/adapters/redis/base";
 import { nanoid } from 'nanoid';
 
 describe('SchedulerExample', () => {
@@ -18,7 +17,7 @@ describe('SchedulerExample', () => {
   }
 
   const client = Spawnkit.Client.from({
-    adapters: baseRedisAdapters,
+    adapter: new Spawnkit.Adapters.InMemoryAdapter(),
     instances: {
       SchedulerExample,
     },

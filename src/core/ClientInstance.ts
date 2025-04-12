@@ -29,18 +29,18 @@
 //     this.instance = instance;
 
 //     this.data = new ClientData<InstanceData>({
-//       adapters: this.client.adapters,
+//       adapter: this.client.adapters,
 //       instance: this.instance,
 //     });
 //   }
 
 //   data = new ClientData<InstanceData>({
-//     adapters: this.client.adapters,
+//     adapter: this.client.adapters,
 //     instance: this.instance,
 //   })
 
 //   createHealthChecker(inst: { kind: string, id: string }) {
-//     const healthCheck = new HealthCheckListener(this.adapters, inst);
+//     const healthCheck = new HealthCheckListener(this.adapter, inst);
 //     setTimeout(() => {
 //       healthCheck.start();
 //     });
@@ -118,7 +118,7 @@
 //     };
 
 //     const data = new ClientData<InstanceData>({
-//       adapters: this.adapters,
+//       adapter: this.adapter,
 //       instance: instanceIdentifier,
 //     });
 

@@ -1,4 +1,4 @@
-import { Adapters, InstanceMethodCall } from "@/adapters";
+import { Adapters, InstanceMethodCall } from "@/adapters/_common";
 import { ControlledInterval } from "@/utils/ControlledInterval";
 import { EventListener } from "@/utils/EventListenener";
 import { ControlledTimeout } from "@/utils/ControlledTimeout";
@@ -20,15 +20,15 @@ export interface HealthCheckEmitterChannels {
 export class HealthCheckEmitter {
 	eventListener = new EventListener<HealthCheckEmitterChannels>();
 
-	adapters: Adapters;
+	adapter: Adapters;
 	instance: { kind: string; id: string };
 
 	static getChannelForHealthSignal() {
 		return `broadcast:__INTERNAL__:health` as const;
 	}
 
-	constructor(adapters: Adapters, instance: { kind: string; id: string }) {
-		this.adapters = adapters;
+	constructor(adapter: Adapters, instance: { kind: string; id: string }) {
+		this.adapter = adapter;
 		this.instance = instance;
 	}
 
@@ -51,7 +51,7 @@ export class HealthCheckEmitter {
 			execute: async (count) => {
 				this.stalled.restart();
 
-				await this.adapters.messages.publish<HealthCheckMessage>(
+				await this.adapter.messages.publish<HealthCheckMessage>(
 					this.instance,
 					HealthCheckEmitter.getChannelForHealthSignal(),
 					true,
@@ -83,11 +83,11 @@ interface HealthCheckListenerChannels {
 export class HealthCheckListener {
 	eventListener = new EventListener<HealthCheckListenerChannels>();
 
-	adapters: Adapters;
+	adapter: Adapters;
 	instance: { kind: string; id: string };
 
-	constructor(adapters: Adapters, instance: { kind: string; id: string }) {
-		this.adapters = adapters;
+	constructor(adapter: Adapters, instance: { kind: string; id: string }) {
+		this.adapter = adapter;
 		this.instance = instance;
 	}
 
@@ -97,7 +97,7 @@ export class HealthCheckListener {
 		if (this.disposed) return;
 
 		this.createAbortInterval();
-		this.currentSubscription = this.adapters.messages.subscribe<HealthCheckMessage>(
+		this.currentSubscription = this.adapter.messages.subscribe<HealthCheckMessage>(
 			this.instance,
 			HealthCheckEmitter.getChannelForHealthSignal(),
 			(message) => this.reset(),

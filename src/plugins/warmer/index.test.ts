@@ -1,6 +1,5 @@
 import * as Spawnkit from "../..";
 import { Warmer } from "./";
-import { baseRedisAdapters } from "../../adapters/redis/base";
 import { nanoid } from 'nanoid';
 
 describe('WarmerExample', () => {
@@ -11,10 +10,17 @@ describe('WarmerExample', () => {
       cron: '*/30 * * * *',
       stayAliveFor: 1000 * 60 * 45,
     });
+
+    initialize(): void {
+      this.warmer.setConfig({
+        cron: '*/30 * * * *',
+        stayAliveFor: 1000 * 60 * 45,
+      });
+    }
   }
 
   const client = Spawnkit.Client.from({
-    adapters: baseRedisAdapters,
+    adapter: new Spawnkit.Adapters.InMemoryAdapter(),
     instances: {
       WarmerExample,
     },

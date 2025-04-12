@@ -8,15 +8,10 @@ import {
 	Adapters,
 	ScheduleId,
 	ScheduleConfig,
-	Cron,
-	Delay,
 	InstanceId,
 	EventId,
 	InstanceMethodCall,
-
-	BaseAdapter,
-	InstanceIdentifier,
-} from "../adapters";
+} from "../adapters/_common";
 // import { ClientData } from "./Data";
 import { HealthCheckEmitter, HealthCheckListener, InstanceStalledError } from "./HealthCheck";
 import { Scheduler } from "./Scheduler";
@@ -30,7 +25,7 @@ export interface Instances {
 }
 
 export interface SpawnkitConfig {
-	adapters: Adapters;
+	adapter: Adapters;
 	instances: Instances;
 	config?: {
 		throwOnStalledInstance?: boolean;
@@ -52,7 +47,7 @@ interface InstType<Config extends SpawnkitConfig, Kind extends keyof Config['ins
 }
 
 export class Client<CP extends SpawnkitConfig> {
-	private adapters!: CP["adapters"];
+	private adapter!: CP["adapter"];
 	private config: ReturnType<typeof Client.createConfig<CP['config']>>;
 	instances!: CP["instances"];
 
@@ -71,7 +66,7 @@ export class Client<CP extends SpawnkitConfig> {
 	}
 
 	constructor(opts: CP) {
-		this.adapters = opts.adapters;
+		this.adapter = opts.adapter;
 		this.instances = opts.instances;
 
 		this.scheduler = Scheduler.from(opts, this);
@@ -107,7 +102,7 @@ export class Client<CP extends SpawnkitConfig> {
 	clientHealthCheck: HealthCheckEmitter;
 
 	public start() {
-		this.clientHealthCheck = new HealthCheckEmitter(this.adapters, {
+		this.clientHealthCheck = new HealthCheckEmitter(this.adapter, {
 			kind: "__internal__client",
 			id: this.id,
 		});
@@ -130,7 +125,7 @@ export class Client<CP extends SpawnkitConfig> {
 	}
 
 	createHealthChecker(inst: { kind: string, id: string }) {
-		const healthCheck = new HealthCheckListener(this.adapters, inst);
+		const healthCheck = new HealthCheckListener(this.adapter, inst);
 		setTimeout(() => {
 			healthCheck.start();
 		});
@@ -151,7 +146,7 @@ export class Client<CP extends SpawnkitConfig> {
 				// when sending an event, we shall always try to spawn an instance
 				// to ensure that the event will be processed
 				this.scheduler.tryWakeInstanceUp(kind, instanceId),
-				this.adapters.messages.publish(instanceIdentifier, `rpc`, methodCallConfig),
+				this.adapter.messages.publish(instanceIdentifier, `rpc`, methodCallConfig),
 			]);
 
 			return eventId;
@@ -165,7 +160,7 @@ export class Client<CP extends SpawnkitConfig> {
 						if (typeof prop !== "string") return;
 
 						return async (...args: any[]) => {
-							const scheduleId = await this.adapters.events.schedule({
+							const scheduleId = await this.adapter.events.schedule({
 								schedule: schedule,
 								instance: {
 									id: instanceId,
@@ -206,7 +201,7 @@ export class Client<CP extends SpawnkitConfig> {
 			const channelId = Client.getChannelForEventBus("instance", channel.toString())
 			const callbackEmitter = instantEventListener.on(channel, callback);
 
-			const subscribe = this.adapters.messages.subscribe<Message>(
+			const subscribe = this.adapter.messages.subscribe<Message>(
 				instanceIdentifier,
 				channelId,
 				(message) => {
@@ -234,7 +229,7 @@ export class Client<CP extends SpawnkitConfig> {
 		) => {
 			const channelID = Client.getChannelForEventBus("internal", channel);
 			const callbackEmitter = internalEventListener.on(channel, callback);
-			const subscribe = this.adapters.messages.subscribe<Message>(
+			const subscribe = this.adapter.messages.subscribe<Message>(
 				instanceIdentifier,
 				channelID,
 				(message) => {
@@ -327,7 +322,7 @@ export class Client<CP extends SpawnkitConfig> {
 							};
 
 							const channel = Client.getChannelForEventResponse(eventId);
-							scope.response = this.adapters.messages.subscribe<InternalMessageData>(
+							scope.response = this.adapter.messages.subscribe<InternalMessageData>(
 								instanceIdentifier,
 								channel,
 								(message) => {
@@ -428,19 +423,19 @@ export class Client<CP extends SpawnkitConfig> {
 			schedule: scheduleRemoteMethodHandler,
 			scheduled: {
 				list: async () => {
-					return this.adapters.events.list(kind, instanceId);
+					return this.adapter.events.list(kind, instanceId);
 				},
 				cancel: async (scheduleId: ScheduleId) => {
-					return this.adapters.events.cancel(kind, instanceId, scheduleId);
+					return this.adapter.events.cancel(kind, instanceId, scheduleId);
 				},
 				delete: async (scheduleId: ScheduleId) => {
-					return this.adapters.events.delete(kind, instanceId, scheduleId);
+					return this.adapter.events.delete(kind, instanceId, scheduleId);
 				},
 				get: async (scheduleId: ScheduleId) => {
-					return this.adapters.events.get(kind, instanceId, scheduleId);
+					return this.adapter.events.get(kind, instanceId, scheduleId);
 				},
 				runs: async (scheduleId: ScheduleId) => {
-					return this.adapters.events.runs(kind, instanceId, scheduleId);
+					return this.adapter.events.runs(kind, instanceId, scheduleId);
 				}
 			},
 		} as const;

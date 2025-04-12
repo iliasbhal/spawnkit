@@ -1,8 +1,8 @@
 import { RedisMemoryServer } from "redis-memory-server";
 import { Redis } from "ioredis";
-import * as RedisAdapters from "./";
-import { Adapters } from "../";
 import { generateTestSuite } from "../generateTestSuite";
+import * as Spawnkit from '../../index';
+
 
 generateTestSuite("Redis Adapter / Core", createAdapterFactory);
 
@@ -21,16 +21,8 @@ function createAdapterFactory() {
 			port: await redisServer.getPort(),
 		});
 
-		const adapters: Adapters = {
-			lock: new RedisAdapters.Lock(redisClient),
-			data: new RedisAdapters.Data(redisClient),
-			messages: new RedisAdapters.MessageBroker(redisClient),
-			instances: new RedisAdapters.InstanceScheduler(redisClient),
-			events: new RedisAdapters.EventScheduler(redisClient),
-			logger: new RedisAdapters.Logger(redisClient),
-		};
-
-		return adapters;
+		const adapter = new Spawnkit.Adapters.RedisAdapter(redisClient);
+		return adapter;
 	});
 
 	return async () => {

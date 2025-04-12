@@ -1,4 +1,4 @@
-import { InstancePlugin } from '../_common'
+import { InstancePlugin } from '../InstancePlugin'
 import path from 'path'
 import fs from 'fs-extra'
 import { VolumeFileSystem } from './VolumeFileSystem';

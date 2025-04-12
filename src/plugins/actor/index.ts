@@ -1,8 +1,8 @@
 import * as x from "xstate";
 import { ControlledPromise } from "@/utils/ControlledPromise";
-import { InstancePlugin } from "../_common";
+import { InstancePlugin } from "../InstancePlugin";
 import { Volume } from '../volume';
-import { MockVolume } from '../volume/mock';
+import { MockVolume } from '../volume/LocalVolume';
 import { AsyncQueue } from "@/utils/AsyncQueue";
 
 type MachineEvent<M extends x.AnyStateMachine> = Parameters<

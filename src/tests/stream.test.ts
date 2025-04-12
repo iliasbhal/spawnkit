@@ -35,7 +35,7 @@ export class StreamExample extends Spawnkit.Instance {
 
 describe("Stream", () => {
   const client = Spawnkit.Client.from({
-    adapters: testRedisAdapters,
+    adapter: testRedisAdapters,
     instances: {
       StreamExample,
     },

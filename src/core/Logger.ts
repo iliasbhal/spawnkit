@@ -1,17 +1,16 @@
-import { Adapters, InstanceIdentifier, InstanceLog } from "../adapters";
+import { Adapters, InstanceIdentifier, InstanceLog } from "../adapters/_common";
 
 export class Logger {
-	adapters: Adapters;
+	adapter: Adapters;
 	ownerId!: string;
 	instance!: InstanceIdentifier;
 
-	constructor(config: { adapters: Adapters; ownerId: string; instance: InstanceIdentifier }) {
-		this.adapters = config.adapters;
+	constructor(config: { adapter: Adapters; ownerId: string; instance: InstanceIdentifier }) {
 		this.instance = config.instance;
 		this.ownerId = config.ownerId;
 	}
 
 	log(log: InstanceLog) {
-		this.adapters.logger?.log(this.instance, this.ownerId, log);
+		// console.log('log', log);
 	}
 }

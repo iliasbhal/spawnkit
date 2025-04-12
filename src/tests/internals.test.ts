@@ -18,7 +18,7 @@ describe("Utils", () => {
   }
 
   const client = Spawnkit.Client.from({
-    adapters: testRedisAdapters,
+    adapter: testRedisAdapters,
     instances: {
       Example,
     },

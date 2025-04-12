@@ -1,4 +1,4 @@
-import { InstancePlugin } from '../_common'
+import { InstancePlugin } from '../InstancePlugin'
 import { SQLite } from '../sqlite';
 
 // https://www.npmjs.com/package/keyv

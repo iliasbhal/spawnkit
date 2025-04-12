@@ -1,26 +1,17 @@
-import "dotenv/config";
-
-import * as RedisAdapter from '../adapters/redis';
-import Redis from "ioredis-mock";
 import { waitFor } from "poll-until-promise";
 
-export const redis = new Redis({
+import * as Spawnkit from '../';
+import RedisMock from "ioredis-mock";
+
+export const redis = new RedisMock({
   port: parseInt(process.env.REDIS_PORT!),
   host: process.env.REDIS_HOST,
-  maxRetriesPerRequest: 0,
+  maxRetriesPerRequest: null,
   enableAutoPipelining: true,
   showFriendlyErrorStack: true,
 });
 
-export const testRedisAdapters = {
-  lock: new RedisAdapter.Lock(redis),
-  data: new RedisAdapter.Data(redis),
-  messages: new RedisAdapter.MessageBroker(redis),
-  events: new RedisAdapter.EventScheduler(redis),
-  instances: new RedisAdapter.InstanceScheduler(redis),
-  logger: new RedisAdapter.Logger(redis),
-};
-
+export const testRedisAdapters = new Spawnkit.Adapters.RedisAdapter(redis);
 
 export async function waitUntilOK(callback: Function) {
   await waitFor(callback, {

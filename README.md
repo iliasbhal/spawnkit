@@ -87,7 +87,7 @@ class OrderBook extends Spawnkit.Instance {
 
 // Create a client
 const client = Spawnkit.Client.from({
-    adapters: createAdapters(), // Your adapter configuration
+    adapter: createAdapters(), // Your adapter configuration
     instances: {
       OrderBook,
     },

@@ -1,6 +1,6 @@
 import { Redis } from "ioredis";
 import * as BullMQ from "bullmq";
-import * as Adapters from "../../index";
+import * as Adapters from "../../_common";
 import { Serde, BaseQueue } from "./_base";
 import { nanoid } from "nanoid";
 

@@ -1,5 +1,5 @@
 import * as BullMQ from "bullmq";
-import * as Adapters from "../../index";
+import * as Adapters from "../../_common";
 import { BaseQueue } from "./_base";
 
 interface JobData {

@@ -1,6 +1,5 @@
 import * as Spawnkit from "../..";
 import * as x from "xstate";
-import { baseRedisAdapters } from "../../adapters/redis/base";
 
 describe("XState Machine Integration", () => {
 
@@ -33,7 +32,7 @@ describe("XState Machine Integration", () => {
         onSnapshot: (data) => {
           // Store snapshots for verification in tests
           this.snapshotHistory.push(data);
-          console.log(`Snapshot received for actor ${data.actorId}:`, data.snapshot);
+          // console.log(`Snapshot received for actor ${data.actorId}:`, data.snapshot);
         }
       });
 
@@ -52,7 +51,7 @@ describe("XState Machine Integration", () => {
     }
 
     const client = Spawnkit.Client.from({
-      adapters: baseRedisAdapters,
+      adapter: new Spawnkit.Adapters.InMemoryAdapter(),
       instances: {
         ToggleMachine,
       },
@@ -65,12 +64,12 @@ describe("XState Machine Integration", () => {
 
       // Initial state should be TRUE
       let snapshot = await instance.getSnapshot();
-      console.log('snapshot', snapshot);
+      // console.log('snapshot', snapshot);
       expect(snapshot.value).toBe('TRUE');
 
       // After toggle, should be FALSE
       const result = await instance.toggle();
-      console.log("result", result);
+      // console.log("result", result);
       snapshot = await instance.getSnapshot();
       expect(snapshot.value).toBe('FALSE');
 
@@ -216,7 +215,7 @@ describe("XState Machine Integration", () => {
 
     // Set up client
     const client = Spawnkit.Client.from({
-      adapters: baseRedisAdapters,
+      adapter: new Spawnkit.Adapters.InMemoryAdapter(),
       instances: {
         InvokeResolvedMachine,
         InvokeRejectedMachine,

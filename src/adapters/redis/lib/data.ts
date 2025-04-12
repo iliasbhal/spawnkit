@@ -1,4 +1,4 @@
-import * as Adapters from "../../index";
+import * as Adapters from "../../_common";
 import { Serde, RedisAdapter } from "./_base";
 
 export class Data extends RedisAdapter implements Adapters.AdapaterData {

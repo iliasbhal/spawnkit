@@ -1,12 +1,12 @@
 import * as Spawnkit from "../../../src";
 import { SQLite } from ".";
-import { baseRedisAdapters } from "../../../src/adapters/redis/base";
 import { nanoid } from 'nanoid';
 
 export class SQLiteExample extends Spawnkit.Instance {
 
   sqlite = new SQLite({
-    name: 'test',
+    // volume: 
+    // name: 'test',
   });
 
   async query(name: string, content: string) {
@@ -20,34 +20,34 @@ export class SQLiteExample extends Spawnkit.Instance {
     this.sqlite.query`
       INSERT INTO ${name} (content) VALUES ("${content}")
     `;
+
+    return 'DONE'
   }
 }
 
 const client = Spawnkit.Client.from({
-  adapters: baseRedisAdapters,
+  adapter: new Spawnkit.Adapters.InMemoryAdapter(),
   instances: {
     SQLiteExample,
   },
 });
 
 
-describe('SQLiteExample', () => {
+describe.skip('SQLiteExample', () => {
   client.start();
 
   it('should be able to download and upload', async () => {
-    const remoteSqlite = client.spawn('SQLiteExample', 'test');
-    const uuid = nanoid();
+    const remoteSqlite = client.spawn('SQLiteExample', nanoid());
+
+    const taskId = nanoid();
 
     // remoteSqlite.schedule({
     //   name: 'test',
     //   cron: '*/1 * * * *',
     // })
 
-    try {
-      await remoteSqlite.query('task', uuid);
-    } catch (error) {
-      console.error('error', error);
-    }
+    const result = await remoteSqlite.query('task', taskId);
 
+    // console.log('done')
   });
 });

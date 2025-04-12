@@ -11,13 +11,14 @@ import {
 	EventId,
 	ScheduleId,
 	ScheduledCallMetaData,
-} from "../adapters";
+} from "../adapters/_common";
 import { SpawnkitError } from "./Error";
 import { Client } from "./Client";
 import { Data } from "./Data";
 import { Logger } from "./Logger";
 import { RemoteError } from "./RemoteError";
 import { InstanceUtils } from "./InstanceUtils";
+import { InstancePlugin } from "@/plugins/InstancePlugin";
 
 export interface InstanceProps {
 	kind: string;
@@ -85,7 +86,7 @@ export class InstanceProxy<Inst extends Instance> {
 	public aborted = new ControlledPromise("Aborted");
 
 	public indenfier: InstanceIdentifier;
-	public adapters: Adapters;
+	public adapter: Adapters;
 	public client: Client<any>;
 
 	public data: Data<Record<string, any>>;
@@ -94,13 +95,13 @@ export class InstanceProxy<Inst extends Instance> {
 
 	constructor(config: {
 		indenfier: InstanceIdentifier;
-		adapters: Adapters;
+		adapter: Adapters;
 		client: Client<any>;
 		ownerId: string;
 	}) {
 
 		this.indenfier = config.indenfier;
-		this.adapters = config.adapters;
+		this.adapter = config.adapter;
 		this.client = config.client;
 
 		const Instance = this.client.instances[config.indenfier.kind];
@@ -109,13 +110,13 @@ export class InstanceProxy<Inst extends Instance> {
 		}
 
 		this.logger = new Logger({
-			adapters: this.adapters,
+			adapter: this.adapter,
 			ownerId: config.ownerId,
 			instance: config.indenfier,
 		});
 
 		this.data = new Data<Record<string, any>>({
-			adapters: this.adapters,
+			adapter: this.adapter,
 			instance: this.indenfier,
 			logger: this.logger,
 		});
@@ -195,8 +196,11 @@ export class InstanceProxy<Inst extends Instance> {
 		return new Proxy(target, {
 			get: (base, prop, receiver) => {
 				if (prop === "context") {
-
 					return event.context.context;
+				}
+
+				if (typeof base[prop] === "function") {
+					return base[prop].bind(base);
 				}
 
 				return Reflect.get(base, prop, receiver);
@@ -381,12 +385,7 @@ export class InstanceProxy<Inst extends Instance> {
 		try {
 			this.trace({ type: "proxy:initialize:start" });
 
-			await this.instance.setup();
-
-			for (const hook of this.instance.hooks.initialize) {
-				await hook();
-			}
-
+			await this.runInstanceHooks('initialize');
 			await this.instance.initialize?.();
 
 			this.trace({ type: "proxy:initialize:success" });
@@ -408,6 +407,24 @@ export class InstanceProxy<Inst extends Instance> {
 		this.initialized = true;
 	}
 
+	private async runInstanceHooks(hookType: 'initialize' | 'dispose') {
+		const plugins = await InstancePlugin.findPlugins();
+		// console.log('RUN INSTANCE HOOKS', hookType, plugins);
+		const stepsOrder = [
+			...plugins.flatMap(p => p.hooks[hookType]),
+			...this.instance.hooks[hookType]
+		];
+
+		if (hookType === 'dispose') {
+			stepsOrder.reverse();
+		}
+
+		// console.log('stepsOrder', plugins, stepsOrder);
+		for (const hookStep of stepsOrder) {
+			await hookStep();
+		}
+	}
+
 	public async dispose() {
 		if (!this.running) return;
 		this.running = false;
@@ -417,12 +434,10 @@ export class InstanceProxy<Inst extends Instance> {
 		try {
 			this.trace({ type: "proxy:dispose:start" });
 			if (this.initialized) {
-				for (const hook of this.instance.hooks.dispose) {
-					await hook();
-				}
-
+				await this.runInstanceHooks('dispose');
 				await this.instance.dispose?.();
 			}
+
 			this.trace({ type: "proxy:dispose:success" });
 		} catch (err) {
 			this.trace({ type: "proxy:dispose:failed" });
@@ -466,7 +481,7 @@ export class InstanceProxy<Inst extends Instance> {
 
 	public healthCheckEmitter: HealthCheckEmitter | undefined;
 	public continouslyEmitHealthCheckSignal() {
-		this.healthCheckEmitter = new HealthCheckEmitter(this.adapters, this.instance);
+		this.healthCheckEmitter = new HealthCheckEmitter(this.adapter, this.instance);
 		this.healthCheckEmitter.start();
 
 		this.healthCheckEmitter.eventListener.on("stalled", (err) => {
@@ -485,7 +500,7 @@ export class InstanceProxy<Inst extends Instance> {
 		timer.start(NO_EVENT_TIMEOUT);
 
 
-		this.onEventSubscription = this.adapters.messages.subscribe<InstanceMethodCall>(
+		this.onEventSubscription = this.adapter.messages.subscribe<InstanceMethodCall>(
 			this.instance,
 			"rpc",
 			async (event) => {
@@ -494,7 +509,7 @@ export class InstanceProxy<Inst extends Instance> {
 
 				const processed = Promise.resolve()
 					.then(() => this.callMethodDefinedInEvent(event.id, event.data))
-					.finally(() => this.adapters.messages.ack(this.instance, "rpc", event.id));
+					.finally(() => this.adapter.messages.ack(this.instance, "rpc", event.id));
 
 				this.keepAlive.add(processed);
 			},
@@ -506,7 +521,7 @@ export class InstanceProxy<Inst extends Instance> {
 	public emittedEventSubscription: { unsubscribe: Function } | undefined;
 	public subscribeToInternalEvent() {
 		// const channelID = Client.getChannelForEventBus("internal", 'all');
-		// this.emittedEventSubscription = this.adapters.messages.subscribe(this.instance, channelID, (message) => {
+		// this.emittedEventSubscription = this.adapter.messages.subscribe(this.instance, channelID, (message) => {
 		// 	// CAN BE USED TO HANDLE INTERNAL EVENTS
 		// 	// LIKE REMOTE EVICTION
 		// });
@@ -519,13 +534,13 @@ export class InstanceProxy<Inst extends Instance> {
 
 	public async emitInternal<Channel extends keyof InternalInstanceEvent>(channel: Channel, message: InternalInstanceEvent[Channel]) {
 		const channelID = Client.getChannelForEventBus("internal", channel);
-		await this.adapters.messages.publish(this.instance, channelID, message);
+		await this.adapter.messages.publish(this.instance, channelID, message);
 	}
 
 	public async emit(channel: string, data: any) {
 		const channelID = Client.getChannelForEventBus("instance", channel.toString());
 		return this.runExternalEffect(async () => {
-			return await this.adapters.messages.publish(this.instance, channelID, data);
+			return await this.adapter.messages.publish(this.instance, channelID, data);
 		});
 	}
 
@@ -549,7 +564,7 @@ export class InstanceProxy<Inst extends Instance> {
 
 		const channelID = Client.getChannelForEventResponse(context.messageId);
 		return this.runExternalEffect(async () => {
-			return await this.adapters.messages.publish(this.instance, channelID, result);
+			return await this.adapter.messages.publish(this.instance, channelID, result);
 		});
 	}
 
@@ -559,7 +574,7 @@ export class InstanceProxy<Inst extends Instance> {
 			return;
 		}
 
-		await this.adapters.events.store(
+		await this.adapter.events.store(
 			this.instance.kind,
 			this.instance.id,
 			scheduleId,

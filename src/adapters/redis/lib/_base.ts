@@ -1,6 +1,6 @@
 import { Redis } from "ioredis";
 import * as BullMQ from "bullmq";
-import { BaseAdapter } from "../../../adapters";
+import { BaseAdapter } from "../../_common";
 
 import SuperJSON from "superjson";
 import * as MsgPack from "@msgpack/msgpack"
@@ -12,15 +12,14 @@ export class RedisAdapter extends BaseAdapter {
 	constructor(redis: Redis) {
 		super();
 
-		this.redis = this.cloneRedisClient(redis);
-		this.pubsubRedis = this.cloneRedisClient(redis);
-		this.startHandlingPubSub();
-	}
+		this.redis = redis.duplicate({
+			maxRetriesPerRequest: null,
+		});
+		this.pubsubRedis = redis.duplicate({
+			maxRetriesPerRequest: null,
+		});
 
-	private cloneRedisClient(redis: Redis) {
-		const redisConfig = redis.options;
-		const client = new Redis(redisConfig);
-		return client;
+		this.startHandlingPubSub();
 	}
 
 	startHandlingPubSub() {
@@ -79,6 +78,8 @@ export class BaseQueue extends RedisAdapter {
 			{
 				autorun: true,
 				concurrency: 10 ** 9,
+
+				// reuse same connection and setup
 				connection: queue.opts.connection,
 				prefix: queue.opts.prefix,
 			},

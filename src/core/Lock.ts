@@ -1,5 +1,5 @@
 import { wait } from "../utils/wait";
-import { Adapters, InstanceId, InstanceIdentifier, InstanceKind } from "../adapters";
+import { Adapters, InstanceId, InstanceIdentifier, InstanceKind } from "../adapters/_common";
 import { ControlledPromise } from "@/utils/ControlledPromise";
 import { Logger } from "./Logger";
 import { SpawnkitError } from './Error'
@@ -45,7 +45,7 @@ export class Lock {
 	static ReleaseError = LockReleaseError;
 
 	config: InstanceLockConfig;
-	adapters: Adapters;
+	adapter: Adapters;
 	logger: Logger;
 	ownerId: string;
 	expireAt: number = 0;
@@ -75,16 +75,16 @@ export class Lock {
 	constructor(
 		config: LockConfig & {
 			ownerId: string;
-			adapters: Adapters;
+			adapter: Adapters;
 		},
 	) {
 
 		this.config = this.getConfig(config);
 		this.ownerId = config.ownerId;
-		this.adapters = config.adapters;
+		this.adapter = config.adapter;
 
 		this.logger = new Logger({
-			adapters: this.adapters,
+			adapter: this.adapter,
 			ownerId: this.ownerId,
 			instance: config.instance,
 		});
@@ -132,7 +132,7 @@ export class Lock {
 		const logger = this.createLockTimelineLogger("acquire", resource, duration);
 		logger.start();
 
-		const acquired = await this.adapters.lock.acquire(resource, this.ownerId, duration);
+		const acquired = await this.adapter.lock.acquire(resource, this.ownerId, duration);
 
 		if (!acquired) {
 			logger.failed();
@@ -152,7 +152,7 @@ export class Lock {
 		const logger = this.createLockTimelineLogger("extend", resource, duration);
 		logger.start();
 
-		const extended = await this.adapters.lock.extend(resource, this.ownerId, duration);
+		const extended = await this.adapter.lock.extend(resource, this.ownerId, duration);
 		if (!extended) {
 			logger.failed();
 			throw new LockExtendError(resource, this.ownerId);
@@ -168,7 +168,7 @@ export class Lock {
 		const logger = this.createLockTimelineLogger("extend", resource, 0);
 		logger.start();
 
-		const released = await this.adapters.lock.release(resource, this.ownerId);
+		const released = await this.adapter.lock.release(resource, this.ownerId);
 		if (!released) {
 			logger.failed();
 			throw new LockReleaseError(resource, this.ownerId);

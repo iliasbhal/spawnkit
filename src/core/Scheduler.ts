@@ -1,7 +1,7 @@
 import { nanoid } from "nanoid";
 import { wait } from "../utils/wait";
 import { Lock } from "./Lock";
-import { InstanceId, InstanceIdentifier, InstanceKind, ScheduleByType, ScheduleContext } from "../adapters";
+import { InstanceId, InstanceIdentifier, InstanceKind, ScheduleByType, ScheduleContext } from "../adapters/_common";
 import type { Client, SpawnkitConfig } from "./Client";
 import { InstanceProxy } from "./InstanceProxy";
 import { EventBus } from "../utils/EventBus";
@@ -13,14 +13,14 @@ interface SchedulerEvents {
 
 export class Scheduler<O extends SpawnkitConfig> {
 	instances: O["instances"];
-	adapters: O["adapters"];
+	adapter: O["adapter"];
 	client: Client<O>;
 
 	eventBus = new EventBus<SchedulerEvents>();
 
 	constructor(config: O, client: Client<any>) {
 		this.instances = config.instances;
-		this.adapters = config.adapters;
+		this.adapter = config.adapter;
 		this.client = client;
 	}
 
@@ -36,7 +36,7 @@ export class Scheduler<O extends SpawnkitConfig> {
 
 	startEventScheduler() {
 		this.subscriptions.add(
-			this.adapters.events.subscribe(async (data, context) => {
+			this.adapter.events.subscribe(async (data, context) => {
 				await this.handleScheduledInstanceMethodCall(data, context);
 			})
 		);
@@ -46,7 +46,9 @@ export class Scheduler<O extends SpawnkitConfig> {
 
 		Object.keys(this.instances).forEach((kind) => {
 			this.subscriptions.add(
-				this.adapters.instances.subscribe(kind, async (data, context) => {
+				this.adapter.instances.subscribe(kind, async (data, context) => {
+
+					// console.log('data', data);
 					// console.log('SUBSCRIBED TO INSTANCE SCHEDULER', data, Object.keys(this.instances));
 					await this.runOnlyOneOfInstance(data.kind, data.id, async () => {
 						const exeuctionId = nanoid();
@@ -76,7 +78,7 @@ export class Scheduler<O extends SpawnkitConfig> {
 			return;
 		}
 
-		this.adapters.instances.schedule({ kind, id });
+		this.adapter.instances.schedule({ kind, id });
 	}
 
 	/**
@@ -88,7 +90,7 @@ export class Scheduler<O extends SpawnkitConfig> {
 		return new InstanceProxy({
 			ownerId: '__internal__',
 			indenfier: { kind, id },
-			adapters: this.adapters,
+			adapter: this.adapter,
 			client: this.client,
 		});
 	}
@@ -204,7 +206,7 @@ export class Scheduler<O extends SpawnkitConfig> {
 		// This is to prevent from executing side effects twice and race conditions.
 		const MIN_LOCK_DURATION = 5_000;
 		const lock = new Lock({
-			adapters: this.adapters,
+			adapter: this.adapter,
 			ownerId: exeuctionId,
 			instance: instanceConfig,
 			duration: MIN_LOCK_DURATION,
@@ -214,7 +216,7 @@ export class Scheduler<O extends SpawnkitConfig> {
 		const proxy = new InstanceProxy({
 			ownerId: exeuctionId,
 			indenfier: instanceConfig,
-			adapters: this.adapters,
+			adapter: this.adapter,
 			client: this.client,
 		});
 
@@ -255,7 +257,7 @@ export class Scheduler<O extends SpawnkitConfig> {
 				for (const waitTime of waitTimeBeforeAttemp) {
 					await wait(waitTime);
 
-					const hasUnprocessedEvents = await this.adapters.messages.has(
+					const hasUnprocessedEvents = await this.adapter.messages.has(
 						instanceConfig,
 						instanceConfig.id,
 					);

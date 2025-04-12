@@ -1,42 +1,63 @@
-import sqlite3 from 'sqlite3'
+import * as SQLite3 from 'sqlite3'
 import path from 'path';
-import { InstancePlugin } from '../_common'
+import { InstancePlugin } from '../InstancePlugin'
 import { Volume } from '../volume';
-import { MockVolume } from '../volume/mock';
 import { AsyncQueue } from '../../utils/AsyncQueue';
 
 interface SQLiteConfig {
   volume?: Volume;
+  inMemoryPersistence?: boolean;
 }
 
-
+const IN_MEMORY_DB_PATH = ":memory:";
 
 export class SQLite extends InstancePlugin {
-  db: sqlite3.Database;
+  db: SQLite3.Database;
   sqliteConfig: Required<SQLiteConfig>;
 
   volume: Volume;
+  config: SQLiteConfig;
 
   constructor(config?: SQLiteConfig) {
     super();
-
-    this.volume = config?.volume || new MockVolume({
-      name: 'sqlite/' + this.instance.id
-    });
+    this.config = config;
+    this.volume = config?.volume;
   }
 
   async setup() {
+    const isInMemory = await this.isInMemory();
+    if (isInMemory) {
+      this.setupInMemory();
+      return;
+    }
 
-    // Ensure the db is closed when the instance is disposed
-    // So that the volume is uploaded with a clean state
-    this.instance.hooks.dispose.push(async () => {
+    this.setupPersistent();
+  }
+
+  private setupInMemory() {
+    // console.log('setupInMemory')
+    this.hooks.initialize.push(async () => {
+      // console.log('sqlite before started')
+      await this.startSqliteDatabase();
+      // console.log('sqlite started')
+    });
+
+    this.hooks.dispose.push(async () => {
       await this.db.close();
     });
 
-    super.setup();
+    // console.log('setupInMemory done')
+  }
 
-    this.instance.hooks.initialize.push(async () => {
+  private setupPersistent() {
+    this.volume.hooks.initialize.push(async () => {
       await this.startSqliteDatabase();
+    });
+
+    // Ensure the db is closed when the instance is disposed
+    // So that the volume is uploaded with a clean state
+    this.volume.hooks.dispose.unshift(async () => {
+      await this.db.close();
     });
   }
 
@@ -79,6 +100,11 @@ export class SQLite extends InstancePlugin {
       return;
     }
 
+    const isInMemory = await this.isInMemory();
+    if (isInMemory) {
+      return;
+    }
+
     this.syncQueue.enqueue(async () => {
       return await this.instance.waitFor(async () => {
         return await this.volume.upload();
@@ -86,15 +112,36 @@ export class SQLite extends InstancePlugin {
     });
   }
 
-  private async startSqliteDatabase() {
-    console.log('startSqliteDatabase', await this.volume.getPath());
-    const volumePath = await this.volume.getPath();
-    const relative = path.relative(__dirname, volumePath);
+  async isInMemory() {
+    const dbPath = await this.getSQLitePath();
+    const isInMemory = dbPath === IN_MEMORY_DB_PATH;
+    return isInMemory;
+  }
 
-    const dbPath = path.resolve(volumePath, 'dump.db');
-    console.log('dbPath', dbPath);
-    this.db = new sqlite3.Database(dbPath, sqlite3.OPEN_READWRITE | sqlite3.OPEN_CREATE, (err) => {
-      console.log('DONE OPENING DB', err);
+  private dbPath: string;
+  private async getSQLitePath() {
+    if (!this.volume) {
+      return IN_MEMORY_DB_PATH
+    }
+
+    const volumePath = await this.volume.getPath();
+    this.dbPath = path.resolve(volumePath, 'dump.db');
+    return this.dbPath;
+  }
+
+  private async startSqliteDatabase() {
+    // console.log('startSqliteDatabase')
+    this.db = await new Promise(async (resolve, reject) => {
+      const mode = SQLite3.OPEN_READWRITE | SQLite3.OPEN_CREATE;
+      const dbPath = await this.getSQLitePath();
+      const db = new SQLite3.Database(dbPath, mode, (err) => {
+        // console.log('DONE OPENING DB', err);
+        if (err) {
+          reject(err);
+        } else {
+          resolve(db);
+        }
+      });
     });
   }
 }

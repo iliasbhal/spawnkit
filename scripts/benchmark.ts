@@ -71,14 +71,7 @@ export class OrderBook extends Spawnkit.Instance<OrderBookContext, OrderBookEven
 }
 
 const client = Spawnkit.Client.from({
-	adapters: {
-		lock: new RedisAdapter.Lock(redis),
-		data: new RedisAdapter.Data(redis),
-		messages: new RedisAdapter.MessageBroker(redis),
-		events: new RedisAdapter.EventScheduler(redis),
-		instances: new RedisAdapter.InstanceScheduler(redis),
-		logger: new RedisAdapter.Logger(redis),
-	},
+	adapter: new Spawnkit.Adapters.InMemoryAdapter(),
 	instances: {
 		OrderBook,
 	},

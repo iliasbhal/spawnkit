@@ -13,7 +13,7 @@ import { testRedisAdapters } from "./_utils";
 
 describe.only("Base", () => {
 	const client = Spawnkit.Client.from({
-		adapters: testRedisAdapters,
+		adapter: testRedisAdapters,
 		instances: {
 			BadExample,
 			OrderBook,

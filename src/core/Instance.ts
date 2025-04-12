@@ -1,6 +1,6 @@
-import { InstanceLog } from "@/adapters";
+import { InstanceLog } from "@/adapters/_common";
 import type { InterfaceAPI } from "./InstanceProxy";
-import { InstancePlugin } from "@/plugins/_common";
+import { InstancePlugin } from "@/plugins/InstancePlugin";
 
 export type AnyRecord = { [key: string]: any };
 export type Context = AnyRecord;
@@ -22,28 +22,27 @@ export class Instance<
 		InstanceChannels: InstanceChannels;
 	};
 
-	async setup() {
-		return new Promise((resolve) => {
-			setTimeout(() => {
+	findPlugins(): InstancePlugin[] {
+		const instance = this as any as Instance;
+		const recursiveFindPlugins = (root: any, acc: InstancePlugin[] = []) => {
+			// console.log('findPlugins', root);
+			return Object.keys(root).flatMap(key => {
+				const plugin = root[key];
+				const isPlugin = plugin instanceof InstancePlugin;
+				if (!isPlugin) return [];
 
-				// Recursively setup plugins in the instance
-				// If a plugin has a plugin, it will be setup too
-				const setupPlugin = (root: any) => {
-					Object.keys(root).forEach(key => {
-						const plugin = root[key];
-						const isPlugin = plugin instanceof InstancePlugin;
-						if (!isPlugin) return;
-
-						plugin.inject(this);
-						setupPlugin(plugin);
-						plugin.setup();
-					})
+				const isSetup = !!plugin.instance;
+				if (!isSetup) {
+					plugin.inject(instance);
+					plugin.setup();
 				}
 
-				setupPlugin(this);
-				resolve(true);
+				acc.push(plugin);
+				return recursiveFindPlugins(plugin, acc);
 			})
-		})
+		}
+
+		return recursiveFindPlugins(this);
 	}
 
 	signal(signal: Prettify<InstanceLog>) {

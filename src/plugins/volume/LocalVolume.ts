@@ -1,13 +1,17 @@
-import { Volume } from ".";
+import { Volume, VolumeConfig } from ".";
 import fs from 'fs-extra';
 import path from 'path';
 
-export class MockVolume extends Volume {
-  static MockDirPath = path.resolve(__dirname, 'mock');
+export class LocalVolume extends Volume {
+  static RootDir = path.resolve(__dirname, 'local');
+
+  constructor(config: VolumeConfig) {
+    super(config);
+  }
 
   async getMockPath() {
     const instancePath = await this.getInstancePath();
-    const mockPath = path.resolve(MockVolume.MockDirPath, instancePath);
+    const mockPath = path.resolve(LocalVolume.RootDir, instancePath);
     await fs.ensureDir(mockPath);
     return mockPath;
   }

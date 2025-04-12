@@ -1,6 +1,6 @@
 import { Redis } from "ioredis";
 import Redlock, { Lock as RedlockLock } from "redlock";
-import * as Adapters from "../../index";
+import * as Adapters from "../../_common";
 import { RedisAdapter } from "./_base";
 
 export class Lock extends RedisAdapter implements Adapters.AdapterLock {

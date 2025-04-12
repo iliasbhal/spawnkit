@@ -1,11 +1,12 @@
-import { Adapters } from "./";
+import { Adapters } from "./_common";
 import { wait } from "../utils/wait";
 import { waitFor } from "poll-until-promise";
 import { nanoid } from "nanoid";
 
-export const generateTestSuite = (name: string, createAdapters: () => () => Promise<Adapters>) => {
+export const generateTestSuite = (name: string, createadapter: () => () => Promise<Adapters>) => {
 	describe(name, () => {
-		const getAdapters = createAdapters();
+
+		const getAdapters = createadapter();
 
 		describe("Lock", () => {
 			it("can acquire lock only once", async () => {

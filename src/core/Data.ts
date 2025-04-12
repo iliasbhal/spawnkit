@@ -1,4 +1,4 @@
-import { Adapters } from "@/adapters";
+import { Adapters } from "@/adapters/_common";
 import { AsyncDebounceHandler } from "@/utils/AsyncDebounceHandler";
 import { CacheMap } from "@/utils/CacheMap";
 import { Logger } from "./Logger";
@@ -14,7 +14,7 @@ export class Data<DataShape extends Record<string, any>> {
 	}
 
 	logger: Logger;
-	adapters: Adapters;
+	adapter: Adapters;
 	instance: {
 		kind: string;
 		id: string;
@@ -23,7 +23,7 @@ export class Data<DataShape extends Record<string, any>> {
 	cache = new CacheMap();
 
 	constructor(config: {
-		adapters: Adapters;
+		adapter: Adapters;
 		logger: Logger;
 		namespace?: string;
 		instance: {
@@ -32,7 +32,7 @@ export class Data<DataShape extends Record<string, any>> {
 		};
 	}) {
 		this.logger = config.logger;
-		this.adapters = config.adapters;
+		this.adapter = config.adapter;
 		this.instance = config.instance;
 		this.namespace = config.namespace;
 	}
@@ -43,7 +43,7 @@ export class Data<DataShape extends Record<string, any>> {
 
 	withNamespace<DataShape extends Record<string, any>>(namespace: string) {
 		return new Data<DataShape>({
-			adapters: this.adapters,
+			adapter: this.adapter,
 			logger: this.logger,
 			namespace,
 			instance: this.instance,
@@ -62,7 +62,7 @@ export class Data<DataShape extends Record<string, any>> {
 			key: namescapedKey,
 		});
 
-		const data = await this.adapters.data.get<DataShape[K] | null>(
+		const data = await this.adapter.data.get<DataShape[K] | null>(
 			this.instance.kind,
 			this.instance.id,
 			namescapedKey,
@@ -84,7 +84,7 @@ export class Data<DataShape extends Record<string, any>> {
 
 		const debouncer = this.debounceByKey.get(namescapedKey)!;
 		await debouncer.onlyLastOnePerTick(async () => {
-			await this.adapters.data.set(this.instance.kind, this.instance.id, namescapedKey, value);
+			await this.adapter.data.set(this.instance.kind, this.instance.id, namescapedKey, value);
 
 			this.emitChange(namescapedKey, value);
 
@@ -104,27 +104,27 @@ export class Data<DataShape extends Record<string, any>> {
 		});
 
 		const channel = Client.getChannelForEventBus("data", key);
-		await this.adapters.messages.publish(this.instance, channel, value);
+		await this.adapter.messages.publish(this.instance, channel, value);
 	}
 }
 
 export class ClientData<DataShape extends Record<string, any>> {
 	namespace?: string;
-	adapters: Pick<Adapters, "data" | "messages">;
+	adapter: Pick<Adapters, "data" | "messages">;
 	instance: {
 		kind: string;
 		id: string;
 	};
 
 	constructor(config: {
-		adapters: Pick<Adapters, "data" | "messages">;
+		adapter: Pick<Adapters, "data" | "messages">;
 		namespace?: string;
 		instance: {
 			kind: string;
 			id: string;
 		};
 	}) {
-		this.adapters = config.adapters;
+		this.adapter = config.adapters;
 		this.instance = config.instance;
 		this.namespace = config.namespace;
 	}
@@ -135,7 +135,7 @@ export class ClientData<DataShape extends Record<string, any>> {
 
 	withNamespace<DataShape extends Record<string, any>>(namespace: string) {
 		return new ClientData<DataShape>({
-			adapters: this.adapters,
+			adapter: this.adapter,
 			namespace,
 			instance: this.instance,
 		});
@@ -143,14 +143,14 @@ export class ClientData<DataShape extends Record<string, any>> {
 
 	async get<K extends keyof DataShape>(key: K): Promise<DataShape[K] | null> {
 		const namescapedKey = this.getNamespacedKey(key.toString());
-		return await this.adapters.data.get(this.instance.kind, this.instance.id, namescapedKey);
+		return await this.adapter.data.get(this.instance.kind, this.instance.id, namescapedKey);
 	}
 
 	on<K extends keyof DataShape>(key: K, callback: (next: DataShape[K]) => any) {
 		const namescapedKey = this.getNamespacedKey(key.toString());
 		const channel = Client.getChannelForEventBus("data", namescapedKey);
 
-		return this.adapters.messages.subscribe<DataShape[K]>(this.instance, channel, (event) => {
+		return this.adapter.messages.subscribe<DataShape[K]>(this.instance, channel, (event) => {
 			callback(event.data);
 		});
 	}

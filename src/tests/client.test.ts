@@ -1,5 +1,5 @@
 import * as Spawnkit from "..";
-import { testRedisAdapters } from "./_utils";
+import { redis } from "./_utils";
 import { v4 as uuidv4 } from 'uuid';
 
 export class BaseExample extends Spawnkit.Instance {
@@ -10,14 +10,14 @@ export class BaseExample extends Spawnkit.Instance {
 
 describe("Client", () => {
   const client = Spawnkit.Client.from({
-    adapters: testRedisAdapters,
+    adapter: new Spawnkit.Adapters.RedisAdapter(redis),
     instances: {
       BaseExample,
     },
   });
 
   const client2 = Spawnkit.Client.from({
-    adapters: testRedisAdapters,
+    adapter: new Spawnkit.Adapters.RedisAdapter(redis),
     instances: {
       BaseExample,
     },
