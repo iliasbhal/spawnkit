@@ -192,7 +192,7 @@ export class InstanceProxy<Inst extends Instance> {
 		});
 	}
 
-	createProxyInstanceForRequest(target: BaseRemoteEntity, event: InstanceMethodCall,) {
+	createProxyInstanceForRequest(target: BaseRemoteEntity | InstanceUtils<InstanceProxy<Inst>>, event: InstanceMethodCall,) {
 		return new Proxy(target, {
 			get: (base, prop, receiver) => {
 				if (prop === "context") {
