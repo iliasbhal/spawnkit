@@ -2,13 +2,17 @@ import * as Spawnkit from "../..";
 import { nanoid } from 'nanoid';
 
 describe('ClientExample', () => {
+
+  const instId1 = nanoid();
+  const instId2 = nanoid();
+
   class ClientExample extends Spawnkit.Instance {
     client = new Spawnkit.Plugins.Client<typeof instances>();
 
     sendMessageToAnotherInstance() {
 
       // console.log('this.client', this.client.spawn)
-      const another = this.client.spawn('PingPong', `test-${nanoid()}`)
+      const another = this.client.spawn('PingPong', instId2)
 
       return another.ping()
     }
@@ -16,7 +20,7 @@ describe('ClientExample', () => {
 
   class PingPong extends Spawnkit.Instance {
     ping() {
-      return 'pong' as const
+      return `pong-${this.id}` as const
     }
   }
 
@@ -32,10 +36,10 @@ describe('ClientExample', () => {
 
   client.start();
 
-  it('should be able to schedule a delay job', async () => {
-    const remoteSqlite = client.spawn('ClientExample', `test-${nanoid()}`);
-    const result = await remoteSqlite.sendMessageToAnotherInstance()
-    expect(result).toBe('pong')
+  it('can call another instance from within a method call', async () => {
+    const inst = client.spawn('ClientExample', instId1);
+    const result = await inst.sendMessageToAnotherInstance()
+    expect(result).toBe(`pong-${instId2}`)
   });
 
 });

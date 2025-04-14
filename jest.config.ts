@@ -12,9 +12,7 @@ const jestConfig: JestConfigWithTsJest = {
 	},
 	transform: {
 		"^.+\\.jsx?$": "babel-jest",
-		"^.+\\.tsx?$": ["ts-jest", {
-			isolatedModules: true,
-		}],
+		"^.+\\.tsx?$": "ts-jest",
 	},
 };
 

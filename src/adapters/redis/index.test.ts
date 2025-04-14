@@ -3,7 +3,6 @@ import { Redis } from "ioredis";
 import { generateTestSuite } from "../generateTestSuite";
 import * as Spawnkit from '../../index';
 
-
 generateTestSuite("Redis Adapter / Core", createAdapterFactory);
 
 describe("Redis Adapter", () => {

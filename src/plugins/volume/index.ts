@@ -18,7 +18,7 @@ export class Volume extends InstancePlugin {
   static TmpDirPath = path.resolve(__dirname, 'tmp');
 
   config: VolumeConfig;
-  private fileSystem = new VolumeFileSystem(this);
+  private fileSystem = new VolumeFileSystem();
 
   constructor(config: VolumeConfig) {
     super();
@@ -45,6 +45,9 @@ export class Volume extends InstancePlugin {
   }
 
   async setup() {
+    const rootPath = await this.getPath();
+    this.fileSystem.setRootPath(rootPath);
+
     this.instance.hooks.initialize.push(async () => {
       try {
         await this.download();

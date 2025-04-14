@@ -408,7 +408,7 @@ export class InstanceProxy<Inst extends Instance> {
 	}
 
 	private async runInstanceHooks(hookType: 'initialize' | 'dispose') {
-		const plugins = await InstancePlugin.findPlugins();
+		const plugins = await InstancePlugin.findPlugins(this.instance);
 		// console.log('RUN INSTANCE HOOKS', hookType, plugins);
 		const stepsOrder = [
 			...plugins.flatMap(p => p.hooks[hookType]),

@@ -28,7 +28,7 @@ describe('WarmerExample', () => {
 
   client.start();
 
-  it('should be able to schedule a delay job', async () => {
+  it('should be able to ensure that an instance is kept alive', async () => {
     const remoteSqlite = client.spawn('WarmerExample', `test-${nanoid()}`);
   });
 

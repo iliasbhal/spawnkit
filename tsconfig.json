@@ -15,6 +15,7 @@
 
     // use Node's module resolution algorithm, instead of the legacy TS one
     "moduleResolution": "node",
+    "isolatedModules": true,
 
     /* Experimental Options */
     "experimentalDecorators": true, 

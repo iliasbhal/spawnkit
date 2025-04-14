@@ -1,6 +1,5 @@
 import * as Spawnkit from "..";
-import { redis } from "./_utils";
-import { v4 as uuidv4 } from 'uuid';
+import { nanoid } from 'nanoid';
 
 export class BaseExample extends Spawnkit.Instance {
   hello() {
@@ -9,15 +8,17 @@ export class BaseExample extends Spawnkit.Instance {
 }
 
 describe("Client", () => {
+  const adapter = new Spawnkit.Adapters.InMemoryAdapter();
+
   const client = Spawnkit.Client.from({
-    adapter: new Spawnkit.Adapters.RedisAdapter(redis),
+    adapter,
     instances: {
       BaseExample,
     },
   });
 
   const client2 = Spawnkit.Client.from({
-    adapter: new Spawnkit.Adapters.RedisAdapter(redis),
+    adapter,
     instances: {
       BaseExample,
     },
@@ -26,7 +27,7 @@ describe("Client", () => {
   client.start();
 
   it("client can be used without starting the worker", async () => {
-    const inst = client2.spawn("BaseExample", uuidv4());
+    const inst = client2.spawn("BaseExample", nanoid());
     const response = await inst.hello();
     expect(response).toBe('world');
   });

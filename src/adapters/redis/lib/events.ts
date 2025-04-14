@@ -60,6 +60,7 @@ export class EventScheduler extends BaseQueue implements Adapters.AdapterEventSc
 			config.schedule.id = nanoid();
 		}
 
+
 		const scheduleId = config.schedule.id;
 		const globalScheduleId = this.getBullJobIdFor(config.instance.kind, config.instance.id, scheduleId);
 

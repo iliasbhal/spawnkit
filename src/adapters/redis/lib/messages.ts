@@ -2,6 +2,7 @@ import { nanoid } from "nanoid";
 import * as Adapters from "../../_common";
 import { RedisAdapter, Serde } from "./_base";
 import { BackoffController } from "@/utils/BackoffContoller";
+import { SetExpire } from "@/utils/SetExpire";
 
 interface Message<DataShape> {
 	id: Adapters.EventId;
@@ -95,6 +96,7 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 		channel: string,
 		callback: (event: E) => any,
 	): { unsubscribe: Function } {
+		// console.log('SUBSCRIBE', instance, channel)
 		this.ensureInitializedClientPubSub();
 
 		const messageChannel = this.getChannel(instance, channel);
@@ -303,7 +305,21 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 
 		const timestampListeningStarted = Date.now();
 		const abortCtl = new AbortController();
-		const previousEventsIds = new Set();
+		const previousEventsIds = new SetExpire({ defaultExpiryMs: 5000 });
+
+		// Also listen to the global direct pubsub channel to avoid 
+		// Having to manually poll the channel for new messages
+		const subscription = this.globalSubscribe(`${channel}:direct`, async (message: any) => {
+			const event = await Serde.deserialize<PublishedEvent>(message);
+			if (abortCtl.signal.aborted) return;
+			if (previousEventsIds.has(event.message.id)) return;
+			previousEventsIds.add(event.message.id);
+			// console.log('event.message.id', event.message.id);
+			callback(event.message);
+		});
+
+		let pingSinceSubscriptionLive = 0;
+
 		const loop = {
 			range: {
 				from: 0,
@@ -318,19 +334,6 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 			stepCount: 25,
 		});
 
-
-		// Also listen to the global direct pubsub channel to avoid 
-		// Having to manually poll the channel for new messages
-		const subscription = this.globalSubscribe(`${channel}:direct`, async (message: any) => {
-			const event = await Serde.deserialize<PublishedEvent>(message);
-			if (abortCtl.signal.aborted) return;
-			if (previousEventsIds.has(event.message.id)) return;
-			callback(event.message);
-
-			previousEventsIds.add(event.message.id);
-		});
-
-		let pingSinceSubscriptionLive = 0;
 		Promise.resolve().then(async () => {
 			while (!abortCtl.signal.aborted) {
 				if (subscription.live) pingSinceSubscriptionLive++;
@@ -365,7 +368,6 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 
 				// Reset & update the list of processed events
 				// So that we don't reprocess them when we fetch the next batch
-				previousEventsIds.clear();
 				eventMessages.forEach((event) => {
 					previousEventsIds.add(event.id);
 				});

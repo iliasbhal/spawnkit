@@ -1,18 +1,17 @@
 import * as Spawnkit from "../../../src";
-import { Scheduler } from ".";
 import { nanoid } from 'nanoid';
 
 describe('SchedulerExample', () => {
-  const scheduledActionSpy = jest.fn();
-  class SchedulerExample extends Spawnkit.Instance {
-    schedule = new Scheduler<SchedulerExample>();
+  const pingSpy = jest.fn();
+  class SchedulerExample extends Spawnkit.Instance<{}, {}> {
+    schedule = new Spawnkit.Plugins.Scheduler<SchedulerExample>();
 
-    async scheduleTask(arg: any) {
+    async schedulePing(arg: any) {
       this.schedule.delay(300).ping(arg);
     }
 
     ping(arg: any) {
-      scheduledActionSpy(arg)
+      pingSpy(arg)
     }
   }
 
@@ -28,16 +27,16 @@ describe('SchedulerExample', () => {
   it('should be able to schedule a delay job', async () => {
     const remoteSqlite = client.spawn('SchedulerExample', `test-${nanoid()}`);
 
-    await remoteSqlite.scheduleTask('test1');
-    await remoteSqlite.scheduleTask('test2');
-    await remoteSqlite.scheduleTask('test3');
+    await remoteSqlite.schedulePing('test1');
+    await remoteSqlite.schedulePing('test2');
+    await remoteSqlite.schedulePing('test3');
 
-    await new Promise(resolve => setTimeout(resolve, 400));
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
-    expect(scheduledActionSpy).toHaveBeenCalledTimes(3);
-    expect(scheduledActionSpy).toHaveBeenCalledWith('test1');
-    expect(scheduledActionSpy).toHaveBeenCalledWith('test2');
-    expect(scheduledActionSpy).toHaveBeenCalledWith('test3');
+    expect(pingSpy).toHaveBeenCalledTimes(3);
+    expect(pingSpy).toHaveBeenCalledWith('test1');
+    expect(pingSpy).toHaveBeenCalledWith('test2');
+    expect(pingSpy).toHaveBeenCalledWith('test3');
 
     await remoteSqlite.scheduled.cancel('test1');
   });

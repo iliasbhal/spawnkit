@@ -1,6 +1,5 @@
 import * as Spawnkit from "..";
 import { wait } from "../utils/wait";
-import { testRedisAdapters } from "./_utils";
 
 describe("Utils", () => {
   class Example extends Spawnkit.Instance<{}, {}> {
@@ -18,7 +17,7 @@ describe("Utils", () => {
   }
 
   const client = Spawnkit.Client.from({
-    adapter: testRedisAdapters,
+    adapter: new Spawnkit.Adapters.InMemoryAdapter(),
     instances: {
       Example,
     },

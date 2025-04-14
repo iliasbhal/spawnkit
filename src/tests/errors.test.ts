@@ -1,5 +1,4 @@
 import * as Spawnkit from "..";
-import { testRedisAdapters } from "./_utils";
 import { wait } from "../utils/wait";
 
 describe("Errors", () => {
@@ -26,7 +25,7 @@ describe("Errors", () => {
   }
 
   const client = Spawnkit.Client.from({
-    adapter: testRedisAdapters,
+    adapter: new Spawnkit.Adapters.InMemoryAdapter(),
     instances: {
       ErrorInitExample,
     },

@@ -59,9 +59,15 @@ export class RedisAdapter extends BaseAdapter {
 
 export class BaseQueue extends RedisAdapter {
 	createQueue(name: string) {
-		return new BullMQ.Queue(name, {
+		// Hack: BullMQ doesn't support queue names with ":"
+		// So we need to remove the ":" and use the rest as the prefix
+		const queueNameParts = name.split(':');
+		const queueName = queueNameParts.pop()!;
+		const extraPrefix = queueNameParts.length > 0 ? `:${queueNameParts.join(':')}` : '';
+
+		return new BullMQ.Queue(queueName, {
 			connection: this.redis,
-			prefix: "spawnkit:queues",
+			prefix: `spawnkit:queues${extraPrefix}`,
 			defaultJobOptions: {
 				removeOnComplete: true,
 				removeOnFail: true,

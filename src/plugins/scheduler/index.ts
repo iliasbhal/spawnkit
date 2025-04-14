@@ -1,5 +1,6 @@
 import { Instance } from "@/core";
 import { InstancePlugin } from "../InstancePlugin";
+import { nanoid } from 'nanoid';
 
 export class Scheduler<Inst extends Instance> extends InstancePlugin {
   getInstanceClient() {
@@ -9,18 +10,14 @@ export class Scheduler<Inst extends Instance> extends InstancePlugin {
 
   cron(cronExpression: string) {
     const client = this.getInstanceClient();
-    return client.schedule({
-      name: 'test',
-      cron: cronExpression,
-    });
+    const id = nanoid();
+    return client.schedule({ id, cron: cronExpression });
   }
 
   delay(delay: number) {
     const client = this.getInstanceClient();
-    return client.schedule({
-      name: 'test',
-      delay: delay,
-    });
+    const id = nanoid();
+    return client.schedule({ id, delay });
   }
 
   list() {

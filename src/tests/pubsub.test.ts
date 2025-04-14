@@ -1,6 +1,5 @@
 import * as Spawnkit from "../../src";
 import { waitFor } from "poll-until-promise";
-import { testRedisAdapters } from "./_utils";
 import { wait } from "@/utils/wait";
 
 describe("PubSub", () => {
@@ -27,7 +26,7 @@ describe("PubSub", () => {
   }
 
   const client = Spawnkit.Client.from({
-    adapter: testRedisAdapters,
+    adapter: new Spawnkit.Adapters.InMemoryAdapter(),
     instances: {
       PubSubExample,
     },

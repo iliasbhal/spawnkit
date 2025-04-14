@@ -49,7 +49,7 @@ export const generateTestSuite = (name: string, createadapter: () => () => Promi
 				const ownerId = nanoid();
 
 				expect(await lock.acquire("lock2", ownerId, 1000)).toBe(true);
-				await wait(1000);
+				await wait(1001);
 				expect(await lock.acquire("lock2", ownerId, 1000)).toBe(true);
 			});
 
@@ -130,7 +130,6 @@ export const generateTestSuite = (name: string, createadapter: () => () => Promi
 		});
 
 		describe("MessageBroker", () => {
-			const createStreamConfig = createPubSubTestConfig();
 
 			it("should be able to emit and receive events ", async () => {
 				const adapters = await getAdapters();
@@ -148,15 +147,6 @@ export const generateTestSuite = (name: string, createadapter: () => () => Promi
 					expect(callback).toHaveBeenCalledWith(expect.objectContaining({ data: { aaa: true } }));
 					sub.unsubscribe();
 				});
-			});
-
-			it("should emit and receive events in same order", async () => {
-				// TODO: test with same client send multiple messages in same timestamp
-				// and check if they are received in order
-
-				// TODO: test with different clients sending messages in different timestamp
-				// and check if they are received in order
-				throw new Error("TODO");
 			});
 
 			it("should not receive event on different channels ", async () => {
@@ -179,7 +169,9 @@ export const generateTestSuite = (name: string, createadapter: () => () => Promi
 				const adapters = await getAdapters();
 
 				const streamId = createStreamConfig();
-				const callback = jest.fn();
+				const callback = jest.fn().mockImplementation((...args) => {
+					// console.log('callback', args);
+				});
 				const sub = adapters.messages.subscribe(streamId.instance, streamId.channel, callback);
 				await adapters.messages.publish(streamId.instance, streamId.channel, {
 					test: 1,
@@ -199,16 +191,60 @@ export const generateTestSuite = (name: string, createadapter: () => () => Promi
 					test: 4,
 				});
 
-				await waitUntilOK(() => {
-					expect(callback).toHaveBeenCalled();
-					expect(callback).toHaveBeenCalledTimes(4);
-					expect(callback).toHaveBeenCalledWith(expect.objectContaining({ data: { test: 1 } }));
-					expect(callback).toHaveBeenCalledWith(expect.objectContaining({ data: { test: 2 } }));
-					expect(callback).toHaveBeenCalledWith(expect.objectContaining({ data: { test: 3 } }));
-					expect(callback).toHaveBeenCalledWith(expect.objectContaining({ data: { test: 4 } }));
-					sub.unsubscribe();
-				});
+				await wait(1000);
+
+				expect(callback).toHaveBeenCalled();
+				expect(callback).toHaveBeenCalledTimes(4);
+				expect(callback).toHaveBeenCalledWith(expect.objectContaining({ data: { test: 1 } }));
+				expect(callback).toHaveBeenCalledWith(expect.objectContaining({ data: { test: 2 } }));
+				expect(callback).toHaveBeenCalledWith(expect.objectContaining({ data: { test: 3 } }));
+				expect(callback).toHaveBeenCalledWith(expect.objectContaining({ data: { test: 4 } }));
+				sub.unsubscribe();
 			});
+
+			it("should emit and receive events in same order", async () => {
+				// TODO: test with same client send multiple messages in same timestamp
+				// and check if they are received in order
+				const adapters = await getAdapters();
+				const streamId = createStreamConfig();
+
+				const callback = jest.fn();
+				const sub = adapters.messages.subscribe(streamId.instance, streamId.channel, callback);
+
+				await Promise.all([
+					adapters.messages.publish(streamId.instance, streamId.channel, { order: 1 }),
+					adapters.messages.publish(streamId.instance, streamId.channel, { order: 2 }),
+					adapters.messages.publish(streamId.instance, streamId.channel, { order: 3 }),
+				])
+
+				await wait(100);
+
+				const order = callback.mock.calls.map(c => c[0].data.order)
+				expect(order).toEqual([1, 2, 3]);
+
+				sub.unsubscribe()
+			});
+
+			it.skip("should emit and receive events in same order from different clients", async () => {
+				// TODO: test with different clients sending messages in different timestamp
+				// and check if they are received in order
+				throw new Error("TODO");
+				const adapters = await getAdapters();
+				const adapters2 = await getAdapters();
+				const streamId = createStreamConfig();
+
+				const callback = jest.fn();
+				const sub = adapters.messages.subscribe(streamId.instance, streamId.channel, callback);
+
+				await Promise.all([
+					adapters.messages.publish(streamId.instance, streamId.channel, { order: 1 }),
+					adapters.messages.publish(streamId.instance, streamId.channel, { order: 2 }),
+					adapters2.messages.publish(streamId.instance, streamId.channel, { order: 1 }),
+					adapters2.messages.publish(streamId.instance, streamId.channel, { order: 2 }),
+					adapters.messages.publish(streamId.instance, streamId.channel, { order: 3 }),
+					adapters2.messages.publish(streamId.instance, streamId.channel, { order: 3 }),
+				])
+			})
 
 			it("should allow for several subscriber to receive events", async () => {
 				const adapters = await getAdapters();
@@ -252,21 +288,21 @@ export const generateTestSuite = (name: string, createadapter: () => () => Promi
 	});
 };
 
-function createPubSubTestConfig() {
+function createStreamConfig(id?: string) {
 	const instance = {
 		kind: "test",
-		id: nanoid(),
+		id: id ?? nanoid(),
 	};
-	let i = 0;
-	return () =>
-		({
-			instance: instance,
-			channel: "rpc",
-		}) as const;
+
+	return {
+		instance,
+		channel: "rpc",
+	} as const
 }
 
 export async function waitUntilOK(callback: Function) {
 	await waitFor(callback, {
 		interval: 10,
+		timeout: 10000,
 	});
 }

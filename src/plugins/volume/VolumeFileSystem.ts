@@ -1,6 +1,5 @@
 import path from 'path'
 import fs from 'fs-extra'
-import type { Volume } from '.';
 
 export interface VolumeConfig {
   name: string;
@@ -8,7 +7,7 @@ export interface VolumeConfig {
 
 // Define a type for the fs interface
 type FsInterface = {
-  [K in keyof typeof fs]?: K extends 'constants'
+  [K in keyof typeof fs]: K extends 'constants'
   ? typeof fs.constants
   : Function;
 };
@@ -17,27 +16,16 @@ type FsInterface = {
  * A class that wraps fs-extra to provide filesystem operations with paths relative to a root directory
  */
 export class VolumeFileSystem {
-  private volume: Volume;
-  private fsInterface: FsInterface = {};
-  private pathCache: { path: string; timestamp: number } | null = null;
-  private readonly CACHE_TTL = 5000; // 5 seconds cache TTL
+  private rootPath: string;
+  private fsInterface: FsInterface = {} as any;
 
-  constructor(volume: Volume) {
-    this.volume = volume;
+  constructor(rootPath?: string) {
+    this.rootPath = rootPath || '/';
     this.setupFsInterface();
   }
 
-  private async getPathWithCache(): Promise<string> {
-    const now = Date.now();
-    // Use cached path if it exists and is still valid
-    if (this.pathCache && (now - this.pathCache.timestamp) < this.CACHE_TTL) {
-      return this.pathCache.path;
-    }
-
-    // Get fresh path and update cache
-    const path = await this.volume.getPath();
-    this.pathCache = { path, timestamp: now };
-    return path;
+  setRootPath(rootPath: string) {
+    this.rootPath = rootPath;
   }
 
   private setupFsInterface() {
@@ -62,34 +50,31 @@ export class VolumeFileSystem {
       'unlink', 'utimes', 'writeFile', 'writeJson'
     ];
 
+    const patchMethodArgs = (method, args) => {
+      // Get path indices for this method, or default to [0] (first argument)
+      const pathIndices = methodsWithPathArgs[method] || [0];
+      const nextArgs = [...args];
+
+      // Resolve paths for all arguments that should be paths
+      for (const index of pathIndices) {
+        if (index < args.length && typeof args[index] === 'string') {
+          nextArgs[index] = path.resolve(this.rootPath, args[index]);
+        }
+      }
+
+      return nextArgs;
+    }
+
     // Create a wrapper for each method
     for (const method of fsMethods) {
       this.fsInterface[method] = async (...args: any[]) => {
-        // Create a local function-level cache to optimize for multiple path resolutions
-        // in a single async operation execution
-        let operationRootPath: string | null = null;
-
-        const getRootPath = async () => {
-          if (operationRootPath === null) {
-            operationRootPath = await this.getPathWithCache();
-          }
-          return operationRootPath;
-        };
-
         // Get path indices for this method, or default to [0] (first argument)
-        const pathIndices = methodsWithPathArgs[method] || [0];
-
-        // Resolve paths for all arguments that should be paths
-        for (const index of pathIndices) {
-          if (index < args.length && typeof args[index] === 'string') {
-            const rootPath = await getRootPath();
-            args[index] = path.resolve(rootPath, args[index]);
-          }
-        }
-
-        return fs[method](...args);
+        const nextArgs = patchMethodArgs(method, args)
+        return fs[method](...nextArgs);
       };
     }
+
+
 
     // Add fs.constants
     this.fsInterface.constants = fs.constants;

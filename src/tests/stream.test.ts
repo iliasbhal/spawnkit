@@ -1,6 +1,5 @@
 import * as Spawnkit from "../";
 import { wait } from "../utils/wait";
-import { testRedisAdapters } from "./_utils";
 export class StreamExample extends Spawnkit.Instance {
   startStream(someData: { count: number }) {
 
@@ -35,7 +34,7 @@ export class StreamExample extends Spawnkit.Instance {
 
 describe("Stream", () => {
   const client = Spawnkit.Client.from({
-    adapter: testRedisAdapters,
+    adapter: new Spawnkit.Adapters.InMemoryAdapter(),
     instances: {
       StreamExample,
     },

@@ -2,7 +2,7 @@ import * as x from "xstate";
 import { ControlledPromise } from "@/utils/ControlledPromise";
 import { InstancePlugin } from "../InstancePlugin";
 import { Volume } from '../volume';
-import { MockVolume } from '../volume/LocalVolume';
+import { LocalVolume } from '../volume/LocalVolume';
 import { AsyncQueue } from "@/utils/AsyncQueue";
 
 type MachineEvent<M extends x.AnyStateMachine> = Parameters<
@@ -75,7 +75,7 @@ export class Actor<StateMachine extends x.AnyStateMachine = x.AnyStateMachine> e
 		this.config = config;
 
 
-		this.volume = new MockVolume({
+		this.volume = new LocalVolume({
 			name: 'xstate/' + this.getActorName()
 		});
 	}

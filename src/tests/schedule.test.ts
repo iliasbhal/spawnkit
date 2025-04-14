@@ -1,7 +1,6 @@
 import * as Spawnkit from "../";
 import { wait } from "../utils/wait";
-import { testRedisAdapters } from "./_utils";
-import { v4 as uuidv4 } from 'uuid';
+import { nanoid } from 'nanoid';
 
 describe("Schedule", () => {
   const helloStub = jest.fn();
@@ -35,7 +34,7 @@ describe("Schedule", () => {
   }
 
   const client = Spawnkit.Client.from({
-    adapter: testRedisAdapters,
+    adapter: new Spawnkit.Adapters.InMemoryAdapter(),
     instances: {
       ScheduleExample,
     },
@@ -49,7 +48,7 @@ describe("Schedule", () => {
   });
 
   it("from client: can schedule method call (delay)", async () => {
-    const inst = client.spawn("ScheduleExample", "1");
+    const inst = client.spawn("ScheduleExample", nanoid());
     const scheduleId = await inst.schedule({ delay: 300 }).hello();
 
     expect(helloStub).toHaveBeenCalledTimes(0);
@@ -67,7 +66,7 @@ describe("Schedule", () => {
   });
 
   it("from client: can cancel schedule method call (delay)", async () => {
-    const inst = client.spawn("ScheduleExample", "1");
+    const inst = client.spawn("ScheduleExample", nanoid());
     const scheduleId = await inst.schedule({ delay: 300 }).hello()
 
     expect(helloStub).toHaveBeenCalledTimes(0);
@@ -93,7 +92,7 @@ describe("Schedule", () => {
   it.todo("from client: can cancel schedule method call (cron)");
 
   it("from client: can list all scheduled method call", async () => {
-    const inst = client.spawn("ScheduleExample", uuidv4());
+    const inst = client.spawn("ScheduleExample", nanoid());
     const scheduleId = await inst.schedule({ delay: 300 }).hello()
     const scheduleId2 = await inst.schedule({ delay: 300 }).hello()
     const scheduleId3 = await inst.schedule({ delay: 300 }).hello()
@@ -119,7 +118,7 @@ describe("Schedule", () => {
   });
 
   it('stores error in scheduled method call', async () => {
-    const inst = client.spawn("ScheduleExample", uuidv4());
+    const inst = client.spawn("ScheduleExample", nanoid());
     const scheduleId = await inst.schedule({ delay: 300 }).createError("test error")
     await expect(inst.scheduled.runs(scheduleId)).resolves.toHaveLength(0);
 
@@ -133,11 +132,11 @@ describe("Schedule", () => {
   })
 
   it('stores response in scheduled method call', async () => {
-    const inst = client.spawn("ScheduleExample", uuidv4());
+    const inst = client.spawn("ScheduleExample", nanoid());
     const scheduleId = await inst.schedule({ delay: 300 }).hello()
     await expect(inst.scheduled.runs(scheduleId)).resolves.toHaveLength(0);
 
-    await wait(400);
+    await wait(1000);
 
     const runData = await inst.scheduled.runs(scheduleId);
     expect(runData).toHaveLength(1);
@@ -145,7 +144,7 @@ describe("Schedule", () => {
   });
 
   it('stores streamed response in scheduled method call', async () => {
-    const inst = client.spawn("ScheduleExample", uuidv4());
+    const inst = client.spawn("ScheduleExample", nanoid());
     const scheduleId = await inst.schedule({ delay: 300 }).stream()
     await expect(inst.scheduled.runs(scheduleId)).resolves.toHaveLength(0);
 
@@ -158,7 +157,7 @@ describe("Schedule", () => {
   })
 
   it("can ensure that a scheduled method is only scheduled once", async () => {
-    const inst = client.spawn("ScheduleExample", uuidv4());
+    const inst = client.spawn("ScheduleExample", nanoid());
     const scheduleId = await inst.schedule({ id: 'test', delay: 300 }).doSomething('1');
     const scheduleId2 = await inst.schedule({ id: 'test', delay: 300 }).doSomething('1');
 
@@ -172,7 +171,7 @@ describe("Schedule", () => {
   });
 
   it('can check if an event is scheduled', async () => {
-    const inst = client.spawn("ScheduleExample", uuidv4());
+    const inst = client.spawn("ScheduleExample", nanoid());
     const scheduled = await inst.scheduled.get('test');
     expect(scheduled).toBe(null);
 
@@ -196,7 +195,7 @@ describe("Schedule", () => {
   })
 
   it("should override scheduled event using same id but different config", async () => {
-    const inst = client.spawn("ScheduleExample", uuidv4());
+    const inst = client.spawn("ScheduleExample", nanoid());
     await inst.schedule({ id: 'test', delay: 700 }).doSomething('1');
     const scheduled1 = await inst.scheduled.get('test');
     expect(scheduled1).toMatchObject({
@@ -233,7 +232,7 @@ describe("Schedule", () => {
   });
 
   it('can schedule an event for later without providing an id', async () => {
-    const inst = client.spawn("ScheduleExample", uuidv4());
+    const inst = client.spawn("ScheduleExample", nanoid());
     const scheduleId = await inst.schedule({ delay: 300 }).hello();
     const scheduleId2 = await inst.schedule({ delay: 300 }).hello();
 
@@ -244,8 +243,8 @@ describe("Schedule", () => {
 
   it('can schedule an event with the same id on different instances', async () => {
     // schedule Ids should be unique per instance, not globally
-    const inst = client.spawn("ScheduleExample", uuidv4());
-    const inst2 = client.spawn("ScheduleExample", uuidv4());
+    const inst = client.spawn("ScheduleExample", nanoid());
+    const inst2 = client.spawn("ScheduleExample", nanoid());
     const scheduleId = await inst.schedule({ id: 'test', delay: 300 }).doSomething('1');
     const scheduleId2 = await inst2.schedule({ id: 'test', delay: 300 }).doSomething('2');
     inst.scheduled.cancel(scheduleId);

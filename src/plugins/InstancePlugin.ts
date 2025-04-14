@@ -15,27 +15,33 @@ export class InstancePlugin {
 
   setup() { }
 
-  static findPlugins(): InstancePlugin[] {
-    return [];
-    const instance = this as any as Instance;
-    const recursiveFindPlugins = (root: any, acc: InstancePlugin[] = []) => {
+  static findPlugins(instance: Instance): InstancePlugin[] {
+    const plugins = []
+
+    const recursiveFindPlugins = (root: any) => {
       return Object.keys(root).flatMap(key => {
         const plugin = root[key];
         const isPlugin = plugin instanceof InstancePlugin;
         if (!isPlugin) return [];
 
-        const isSetup = !!plugin.instance;
-        if (!isSetup) {
-          plugin.inject(instance);
-          plugin.setup();
-        }
+        InstancePlugin.ensurePluginSetup(plugin, instance);
 
-        acc.push(plugin);
-        return recursiveFindPlugins(plugin, acc);
+        recursiveFindPlugins(plugin);
+        plugins.push(plugin);
+        return
       })
     }
 
-    return recursiveFindPlugins(this);
+    recursiveFindPlugins(instance);
+    return plugins;
+
+  }
+
+  static ensurePluginSetup(plugin: InstancePlugin, instance: Instance) {
+    if (plugin.instance) return;
+
+    plugin.inject(instance);
+    plugin.setup();
   }
 
 

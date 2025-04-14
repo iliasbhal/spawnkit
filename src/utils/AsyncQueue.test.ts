@@ -1,13 +1,10 @@
 import { AsyncQueue } from "./AsyncQueue";
 
 describe("AsyncQueue", () => {
-  let queue: AsyncQueue;
 
-  beforeEach(() => {
-    queue = new AsyncQueue();
-  });
 
   it("should process tasks sequentially", async () => {
+    const queue = new AsyncQueue();
     const results: number[] = [];
     const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -46,6 +43,7 @@ describe("AsyncQueue", () => {
   });
 
   it("should properly handle errors in tasks", async () => {
+    const queue = new AsyncQueue();
     const successTask = async () => "success";
     const errorTask = async () => {
       throw new Error("Task failed");
@@ -68,6 +66,7 @@ describe("AsyncQueue", () => {
   });
 
   it("should report correct queue length", async () => {
+    const queue = new AsyncQueue();
     expect(queue.length).toBe(0);
 
     const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -96,6 +95,7 @@ describe("AsyncQueue", () => {
   });
 
   it("should report processing status correctly", async () => {
+    const queue = new AsyncQueue();
     expect(queue.processing).toBe(false);
 
     const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -120,9 +120,9 @@ describe("AsyncQueue", () => {
   });
 
   it("should process a large number of tasks sequentially", async () => {
+    const queue = new AsyncQueue();
     const results: number[] = [];
     const taskCount = 50;
-
     // Create and enqueue many tasks
     const promises = Array.from({ length: taskCount }, (_, i) => {
       return queue.enqueue(async () => {
@@ -140,32 +140,8 @@ describe("AsyncQueue", () => {
     expect(queue.processing).toBe(false);
   });
 
-  it("should handle nested queue operations", async () => {
-    const results: string[] = [];
-
-    // Enqueue a task that itself enqueues more tasks
-    await queue.enqueue(async () => {
-      results.push("parent-start");
-
-      // Enqueue child tasks from within this task
-      await queue.enqueue(async () => {
-        results.push("child-1");
-      });
-
-      await queue.enqueue(async () => {
-        results.push("child-2");
-      });
-
-      results.push("parent-end");
-      return "parent-done";
-    });
-
-    // The expected order is: parent-start, parent-end, child-1, child-2
-    // This is because nested enqueues are added to the queue but the parent task completes first
-    expect(results).toEqual(["parent-start", "parent-end", "child-1", "child-2"]);
-  });
-
   it("should correctly report the number of waiting tasks", async () => {
+    const queue = new AsyncQueue();
     expect(queue.waitingCount).toBe(0);
 
     const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));

@@ -9,11 +9,10 @@ import {
 import { ControlledPromise } from "../utils/ControlledPromise";
 
 import { nanoid } from "nanoid";
-import { testRedisAdapters } from "./_utils";
 
 describe.only("Base", () => {
 	const client = Spawnkit.Client.from({
-		adapter: testRedisAdapters,
+		adapter: new Spawnkit.Adapters.InMemoryAdapter(),
 		instances: {
 			BadExample,
 			OrderBook,

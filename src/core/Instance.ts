@@ -22,28 +22,7 @@ export class Instance<
 		InstanceChannels: InstanceChannels;
 	};
 
-	findPlugins(): InstancePlugin[] {
-		const instance = this as any as Instance;
-		const recursiveFindPlugins = (root: any, acc: InstancePlugin[] = []) => {
-			// console.log('findPlugins', root);
-			return Object.keys(root).flatMap(key => {
-				const plugin = root[key];
-				const isPlugin = plugin instanceof InstancePlugin;
-				if (!isPlugin) return [];
 
-				const isSetup = !!plugin.instance;
-				if (!isSetup) {
-					plugin.inject(instance);
-					plugin.setup();
-				}
-
-				acc.push(plugin);
-				return recursiveFindPlugins(plugin, acc);
-			})
-		}
-
-		return recursiveFindPlugins(this);
-	}
 
 	signal(signal: Prettify<InstanceLog>) {
 		signal;

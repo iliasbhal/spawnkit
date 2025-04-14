@@ -12,6 +12,7 @@ export interface InternalInstanceData {
 /** These methods can be called from client */
 export class InstanceUtils<Proxy extends InstanceProxy<any>> {
   private proxy: Proxy;
+  context: any
 
   constructor(proxy: Proxy) {
     this.proxy = proxy;
@@ -38,7 +39,7 @@ export class InstanceUtils<Proxy extends InstanceProxy<any>> {
     return await this.proxy.data.set('last_initialized', timestamp);
   }
 
-  static ensureInstanceIsValid(instance: Instance) {
+  ensureInstanceIsValid() {
     const baseInst = new Instance();
 
     console.log('Object.keys(baseInst)', Object.keys(baseInst));
