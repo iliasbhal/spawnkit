@@ -354,23 +354,27 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 				);
 
 				const eventMessages = events
-					.sort((a, b) => a.order - b.order)
-					.map((a) => a.message);
+					.flatMap(event => {
+						if (previousEventsIds.has(event.message.id)) return [];
+						// Reset & update the list of processed events
+						// So that we don't reprocess them when we fetch the next batch
+						previousEventsIds.add(event.message.id);
+						return [event];
+					})
+					.sort((a, b) => {
+						const originA = a.message.meta.origin;
+						const originB = b.message.meta.origin;
 
+						return originA.localeCompare(originB)
+							|| a.order - b.order;
+					})
 
 				if (eventMessages.length) {
 					eventMessages.forEach((event) => {
 						if (abortCtl.signal.aborted) return;
-						if (previousEventsIds.has(event.id)) return;
-						callback(event as any);
+						callback(event.message);
 					});
 				}
-
-				// Reset & update the list of processed events
-				// So that we don't reprocess them when we fetch the next batch
-				eventMessages.forEach((event) => {
-					previousEventsIds.add(event.id);
-				});
 
 				const isEmptyRun = previousEventsIds.size === 0;
 				if (isEmptyRun) backoff.reset();

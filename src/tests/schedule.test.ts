@@ -1,3 +1,4 @@
+import { waitUntilOK } from "@/adapters/generateTestSuite";
 import * as Spawnkit from "../";
 import { wait } from "../utils/wait";
 import { nanoid } from 'nanoid';
@@ -58,11 +59,11 @@ describe("Schedule", () => {
 
     expect(helloStub).toHaveBeenCalledTimes(0);
 
-    await wait(1000);
-
-    const runs2 = await inst.scheduled.runs(scheduleId)
-    expect(runs2).toHaveLength(1);
-    expect(helloStub).toHaveBeenCalledTimes(1);
+    await waitUntilOK(async () => {
+      const runs2 = await inst.scheduled.runs(scheduleId)
+      expect(runs2).toHaveLength(1);
+      expect(helloStub).toHaveBeenCalledTimes(1);
+    })
   });
 
   it("from client: can cancel schedule method call (delay)", async () => {
@@ -80,11 +81,11 @@ describe("Schedule", () => {
 
     await inst.scheduled.cancel(scheduleId);
 
-    await wait(1000);
-
-    expect(helloStub).toHaveBeenCalledTimes(0);
-    const runs2 = await inst.scheduled.runs(scheduleId)
-    expect(runs2).toHaveLength(0);
+    await waitUntilOK(async () => {
+      expect(helloStub).toHaveBeenCalledTimes(0);
+      const runs2 = await inst.scheduled.runs(scheduleId)
+      expect(runs2).toHaveLength(0);
+    });
   });
 
 

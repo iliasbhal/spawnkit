@@ -12,6 +12,8 @@
 
 # Spawnkit lib
 
+- TODO: message ordering from same client same timestamp. (same timestamp order + order within timstamp)
+
 - Add ability to list using some queries. ( first X, lastX, between2 dates );
 
 - Move instance validation within .spawn.

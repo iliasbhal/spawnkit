@@ -22,7 +22,7 @@ export const generateTestSuite = (name: string, createadapter: () => () => Promi
 				const ownerId = nanoid();
 
 				const results = await Promise.all(
-					Array.from({ length: 100 }).map(async () => {
+					Array.from({ length: 1000 }).map(async () => {
 						const jitter = Math.random() * 1000;
 						return wait(jitter).then(() => lock.acquire("lock-concurent", ownerId, 1000));
 					}),
@@ -202,7 +202,7 @@ export const generateTestSuite = (name: string, createadapter: () => () => Promi
 				sub.unsubscribe();
 			});
 
-			it("should emit and receive events in same order", async () => {
+			it.only("should emit and receive events in same order", async () => {
 				// TODO: test with same client send multiple messages in same timestamp
 				// and check if they are received in order
 				const adapters = await getAdapters();
@@ -211,16 +211,20 @@ export const generateTestSuite = (name: string, createadapter: () => () => Promi
 				const callback = jest.fn();
 				const sub = adapters.messages.subscribe(streamId.instance, streamId.channel, callback);
 
-				await Promise.all([
-					adapters.messages.publish(streamId.instance, streamId.channel, { order: 1 }),
-					adapters.messages.publish(streamId.instance, streamId.channel, { order: 2 }),
-					adapters.messages.publish(streamId.instance, streamId.channel, { order: 3 }),
-				])
+				for (let i = 0; i < 30; i++) {
+					await Promise.all([
+						adapters.messages.publish(streamId.instance, streamId.channel, { order: 1 }),
+						adapters.messages.publish(streamId.instance, streamId.channel, { order: 2 }),
+						adapters.messages.publish(streamId.instance, streamId.channel, { order: 3 }),
+					])
 
-				await wait(100);
+					await wait(100);
 
-				const order = callback.mock.calls.map(c => c[0].data.order)
-				expect(order).toEqual([1, 2, 3]);
+					const order = callback.mock.calls.map(c => c[0].data.order)
+					expect(order).toEqual([1, 2, 3]);
+					callback.mockClear();
+				}
+
 
 				sub.unsubscribe()
 			});
@@ -280,9 +284,13 @@ export const generateTestSuite = (name: string, createadapter: () => () => Promi
 		});
 
 		describe("Events", () => {
-			it.todo('can schedule an event for later without providing an id');
-			it.todo('can schedule an event for later with provided id');
+			it.todo('can schedule a delayed event for later without providing an id');
+			it.todo('can schedule a delayed event for later with provided id');
 			it.todo('can cancel a delayed event');
+
+			it.todo('can schedule a reccuring event for later without provided id');
+			it.todo('can schedule a reccuring event for later with provided id');
+			it.todo('can cancel a reccuring event');
 		})
 
 	});
