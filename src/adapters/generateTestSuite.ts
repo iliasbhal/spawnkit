@@ -202,7 +202,7 @@ export const generateTestSuite = (name: string, createadapter: () => () => Promi
 				sub.unsubscribe();
 			});
 
-			it.only("should emit and receive events in same order", async () => {
+			it("should emit and receive events in same order", async () => {
 				// TODO: test with same client send multiple messages in same timestamp
 				// and check if they are received in order
 				const adapters = await getAdapters();
