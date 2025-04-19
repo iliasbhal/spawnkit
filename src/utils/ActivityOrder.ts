@@ -9,12 +9,16 @@ export class ActivityOrder {
     Promise.resolve().then(async () => {
       for (let i = order; i < this.promiseByOrder.length; i++) {
         const eventPromise = this.promiseByOrder[i];
-        const prevEventPromise = this.promiseByOrder[i - 1];
+        if (!eventPromise) return;
 
-        const isInOrder = i === 0 || prevEventPromise.fulfilled;
+        const isAlreadyFulfilled = eventPromise?.fulfilled;
+        if (isAlreadyFulfilled) return;
+
+        const prevEventPromise = this.promiseByOrder[i - 1];
+        const isInOrder = i === 0 || prevEventPromise?.fulfilled;
         if (!isInOrder) return;
 
-        eventPromise?.resolve(i);
+        eventPromise.resolve(i);
       }
     });
 
@@ -23,14 +27,11 @@ export class ActivityOrder {
 
   ensureOrderFilled(order: number) {
     const eventPromise = this.promiseByOrder[order];
-    if (eventPromise) return eventPromise;
-
-    for (let i = this.promiseByOrder.length; i <= order; i++) {
-      const eventPromise = new ControlledPromise<number>();
-      this.promiseByOrder[i] = eventPromise;
+    if (eventPromise) {
+      throw new Error('Order already filled');
     }
 
-
+    this.promiseByOrder[order] = new ControlledPromise<number>();
     return this.promiseByOrder[order];
   }
 }
