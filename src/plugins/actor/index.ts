@@ -76,7 +76,7 @@ export class Actor<StateMachine extends x.AnyStateMachine = x.AnyStateMachine> e
 
 
 		this.volume = new LocalVolume({
-			name: 'xstate/' + this.getActorName()
+			path: './xstate/' + this.getActorName()
 		});
 	}
 

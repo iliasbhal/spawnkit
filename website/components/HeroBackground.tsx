@@ -102,18 +102,25 @@ const BackgroundBox = React.memo((props: { size: number, isActive: boolean }) =>
 	const SIZE = props.size - (2 *GAP);
 
 	return (
-		<div
-			className={`flex items-center justify-center shadow-xl border rounded-md transition-all ease-out duration-500 ${props.isActive ? 'active' : ''}`}
+		<div 
+			className="flex items-center justify-center relative"
 			style={{
 				width: SIZE,
 				height: SIZE,
 				margin: GAP,
 				opacity: props.isActive ? 0.5 : 0.2,
-				transform: `rotate(${props.isActive ? 90 : 0}deg)`,
-				borderWidth: 1,
-				borderColor: props.isActive ? ACTIVE_COLOR : BASE_COLOR,
 			}}
 		>
+			<div
+				className={`absolute shadow-xl border rounded-md transition-all ease-out duration-500 ${props.isActive ? 'active' : ''}`}
+				style={{
+					width: '100%',
+					height: '100%',
+					transform: `rotate(${props.isActive ? 90 : 0}deg)`,
+					borderWidth: 1,
+					borderColor: props.isActive ? ACTIVE_COLOR : BASE_COLOR,
+				}}
+			/>
 			<svg 
 				xmlns="http://www.w3.org/2000/svg" 
 				strokeWidth="10px"
@@ -122,7 +129,6 @@ const BackgroundBox = React.memo((props: { size: number, isActive: boolean }) =>
 				style={{
 					fill: ACTIVE_COLOR,
 					fillOpacity: props.isActive ? 0.2 : 0,
-					transform: `rotate(${props.isActive ? -90 : 0}deg)`,
 					stroke: props.isActive ? ACTIVE_COLOR : BASE_COLOR,
 				}}
 				width={SIZE / 2} 

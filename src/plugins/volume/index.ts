@@ -1,10 +1,11 @@
-import { InstancePlugin } from '../InstancePlugin'
 import path from 'path'
 import fs from 'fs-extra'
 import { VolumeFileSystem } from './VolumeFileSystem';
+import { InstancePlugin } from '../InstancePlugin'
 
 export interface VolumeConfig {
-  name: string;
+  path?: string;
+  lazy?: boolean;
 }
 
 // Define a type for the fs interface
@@ -29,11 +30,36 @@ export class Volume extends InstancePlugin {
    * Get the fs-extra interface with paths relative to the volume root
    */
   get fs(): FsInterface {
-    return this.fileSystem.fs;
+    const handler = {
+      get: (target: FsInterface, prop: keyof FsInterface) => {
+        if (prop === 'constants') {
+          return target[prop];
+        }
+        if (typeof target[prop] === 'function') {
+          return async (...args: any[]) => {
+            await this.ensureDownloaded();
+            return target[prop]!(...args);
+          };
+        }
+        return target[prop];
+      }
+    };
+    return new Proxy(this.fileSystem.fs, handler);
+  }
+
+  private ensureDownloadedPromise: Promise<void> | null = null;
+  public async ensureDownloaded() {
+    if (!this.ensureDownloadedPromise) {
+      this.ensureDownloadedPromise = this.download();
+    }
+
+    return await this.ensureDownloadedPromise;
   }
 
   async getInstancePath() {
-    const volumePath = `${this.instance.kind}:${this.instance.id}/volumes/${this.config.name}`;
+    const instancePath = `${this.instance.kind}:${this.instance.id}`;
+    const pluginPath = this.config.path || 'default';
+    const volumePath = path.resolve(instancePath, 'volumes', pluginPath);
     return volumePath;
   }
 
@@ -50,7 +76,7 @@ export class Volume extends InstancePlugin {
 
     this.instance.hooks.initialize.push(async () => {
       try {
-        await this.download();
+        await this.ensureDownloaded();
       } catch (error) {
         await this.cleanup();
         throw error;

@@ -80,7 +80,7 @@ const features = [
 export default function HomePage() {
 	return (
 		<main className="h-min mx-auto overflow-x-hidden">
-				<div className="md:w-10/12 my-20 mx-auto font-geist relative  rounded-none -pr-2">
+			<div className="md:w-10/12 max-w-[1200px] my-20 mx-auto font-geist relative  rounded-none -pr-2">
 			<div className="w-full md:mx-0">
 			<div className="relative col-span-3 border-yellow-200/20 border-[0.1px] h-full">
 					<div className="w-full h-full">

@@ -1,10 +1,6 @@
 import path from 'path'
 import fs from 'fs-extra'
 
-export interface VolumeConfig {
-  name: string;
-}
-
 // Define a type for the fs interface
 type FsInterface = {
   [K in keyof typeof fs]: K extends 'constants'

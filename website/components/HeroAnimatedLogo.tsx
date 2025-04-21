@@ -8,8 +8,8 @@ export const AnimatedHeroLogo = () => {
 		<div 
 			className="relative w-20 h-6"
 			style={{
-				width: 449 * 1.3,
-				height: 114 * 1.3,
+				width: 449 * 1,
+				height: 114 * 1,
 			}}
 		>
 			<div className={`w-full h-full relative `}>

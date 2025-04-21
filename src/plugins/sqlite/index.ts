@@ -1,4 +1,4 @@
-import * as SQLite3 from 'sqlite3'
+import SQLite3 from 'better-sqlite3'
 import path from 'path';
 import { InstancePlugin } from '../InstancePlugin'
 import { Volume } from '../volume';
@@ -6,7 +6,7 @@ import { AsyncQueue } from '../../utils/AsyncQueue';
 
 interface SQLiteConfig {
   volume?: Volume;
-  inMemoryPersistence?: boolean;
+  initialize?: (db: SQLite3.Database) => Promise<void> | void;
 }
 
 const IN_MEMORY_DB_PATH = ":memory:";
@@ -25,38 +25,7 @@ export class SQLite extends InstancePlugin {
   }
 
   async setup() {
-    const isInMemory = await this.isInMemory();
-    if (isInMemory) {
-      this.setupInMemory();
-      return;
-    }
-
-    this.setupPersistent();
-  }
-
-  private setupInMemory() {
-    // console.log('setupInMemory')
-    this.hooks.initialize.push(async () => {
-      // console.log('sqlite before started')
-      await this.startSqliteDatabase();
-      // console.log('sqlite started')
-    });
-
-    this.hooks.dispose.push(async () => {
-      await this.db.close();
-    });
-
-    // console.log('setupInMemory done')
-  }
-
-  private setupPersistent() {
-    this.volume.hooks.initialize.push(async () => {
-      await this.startSqliteDatabase();
-    });
-
-    // Ensure the db is closed when the instance is disposed
-    // So that the volume is uploaded with a clean state
-    this.volume.hooks.dispose.unshift(async () => {
+    this.volume?.hooks.dispose.unshift(async () => {
       await this.db.close();
     });
   }
@@ -77,16 +46,49 @@ export class SQLite extends InstancePlugin {
     };
   }
 
-  async query(strings: TemplateStringsArray, ...values: any[]) {
-    const parsed = this.parseQuery(strings, ...values);
-
-    const result = await this.db.exec(parsed.sqlQuery);
-    if (parsed.isWrite) {
-      this.syncVolume();
+  private ensureInitializedPromise: () => Promise<void> | null = null;
+  private async ensureDatabaseInitialized() {
+    if (!this.ensureInitializedPromise) {
+      this.ensureInitializedPromise = async () => {
+        await this.volume?.ensureDownloaded();
+        await this.startSqliteDatabase()
+      }
     }
-    return result;
+
+    return await this.ensureInitializedPromise();
   }
 
+  withInit<T extends keyof SQLite3.Database>(attribute: T): SQLite3.Database[T] {
+    if (typeof this.db?.[attribute] === 'function') {
+      return async (...args: any[]) => {
+        await this.ensureDatabaseInitialized();
+        return this.db?.[attribute](...args);
+      }
+    }
+
+    return this.db?.[attribute];
+  }
+
+  get client() { return this.db }
+
+  get aggregate() { return this.withInit('aggregate') }
+  get backup() { return this.withInit('backup') }
+  get close() { return this.withInit('close') }
+  get defaultSafeIntegers() { return this.withInit('defaultSafeIntegers') }
+  get exec() { return this.withInit('exec') }
+  get function() { return this.withInit('function') }
+  get inTransaction() { return this.withInit('inTransaction') }
+  get loadExtension() { return this.withInit('loadExtension') }
+  get memory() { return this.withInit('memory') }
+  get name() { return this.withInit('name') }
+  get open() { return this.withInit('open') }
+  get pragma() { return this.withInit('pragma') }
+  get prepare() { return this.withInit('prepare') }
+  get readonly() { return this.withInit('readonly') }
+  get serialize() { return this.withInit('serialize') }
+  get table() { return this.withInit('table') }
+  get transaction() { return this.withInit('transaction') }
+  get unsafeMode() { return this.withInit('unsafeMode') }
 
   private syncQueue: AsyncQueue = new AsyncQueue();
 
@@ -94,7 +96,7 @@ export class SQLite extends InstancePlugin {
    * This will sync the volume 
    * and keeps the instance awake while it's uploading
    */
-  private async syncVolume() {
+  async persist() {
     const willAlreadySync = this.syncQueue.waitingCount >= 1;
     if (willAlreadySync) {
       return;
@@ -130,18 +132,11 @@ export class SQLite extends InstancePlugin {
   }
 
   private async startSqliteDatabase() {
-    // console.log('startSqliteDatabase')
-    this.db = await new Promise(async (resolve, reject) => {
-      const mode = SQLite3.OPEN_READWRITE | SQLite3.OPEN_CREATE;
-      const dbPath = await this.getSQLitePath();
-      const db = new SQLite3.Database(dbPath, mode, (err) => {
-        // console.log('DONE OPENING DB', err);
-        if (err) {
-          reject(err);
-        } else {
-          resolve(db);
-        }
-      });
+    const dbPath = await this.getSQLitePath();
+    this.db = new SQLite3(dbPath, {
+      fileMustExist: true,
     });
+
+    await this.config.initialize?.(this.db);
   }
 }

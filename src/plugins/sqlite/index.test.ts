@@ -1,28 +1,41 @@
 import * as Spawnkit from "../../../src";
-import { SQLite } from ".";
 import { nanoid } from 'nanoid';
 
 export class SQLiteExample extends Spawnkit.Instance {
-
-  sqlite = new SQLite({
-    // volume: 
-    // name: 'test',
+  volume = new Spawnkit.Plugins.Volume({
+    path: '/test',
+    lazy: true,
   });
 
-  async query(name: string, content: string) {
-    this.sqlite.query`
-      CREATE TABLE IF NOT EXISTS ${name} (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        content TEXT
-      );
-    `;
+  sqlite = new Spawnkit.Plugins.SQLite({
+    // volume: this.volume,
+    initialize: async (db) => {
+      await db.pragma('journal_mode = WAL');
+    }
+  });
 
-    this.sqlite.query`
-      INSERT INTO ${name} (content) VALUES ("${content}")
-    `;
-
-    return 'DONE'
+  async sql(strings: TemplateStringsArray, ...values: any[]) {
+    const parsed = this.parseQuery(strings, ...values);
+    return this.sqlite.prepare(parsed.sqlQuery);
   }
+
+
+  private parseQuery(strings: TemplateStringsArray, ...values: any[]) {
+    let query = strings[0];
+    for (let i = 0; i < values.length; i++) {
+      const value = values[i];
+      query += value + strings[i + 1];
+    }
+
+    const sqlQuery = query.trim();
+    const isRead = sqlQuery.toUpperCase().startsWith('SELECT');
+    return {
+      sqlQuery,
+      isRead,
+      isWrite: !isRead,
+    };
+  }
+
 }
 
 const client = Spawnkit.Client.from({
@@ -36,18 +49,26 @@ const client = Spawnkit.Client.from({
 describe.skip('SQLiteExample', () => {
   client.start();
 
-  it('should be able to download and upload', async () => {
+  it('should be able to run queries against the database', async () => {
+    const remoteSqlite = client.spawn('SQLiteExample', nanoid());
+
+    const result = await remoteSqlite.sql`
+      CREATE TABLE tasks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        content TEXT
+      );
+    `;
+
+
+  });
+
+  it('should only download the database when the first query is made', async () => {
     const remoteSqlite = client.spawn('SQLiteExample', nanoid());
 
     const taskId = nanoid();
 
-    // remoteSqlite.schedule({
-    //   name: 'test',
-    //   cron: '*/1 * * * *',
-    // })
-
     const result = await remoteSqlite.query('task', taskId);
 
-    // console.log('done')
-  });
+    console.log('done')
+  })
 });
