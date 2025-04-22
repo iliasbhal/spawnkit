@@ -1,4 +1,5 @@
 import { ControlledPromise } from './ControlledPromise'
+import { MapExpire } from './MapExpire';
 
 export class ActivityOrder {
   private promiseByOrder: ControlledPromise<number>[] = [];
@@ -7,7 +8,7 @@ export class ActivityOrder {
     const eventPromise = this.ensureOrderFilled(order);
 
     return new Promise((resolve) => {
-      eventPromise.await.then(resolve)
+      eventPromise.await.then(resolve);
       this.fulfillCorrectlyOrdered(order)
     })
   }
@@ -34,5 +35,45 @@ export class ActivityOrder {
     this.promiseByOrder[order] = new ControlledPromise<number>();
     return this.promiseByOrder[order];
   }
+
+  static activityOrderByOriginAndTimestamp = new MapExpire<string, ActivityOrder>({ defaultExpiryMs: 5000 })
+  static getOrCreateActivityOrder(origin: string, timestamp: number) {
+    const eventKey = `${origin}:${timestamp}`;
+
+    const alreadyExisting = ActivityOrder.activityOrderByOriginAndTimestamp.get(eventKey);
+    if (alreadyExisting) {
+      return alreadyExisting;
+    }
+
+    const orderData = new ActivityOrder();
+    ActivityOrder.activityOrderByOriginAndTimestamp.set(eventKey, orderData);
+    return orderData;
+  }
 }
+
+export class ActivityOrderFactory {
+  private accumulator = {
+    timestamp: Date.now(),
+    order: 0,
+  };
+
+  getOrderedMetadata = (): { timestamp: number; order: number } => {
+    const timestamp = Date.now();
+
+    const timestampChanged = this.accumulator.timestamp !== timestamp;
+    if (timestampChanged) {
+      this.accumulator = {
+        timestamp,
+        order: 0,
+      };
+    } else {
+      this.accumulator.order++;
+    }
+
+    return {
+      ...this.accumulator,
+    };
+  }
+}
+
 

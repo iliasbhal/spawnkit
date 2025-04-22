@@ -12,19 +12,20 @@ describe("Redis Adapter", () => {
 });
 
 function createAdapterFactory() {
-	const redisServer = new RedisMemoryServer();
 
-	const adapters = Promise.resolve().then(async () => {
+	const waitForRedisClient = Promise.resolve().then(async () => {
+		const redisServer = new RedisMemoryServer();
 		const redisClient = new Redis({
 			host: await redisServer.getHost(),
 			port: await redisServer.getPort(),
 		});
 
-		const adapter = new Spawnkit.Adapters.RedisAdapter(redisClient);
-		return adapter;
+		return redisClient;
 	});
 
 	return async () => {
-		return await adapters;
+		const redisClient = await waitForRedisClient;
+		const adapter = new Spawnkit.Adapters.RedisAdapter(redisClient);
+		return adapter;
 	};
 }

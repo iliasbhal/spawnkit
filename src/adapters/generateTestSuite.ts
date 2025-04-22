@@ -191,14 +191,15 @@ export const generateTestSuite = (name: string, createadapter: () => () => Promi
 					test: 4,
 				});
 
-				await wait(1000);
+				await waitUntilOK(() => {
+					expect(callback).toHaveBeenCalled();
+					expect(callback).toHaveBeenCalledTimes(4);
+					expect(callback).toHaveBeenCalledWith(expect.objectContaining({ data: { test: 1 } }));
+					expect(callback).toHaveBeenCalledWith(expect.objectContaining({ data: { test: 2 } }));
+					expect(callback).toHaveBeenCalledWith(expect.objectContaining({ data: { test: 3 } }));
+					expect(callback).toHaveBeenCalledWith(expect.objectContaining({ data: { test: 4 } }));
+				})
 
-				expect(callback).toHaveBeenCalled();
-				expect(callback).toHaveBeenCalledTimes(4);
-				expect(callback).toHaveBeenCalledWith(expect.objectContaining({ data: { test: 1 } }));
-				expect(callback).toHaveBeenCalledWith(expect.objectContaining({ data: { test: 2 } }));
-				expect(callback).toHaveBeenCalledWith(expect.objectContaining({ data: { test: 3 } }));
-				expect(callback).toHaveBeenCalledWith(expect.objectContaining({ data: { test: 4 } }));
 				sub.unsubscribe();
 			});
 
@@ -212,16 +213,16 @@ export const generateTestSuite = (name: string, createadapter: () => () => Promi
 				const sub = adapters.messages.subscribe(streamId.instance, streamId.channel, callback);
 
 				for (let i = 0; i < 30; i++) {
-					await Promise.all([
-						adapters.messages.publish(streamId.instance, streamId.channel, { order: 1 }),
-						adapters.messages.publish(streamId.instance, streamId.channel, { order: 2 }),
-						adapters.messages.publish(streamId.instance, streamId.channel, { order: 3 }),
-					])
+					const indexOrder = Array.from({ length: 100 }).map((_, i) => i)
+
+					await Promise.all(
+						indexOrder.map((_, i) => adapters.messages.publish(streamId.instance, streamId.channel, { index: i }))
+					)
 
 					await wait(100);
 
-					const order = callback.mock.calls.map(c => c[0].data.order)
-					expect(order).toEqual([1, 2, 3]);
+					const order = callback.mock.calls.map(c => c[0].data.index)
+					expect(order).toEqual(indexOrder);
 					callback.mockClear();
 				}
 
@@ -229,57 +230,85 @@ export const generateTestSuite = (name: string, createadapter: () => () => Promi
 				sub.unsubscribe()
 			});
 
-			it.skip("should emit and receive events in same order from different clients", async () => {
+			it.only("should emit and receive events in same order from different clients", async () => {
 				// TODO: test with different clients sending messages in different timestamp
 				// and check if they are received in order
-				throw new Error("TODO");
-				const adapters = await getAdapters();
-				const adapters2 = await getAdapters();
-				const streamId = createStreamConfig();
+				const client1 = await getAdapters();
+				const client2 = await getAdapters();
 
-				const callback = jest.fn();
-				const sub = adapters.messages.subscribe(streamId.instance, streamId.channel, callback);
+				const streamId = createStreamConfig();
+				const callback1 = jest.fn();
+				const callback2 = jest.fn();
+
+				const subscription1 = client1.messages.subscribe(streamId.instance, streamId.channel, callback1);
+				const subscription2 = client2.messages.subscribe(streamId.instance, streamId.channel, callback2);
 
 				await Promise.all([
-					adapters.messages.publish(streamId.instance, streamId.channel, { order: 1 }),
-					adapters.messages.publish(streamId.instance, streamId.channel, { order: 2 }),
-					adapters2.messages.publish(streamId.instance, streamId.channel, { order: 1 }),
-					adapters2.messages.publish(streamId.instance, streamId.channel, { order: 2 }),
-					adapters.messages.publish(streamId.instance, streamId.channel, { order: 3 }),
-					adapters2.messages.publish(streamId.instance, streamId.channel, { order: 3 }),
+					client1.messages.publish(streamId.instance, streamId.channel, { order: 1 }),
+					client1.messages.publish(streamId.instance, streamId.channel, { order: 2 }),
+					client2.messages.publish(streamId.instance, streamId.channel, { order: 1 }),
+					client2.messages.publish(streamId.instance, streamId.channel, { order: 2 }),
+					client1.messages.publish(streamId.instance, streamId.channel, { order: 3 }),
+					client2.messages.publish(streamId.instance, streamId.channel, { order: 3 }),
 				])
+
+
+				await wait(100);
+
+
+				// const calls1 = callback1.mock.calls.flat().map(e => [e.meta.origin, e.data.order])
+				// const calls2 = callback2.mock.calls.flat().map(e => [e.meta.origin, e.data.order])
+
+				const calls1 = callback1.mock.calls.flat().map(e => e.data.order)
+				const calls2 = callback2.mock.calls.flat().map(e => e.data.order)
+
+				// console.log('callback1.mock.calls', calls1);
+				// console.log('callback2.mock.calls', calls2);
+
+				expect(calls1).toEqual(calls2);
+				expect(calls1).toEqual([1, 2, 3, 1, 2, 3]);
+
+
 			})
 
 			it("should allow for several subscriber to receive events", async () => {
-				const adapters = await getAdapters();
 
 				const streamId = createStreamConfig();
+				const adapters = await getAdapters();
 
-				const subscribers = Array.from({ length: 16 }).map(() => {
-					const callback = jest.fn();
-					const subscription = adapters.messages.subscribe(
-						streamId.instance,
-						streamId.channel,
-						callback,
-					);
-					return {
-						callback,
-						subscription,
-					};
-				});
+				await Promise.all([
+					Array.from({ length: 1000 }).map(async () => {
 
-				await adapters.messages.publish(streamId.instance, streamId.channel, {
-					aaa: true,
-				});
+						const subscribers = Array.from({ length: 16 }).map(() => {
+							const callback = jest.fn();
+							const subscription = adapters.messages.subscribe(
+								streamId.instance,
+								streamId.channel,
+								callback,
+							);
+							return {
+								callback,
+								subscription,
+							};
+						});
 
-				await waitUntilOK(() => {
-					subscribers.forEach(({ callback, subscription }) => {
-						expect(callback).toHaveBeenCalled();
-						expect(callback).toHaveBeenCalledTimes(1);
-						expect(callback).toHaveBeenCalledWith(expect.objectContaining({ data: { aaa: true } }));
-						subscription.unsubscribe();
-					});
-				});
+						await adapters.messages.publish(streamId.instance, streamId.channel, {
+							aaa: true,
+						});
+
+						await waitUntilOK(() => {
+							subscribers.forEach(({ callback }) => {
+								expect(callback).toHaveBeenCalled();
+								expect(callback).toHaveBeenCalledTimes(1);
+								expect(callback).toHaveBeenCalledWith(expect.objectContaining({ data: { aaa: true } }));
+							});
+						});
+
+						subscribers.forEach(({ subscription }) => {
+							subscription.unsubscribe();
+						})
+					})
+				])
 			});
 		});
 

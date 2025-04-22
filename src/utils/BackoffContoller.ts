@@ -12,7 +12,7 @@ enum BACKOFF_STRATEGIES {
 }
 
 export class BackoffController {
-	failAttemptCount = 0;
+	attemptCount = 0;
 	config: Required<BackoffConfig>;
 
 	static LERP = BACKOFF_STRATEGIES.LERP;
@@ -35,15 +35,15 @@ export class BackoffController {
 	}
 
 	reset() {
-		this.failAttemptCount = 0;
+		this.attemptCount = 0;
 	}
 
 	async waitUsingLerp() {
 		const { minWaitTime, maxWaitTime, stepCount } = this.config;
-		const emptyRunCountClamped = Math.min(stepCount, this.failAttemptCount);
+		const emptyRunCountClamped = Math.min(stepCount, this.attemptCount);
 		const ratio = emptyRunCountClamped / maxWaitTime;
 		const waitTimeMs = lerp(minWaitTime, maxWaitTime, ratio);
-		this.failAttemptCount++;
+		this.attemptCount++;
 		await wait(waitTimeMs);
 	}
 

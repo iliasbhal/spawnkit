@@ -4,7 +4,7 @@ import { RedisAdapter, Serde } from "./_base";
 import { BackoffController } from "@/utils/BackoffContoller";
 import { SetExpire } from "@/utils/SetExpire";
 import { MapExpire } from "@/utils/MapExpire";
-import { ActivityOrder } from "@/utils/ActivityOrder";
+import { ActivityOrder, ActivityOrderFactory } from "@/utils/ActivityOrder";
 
 interface Message<DataShape> {
 	id: Adapters.EventId;
@@ -181,14 +181,14 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 		// 1. get the list of clients subscribed to this channel
 		// And delete outdated client that didn't renew their subscription
 		const now = Date.now();
-		const [_, members] = await Promise.all([
+		const [_, originIds] = await Promise.all([
 			this.redis.zremrangebyscore(channel, 0, now - 20_000),
 			this.redis.zrange(channel, 0, now),
 		]);
 
 		// 2. publish to their channel
 		await Promise.all(
-			members.map((originId) => this.publishClientPubSub(originId, channel, message)),
+			originIds.map((originId) => this.publishClientPubSub(originId, channel, message)),
 		);
 	}
 
@@ -257,28 +257,10 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 		return hasUnprocessedEvents;
 	}
 
-	currentOrder = {
-		timestamp: Date.now(),
-		order: 0,
-	};
-
-	private getTimestampAndOrder = (): { timestamp: number; order: number } => {
-		const timestamp = Date.now();
-
-		const timestampChanged = this.currentOrder.timestamp !== timestamp;
-		if (timestampChanged) {
-			this.currentOrder = {
-				timestamp,
-				order: 0,
-			};
-		}
-
-		this.currentOrder.order++;
-		return this.currentOrder;
-	};
+	activityOrderFactory = new ActivityOrderFactory();
 
 	private async publishMQ<EventData>(channel: string, message: Message<EventData>) {
-		const { timestamp, order } = this.getTimestampAndOrder();
+		const { timestamp, order } = this.activityOrderFactory.getOrderedMetadata();
 		const serialized = await Serde.serialize({
 			message,
 			timestamp,
@@ -318,12 +300,11 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 			if (abortCtl.signal.aborted) return;
 			if (previousEventsIds.has(event.message.id)) return;
 			previousEventsIds.add(event.message.id);
-
 			// because of varying network latency
 			// There is no guarantee that the messages will arrive in order
 			// So we need to ensure that the message is in order
 			// before calling the callback
-			const activityOrder = this.getOrCreateActivityOrder(event.message.meta.origin, event.timestamp);
+			const activityOrder = ActivityOrder.getOrCreateActivityOrder(event.message.meta.origin, event.timestamp);
 			await activityOrder.waitForOrder(event.order);
 			callback(event.message);
 		});
@@ -372,10 +353,10 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 						return [event];
 					})
 					.sort((a, b) => {
-						const originA = a.message.meta.origin;
-						const originB = b.message.meta.origin;
+						// const originA = a.message.meta.origin;
+						// const originB = b.message.meta.origin;
 
-						return originA.localeCompare(originB)
+						return a.timestamp - b.timestamp
 							|| a.order - b.order;
 					})
 
@@ -398,20 +379,6 @@ export class MessageBroker extends RedisAdapter implements Adapters.AdapaterMess
 				abortCtl.abort();
 			},
 		};
-	}
-
-	private activityOrderByOriginAndTimestamp = new MapExpire<string, ActivityOrder>({ defaultExpiryMs: 5000 })
-	getOrCreateActivityOrder(origin: string, timestamp: number) {
-		const eventKey = `${origin}:${timestamp}`;
-
-		const alreadyExisting = this.activityOrderByOriginAndTimestamp.get(eventKey);
-		if (alreadyExisting) {
-			return alreadyExisting;
-		}
-
-		const orderData = new ActivityOrder();
-		this.activityOrderByOriginAndTimestamp.set(eventKey, orderData);
-		return orderData;
 	}
 
 	private async getLatestMessagesRaw(channel: string, range: { from: number; to: number }) {
